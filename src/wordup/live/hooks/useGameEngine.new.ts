@@ -339,6 +339,10 @@ export function useGameEngine(props: EngineProps) {
         setOpponentScore((s) => s + opponentCurrentPointsRef.current);
 
         setCurrentRound(next);
+        myChoiceRef.current = null;
+        opponentChoiceRef.current = null;
+        myCurrentPointsRef.current = 0;
+        opponentCurrentPointsRef.current = 0;
         setMyChoice(null);
         setOpponentChoice(null);
         setMyCurrentPoints(0);
@@ -472,6 +476,10 @@ export function useGameEngine(props: EngineProps) {
                 currentRoundRef.current = targetRound;
                 useLiveStore.getState().setCurrentIdx(targetRound);
 
+                myChoiceRef.current = null;
+                opponentChoiceRef.current = null;
+                myCurrentPointsRef.current = 0;
+                opponentCurrentPointsRef.current = 0;
                 setMyChoice(null);
                 setOpponentChoice(null);
                 setMyCurrentPoints(0);
@@ -677,6 +685,7 @@ export function useGameEngine(props: EngineProps) {
         const pts = calcPoints(correct, timeTaken, duration, (currentRoundRef.current + 1) % 7 === 0);
 
         myTimeTakenRef.current = timeTaken;
+        myChoiceRef.current = choice;
         setMyChoice(choice);
         setMyCurrentPoints(pts);
 
@@ -713,6 +722,7 @@ export function useGameEngine(props: EngineProps) {
                 (currentRoundRef.current + 1) % 7 === 0,
             );
             opponentTimeTakenRef.current = br.time_taken;
+            opponentChoiceRef.current = botChoice;
             setOpponentChoice(botChoice);
             setOpponentCurrentPoints(botPts);
         }
@@ -1069,6 +1079,10 @@ export function useGameEngine(props: EngineProps) {
             myScoreRef.current = initialMyScore;
             opponentScoreRef.current = initialOppScore;
 
+            myChoiceRef.current = null;
+            opponentChoiceRef.current = null;
+            myCurrentPointsRef.current = 0;
+            opponentCurrentPointsRef.current = 0;
             setMyCurrentPoints(0);
             setOpponentCurrentPoints(0);
             setMyChoice(null);
