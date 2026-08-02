@@ -559,18 +559,51 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
                   waitingForOpponent={waitingForOpponent}
                   playerSignalLevel={playerSignalLevel}
                   opponentSignalLevel={matchDataFromStore?.is_bot_match ? playerSignalLevel : engine.opponentSignalLevel}
-                  onPause={() => {
+                  onPause={async () => {
                      const state = useLiveStore.getState();
                      if (state.matchId && state.questions && state.questions.length > 0) {
+                        const isP1 = state.role === "player1";
+                        const updatedMatchData = {
+                           ...(state.matchData || matchDataFromStore || {}),
+                           category: state.category || category || "mixed",
+                           is_bot_match: true,
+                           allow_pause: true,
+                           current_question_index: state.currentIdx || 0,
+                           p1_score: isP1 ? (engine.myScore ?? state.matchData?.p1_score ?? 0) : (engine.opponentScore ?? state.matchData?.p1_score ?? 0),
+                           p2_score: isP1 ? (engine.opponentScore ?? state.matchData?.p2_score ?? 0) : (engine.myScore ?? state.matchData?.p2_score ?? 0),
+                           status: "paused",
+                        };
+
                         savePausedGame({
                            matchId: state.matchId,
                            categoryId: state.category || category || "mixed",
                            currentIdx: state.currentIdx || 0,
                            role: state.role,
-                           matchData: state.matchData || matchDataFromStore,
+                           matchData: updatedMatchData,
                            questions: state.questions,
                            pausedAt: Date.now(),
                         });
+
+                        const dbId = cleanBotMatchId(state.matchId);
+                        if (dbId) {
+                           const dbPromise = supabase
+                              .from("wordup_matches")
+                              .update({
+                                 status: "paused",
+                                 current_question_index: state.currentIdx || 0,
+                                 p1_score: updatedMatchData.p1_score,
+                                 p2_score: updatedMatchData.p2_score,
+                              })
+                              .eq("id", dbId);
+
+                           const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 1500));
+                           await Promise.race([dbPromise, timeoutPromise]).catch((err) => {
+                              console.warn("[LiveView] Paused DB save error:", err);
+                           });
+                        }
+
+                        // Brief 300ms visual buffer for transition overlay
+                        await new Promise((resolve) => setTimeout(resolve, 300));
                      }
                      resetGame();
                      onBack?.();

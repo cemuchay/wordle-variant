@@ -1,23 +1,23 @@
-import { useState, useEffect, useRef, Fragment } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import type { TargetAndTransition, Transition } from "framer-motion";
-import { AlertTriangle, Volume2, VolumeX, PauseCircle, Play, Home } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { AlertTriangle, PauseCircle, Volume2, VolumeX } from "lucide-react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { useConfirmation } from "../../../hooks/useConfirmation";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../utils/wordupQuestionGenerator";
 import { getCachedFlagUrl } from "../../../utils/wordupQuestionPostProcessor";
-import { useConfirmation } from "../../../hooks/useConfirmation";
 import FormulaRenderer from "../../shared/FormulaRenderer";
 import { PreloadedImage } from "../../shared/PreloadedImage";
 import { type ProfileStats } from "../../shared/types";
 
 
-import { getQuestionDuration } from "../hooks/useGameEngine.core";
 import { ProtectedAvatar } from "../../../components/chat/ProtectedAvatar";
-import { WORDUP_GAME, CONFETTI, PROMPT_FONT_SIZE, CHOICE_FONT_SIZE } from "../../../constants/wordup";
+import { CHOICE_FONT_SIZE, CONFETTI, PROMPT_FONT_SIZE, WORDUP_GAME } from "../../../constants/wordup";
 import { CircularTimer } from "../../shared/CircularTimer";
+import { GameStatusToast } from "../../shared/GameStatusToast";
 import { ScoreBar } from "../../shared/ScoreBar";
 import { SignalBar } from "../../shared/SignalBar";
-import { GameStatusToast } from "../../shared/GameStatusToast";
 import { CATEGORIES } from "../../shared/constants";
+import { getQuestionDuration } from "../hooks/useGameEngine.core";
 
 interface MatchData {
    p1_score?: number;
@@ -95,8 +95,10 @@ export const BattleView = ({
 }: BattleViewProps) => {
    const [particles, setParticles] = useState<Particle[]>([]);
    const [imgErrorMap, setImgErrorMap] = useState<Record<string, boolean>>({});
-   const [showPauseOverlay, setShowPauseOverlay] = useState(false);
+   const [isSavingPause, setIsSavingPause] = useState(false);
    const { ask } = useConfirmation();
+
+
 
    useEffect(() => {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -333,15 +335,25 @@ export const BattleView = ({
                   <span>{soundEnabled ? "Mute" : "Sound"}</span>
                </button>
             )}
-            {matchData?.allow_pause && onPause && (
-               <button
-                  onClick={() => setShowPauseOverlay(true)}
-                  className="flex items-center gap-1 bg-amber-950/40 border border-amber-500/30 text-amber-400 hover:bg-amber-950/60 px-2 sm:px-3 py-0.5 sm:py-1.5 rounded-xl text-[8px] sm:text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-sm"
-               >
-                  <PauseCircle size={12} />
-                  <span>Pause</span>
-               </button>
-            )}
+             {matchData?.allow_pause && onPause && (
+                <button
+                   disabled={isSavingPause}
+                   onClick={async () => {
+                      if (isSavingPause) return;
+                      setIsSavingPause(true);
+                      try {
+                         await onPause();
+                      } catch (e) {
+                         console.warn("[BattleView] Pause error:", e);
+                         setIsSavingPause(false);
+                      }
+                   }}
+                   className="flex items-center gap-1 bg-amber-950/40 border border-amber-500/30 text-amber-400 hover:bg-amber-950/60 px-2 sm:px-3 py-0.5 sm:py-1.5 rounded-xl text-[8px] sm:text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-sm disabled:opacity-50"
+                >
+                   <PauseCircle size={12} className={isSavingPause ? "animate-spin" : ""} />
+                   <span>{isSavingPause ? "Saving..." : "Pause"}</span>
+                </button>
+             )}
             <button
                onClick={async () => {
                   const confirmed = await ask({
@@ -643,87 +655,42 @@ export const BattleView = ({
             })}
          </div>
 
-         {/* Paused Game Screen / Overlay */}
+         {/* Saving / Transition Overlay on Pause */}
          <AnimatePresence>
-            {showPauseOverlay && (
-               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+            {isSavingPause && (
+               <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md text-white text-center"
+               >
                   <motion.div
-                     initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                     animate={{ opacity: 1, scale: 1, y: 0 }}
-                     exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                     className="w-full max-w-sm bg-[#18181b] border border-amber-500/30 rounded-3xl p-6 text-white shadow-2xl space-y-5 text-center relative overflow-hidden"
+                     initial={{ scale: 0.9, opacity: 0, y: 10 }}
+                     animate={{ scale: 1, opacity: 1, y: 0 }}
+                     className="bg-[#18181b] border border-amber-500/40 rounded-3xl p-8 max-w-xs w-full shadow-2xl space-y-4 flex flex-col items-center relative overflow-hidden"
                   >
-                     {/* Accent Glow */}
-                     <div className="absolute -top-16 -right-16 w-36 h-36 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+                     <div className="absolute -top-12 -right-12 w-28 h-28 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
 
-                     {/* Header */}
+                     <div className="relative w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                        <PauseCircle className="w-8 h-8 animate-pulse" />
+                        <div className="absolute inset-0 rounded-2xl border-2 border-amber-400/40 animate-ping" />
+                     </div>
+
                      <div className="space-y-1">
-                        <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center mx-auto text-amber-400 shadow-inner">
-                           <PauseCircle size={28} />
-                        </div>
-                        <h2 className="text-xl font-black uppercase tracking-wider text-amber-400">
+                        <h3 className="text-lg font-black uppercase tracking-wider text-amber-400">
                            Match Paused
-                        </h2>
-                        <p className="text-[10px] text-white/60 font-bold uppercase tracking-wider">
-                           {categoryName} • {questions.length > 7 ? `Game ${Math.floor(currentIdx / 7) + 1} of ${Math.ceil(questions.length / 7)}` : "Extended Rounds"}
+                        </h3>
+                        <p className="text-xs text-white/70 font-semibold leading-relaxed">
+                           Saving match snapshot & updating database...
                         </p>
                      </div>
 
-                     {/* Score & Round Info Card */}
-                     <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
-                        <div className="flex justify-between items-center text-xs font-black uppercase tracking-wider text-amber-300 border-b border-white/10 pb-2">
-                           <span>Round Progress</span>
-                           <span>Round {currentIdx + 1} of {questions.length}</span>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 pt-1">
-                           <div className="bg-white/5 p-2.5 rounded-xl border border-white/5 flex flex-col items-center">
-                              <ProtectedAvatar
-                                 userId={playerProfile?.id || undefined}
-                                 src={playerProfile?.avatar_url || undefined}
-                                 username={playerProfile?.username || "You"}
-                                 className="w-8 h-8 rounded-full mb-1"
-                              />
-                              <span className="text-[9px] text-white/40 font-black uppercase truncate max-w-[80px]">You</span>
-                              <span className="text-lg font-black text-white">{myScore} pts</span>
-                           </div>
-                           <div className="bg-white/5 p-2.5 rounded-xl border border-white/5 flex flex-col items-center">
-                              <ProtectedAvatar
-                                 userId={matchData?.is_bot_match ? undefined : ((isP1 ? matchData?.player2_id : matchData?.player1_id) || undefined)}
-                                 src={matchData?.is_bot_match ? `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(opponentName)}` : (opponentStats?.avatar_url || undefined)}
-                                 username={opponentName}
-                                 className="w-8 h-8 rounded-full mb-1"
-                              />
-                              <span className="text-[9px] text-white/40 font-black uppercase truncate max-w-[80px]">{opponentName}</span>
-                              <span className="text-lg font-black text-white">{oppScore} pts</span>
-                           </div>
-                        </div>
-                     </div>
-
-                     {/* Action Buttons */}
-                     <div className="space-y-2.5 pt-1">
-                        <button
-                           type="button"
-                           onClick={() => setShowPauseOverlay(false)}
-                           className="w-full py-3.5 rounded-2xl font-black uppercase tracking-wider text-xs bg-amber-500 hover:bg-amber-600 text-black flex items-center justify-center gap-2 shadow-lg cursor-pointer transition-all hover:scale-102 active:scale-98"
-                        >
-                           <Play size={16} fill="black" />
-                           <span>Resume Game</span>
-                        </button>
-                        <button
-                           type="button"
-                           onClick={() => {
-                              setShowPauseOverlay(false);
-                              onPause?.();
-                           }}
-                           className="w-full py-3.5 rounded-2xl font-black uppercase tracking-wider text-xs bg-white/10 hover:bg-white/15 border border-white/10 text-white flex items-center justify-center gap-2 cursor-pointer transition-all hover:scale-102 active:scale-98"
-                        >
-                           <Home size={16} />
-                           <span>Return to Lobby</span>
-                        </button>
+                     <div className="flex items-center gap-2 pt-2 text-[10px] font-black uppercase tracking-widest text-amber-300/80">
+                        <div className="w-3.5 h-3.5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                        <span>Returning to lobby...</span>
                      </div>
                   </motion.div>
-               </div>
+               </motion.div>
             )}
          </AnimatePresence>
       </motion.div>

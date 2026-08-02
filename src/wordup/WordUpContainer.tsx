@@ -59,6 +59,12 @@ export const WordUpContainer = ({
       setPausedMatches(getPausedGames());
    }, []);
 
+   useEffect(() => {
+      if (wordupMode === null) {
+         refreshPausedMatches();
+      }
+   }, [wordupMode, refreshPausedMatches]);
+
    const handleResumePausedMatch = useCallback((paused: PausedMatch) => {
       const liveStore = useLiveStore.getState();
       liveStore.resetGame();
@@ -402,6 +408,7 @@ export const WordUpContainer = ({
          {wordupMode === "live" && (
             <LiveView
                onBack={(goHome) => {
+                  refreshPausedMatches();
                   if (goHome) {
                      setLastCategory(null);
                      setWordupMode(null);
@@ -410,6 +417,7 @@ export const WordUpContainer = ({
                      const targetCategory = lastCategory || useLiveStore.getState().category;
                      setWordupMode(null);
                      setTimeout(() => {
+                        refreshPausedMatches();
                         if (targetCategory) {
                            setLastCategory(targetCategory);
                         }

@@ -452,8 +452,11 @@ export function useGameEngine(props: EngineProps) {
     useEffect(() => {
         if (phase !== "countdown") return;
 
+        const targetRound = (matchDataRef.current?.current_question_index as number | undefined) ?? useLiveStore.getState().currentIdx ?? 0;
+        const isResuming = targetRound > 0;
+
         Promise.resolve().then(() => {
-            setCountdownText("3");
+            setCountdownText(isResuming ? "Resuming in 3..." : "3");
         });
         wordupAudio.playCountdownTick(3);
         let count = 3;
@@ -464,20 +467,23 @@ export function useGameEngine(props: EngineProps) {
                 stopCountdown();
                 wordupAudio.playGameStart();
 
-                // Start the first round
-                setCurrentRound(0);
+                // Start the round (0 if new game, targetRound if resuming)
+                setCurrentRound(targetRound);
+                currentRoundRef.current = targetRound;
+                useLiveStore.getState().setCurrentIdx(targetRound);
+
                 setMyChoice(null);
                 setOpponentChoice(null);
                 setMyCurrentPoints(0);
                 setOpponentCurrentPoints(0);
-                const q = questionsRef.current[0];
+                const q = questionsRef.current[targetRound];
                 const dur = q ? getQuestionDuration(q.type) : 10;
                 setTimeRemaining(dur);
                 setMaxTime(dur);
                 roundStartedAtRef.current = Date.now();
                 setPhase("playing");
             } else {
-                setCountdownText(String(count));
+                setCountdownText(isResuming ? `Resuming in ${count}...` : String(count));
                 wordupAudio.playCountdownTick(count);
             }
         }, 1000);
@@ -1053,9 +1059,16 @@ export function useGameEngine(props: EngineProps) {
             useLiveStore.getState().setOpponentStats(oppStats);
             useLiveStore.getState().setQuestions(questions);
 
-            // Reset scores and choices for new game
-            setMyScore(0);
-            setOpponentScore(0);
+            // Initialize scores from matchData (0 for new games, restored scores for resumed games)
+            const isP1 = activeRole === "player1";
+            const initialMyScore = isP1 ? ((matchData?.p1_score as number) || 0) : ((matchData?.p2_score as number) || 0);
+            const initialOppScore = isP1 ? ((matchData?.p2_score as number) || 0) : ((matchData?.p1_score as number) || 0);
+
+            setMyScore(initialMyScore);
+            setOpponentScore(initialOppScore);
+            myScoreRef.current = initialMyScore;
+            opponentScoreRef.current = initialOppScore;
+
             setMyCurrentPoints(0);
             setOpponentCurrentPoints(0);
             setMyChoice(null);
