@@ -298,7 +298,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
 
    useEffect(() => {
       if (matchDataFromStore?.status === "completed") return;
-      if (matchId && role && (matchId !== launchedMatchRef.current || view === "connecting") && (view === "menu" || view === "matchmaking" || view === "gameover" || view === "loading" || view === "connecting")) {
+      if (matchId && role && (matchId !== launchedMatchRef.current || view === "connecting" || view === "countdown") && (view === "menu" || view === "matchmaking" || view === "gameover" || view === "loading" || view === "connecting" || view === "countdown")) {
          launchedMatchRef.current = matchId;
          startMatchRef.current?.(matchId, role);
       }

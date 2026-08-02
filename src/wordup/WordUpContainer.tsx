@@ -74,7 +74,7 @@ export const WordUpContainer = ({
       liveStore.setMatchData(paused.matchData);
       liveStore.setQuestions(paused.questions);
       liveStore.setCurrentIdx(paused.currentIdx);
-      liveStore.setView("connecting");
+      liveStore.setView("countdown");
       setWordupMode("live");
    }, [setWordupMode]);
 
