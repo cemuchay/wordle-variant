@@ -24,6 +24,7 @@ import { ConnectionOverlay } from "../shared/ConnectionOverlay";
 import { ConnectingView } from "./components/ConnectingView";
 import { safeLocalStorage } from "../../utils/storage";
 import { savePausedGame, removePausedGame } from "../shared/pauseStorage";
+import { cleanBotMatchId } from "../shared/botUtils";
 
 import { RATING, XP, WORDUP_TIMEOUT, WORDUP_LIMITS, BOT_PROFILES_RATINGS } from "../../constants/wordup";
 import { useLiveStore } from "./store/useLiveStore";
@@ -235,11 +236,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
 
       // Save bot match record to DB with retry queue
       if (match.is_bot_match) {
-         const dbMatchId = match.id.startsWith("bot-marathon-")
-            ? match.id.replace("bot-marathon-", "")
-            : match.id.startsWith("bot-match-")
-               ? match.id.replace("bot-match-", "")
-               : match.id;
+         const dbMatchId = cleanBotMatchId(match.id);
          const record = {
             id: dbMatchId,
             category: match.category,

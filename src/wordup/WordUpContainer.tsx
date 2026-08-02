@@ -14,7 +14,7 @@ import { wordupAudio } from "../utils/wordupAudio";
 import { useWordUpStore } from "../store/useWordUpStore";
 import { TOAST_DURATION } from "../constants/ui";
 import { MarathonConfigModal } from "./shared/MarathonConfigModal";
-import { PausedMatch, getPausedGames, removePausedGame } from "./shared/pauseStorage";
+import { type PausedMatch, getPausedGames, removePausedGame } from "./shared/pauseStorage";
 
 import { useTheme } from "../hooks/useTheme";
 
@@ -496,7 +496,7 @@ export const WordUpView = () => {
       <WordUpContainer
          wordupMode={wordupMode}
          setWordupMode={setWordupMode}
-         onTutorial={() => {}}
+         onTutorial={() => { }}
       />
    );
 };

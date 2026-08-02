@@ -33,6 +33,7 @@ import {
     encryptQuestions,
     simulateBotResponse,
 } from "../../../utils/wordupQuestionGenerator";
+import { isBotMatchId, cleanBotMatchId } from "../../shared/botUtils";
 import { preloadMatchImages } from "../../../utils/wordupQuestionPostProcessor";
 import { BOT_PROFILES } from "../../../utils/wordupQuestionGenerator";
 import { safeLocalStorage } from "../../../utils/storage";
@@ -815,21 +816,26 @@ export function useGameEngine(props: EngineProps) {
     const abortMatch = useCallback(async () => {
         stopAllTimers();
         const mId = useLiveStore.getState().matchId;
-        if (mId && !mId.startsWith("bot-match-")) {
-            if (channelRef.current) {
+        const isBot = isBotMatchId(mId);
+        const dbId = cleanBotMatchId(mId);
+
+        if (mId) {
+            if (!isBot && channelRef.current) {
                 channelRef.current.send({
                     type: "broadcast",
                     event: "match_abandoned",
                     payload: { role: roleRef.current }
                 });
             }
-            try {
-                await supabase
-                    .from("wordup_matches")
-                    .update({ status: "abandoned" })
-                    .eq("id", mId);
-            } catch (e) {
-                console.error("Failed to mark match as abandoned in DB:", e);
+            if (dbId) {
+                try {
+                    await supabase
+                        .from("wordup_matches")
+                        .update({ status: "abandoned" })
+                        .eq("id", dbId);
+                } catch (e) {
+                    console.error("Failed to mark match as abandoned in DB:", e);
+                }
             }
         }
         setPhase("idle");
@@ -853,7 +859,7 @@ export function useGameEngine(props: EngineProps) {
             let matchData: Record<string, unknown>;
             let oppStats: ProfileStats | null = null;
 
-            if (mId.startsWith("bot-match-") || mId.startsWith("bot-marathon-")) {
+            if (isBotMatchId(mId)) {
                 const category = useLiveStore.getState().category || "mixed";
                 const storeQuestions = useLiveStore.getState().questions;
                 const storeMatchData = useLiveStore.getState().matchData as Record<string, unknown> | null;
@@ -885,7 +891,7 @@ export function useGameEngine(props: EngineProps) {
                 } else {
                     // fall back to generate on the fly
                     if (isProceduralCategory(category)) {
-                        const cleanId = mId.startsWith("bot-match-") ? mId.slice(10) : mId;
+                        const cleanId = cleanBotMatchId(mId);
                         cleanIdRef.current = cleanId;
                         const seed = `${cleanId}-${category}`;
                         const { data: edgeData } = await supabase.functions.invoke(
@@ -1053,7 +1059,7 @@ export function useGameEngine(props: EngineProps) {
 
             // Enforce visual buffer so the user can see their opponent
             const elapsed = Date.now() - loadStart;
-            const bufferDuration = mId.startsWith("bot-match-") ? 300 : 800;
+            const bufferDuration = isBotMatchId(mId) ? 300 : 800;
             const remainingDelay = Math.max(0, bufferDuration - elapsed);
             if (remainingDelay > 0) {
                 await new Promise((resolve) => setTimeout(resolve, remainingDelay));
@@ -1068,7 +1074,7 @@ export function useGameEngine(props: EngineProps) {
                 channelRef.current = null;
             }
 
-            if (!mId.startsWith("bot-match-")) {
+            if (!isBotMatchId(mId)) {
                 const channelName = `wordup_match_${mId}`;
                 const ch = supabase.channel(channelName);
 
