@@ -17,6 +17,8 @@ class Logger {
    private buffer: LogEntry[] = [];
    private readonly MAX_BUFFER_SIZE = 50;
    private isStreaming = false;
+   private recentSentErrors = new Map<string, number>();
+   private readonly ERROR_DEDUP_MS = 5 * 60 * 1000; // 5 minutes
 
    private constructor() {
       this.sessionId = Math.random().toString(36).substring(2, 15);
@@ -81,6 +83,19 @@ class Logger {
 
    private async streamLog(entry: LogEntry) {
       if (this.isStreaming) return;
+
+      if (entry.level === "fatal" || entry.level === "error") {
+         const msg = String(entry.message || "").slice(0, 100).replace(/\d+/g, "#");
+         const key = `${entry.level}:${msg}`;
+         const now = Date.now();
+         const lastTime = this.recentSentErrors.get(key);
+         if (lastTime && now - lastTime < this.ERROR_DEDUP_MS) {
+            console.warn(`[Logger] Suppressing duplicate ${entry.level} log stream for:`, entry.message);
+            return;
+         }
+         this.recentSentErrors.set(key, now);
+      }
+
       this.isStreaming = true;
 
       try {
