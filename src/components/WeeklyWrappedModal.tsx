@@ -1060,6 +1060,10 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     // 6. Record Canvas animation with Audio stream to share/download a video (WebM)
     const exportWrappedVideo = async () => {
         if (generatedVideoFile) {
+            setIsMusicPlaying(false);
+            if (synthRef.current) {
+                synthRef.current.stop();
+            }
             setShowVideoOverlay(true);
             return;
         }
@@ -1180,10 +1184,12 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             const rawMime = selectedMimeType.split(';')[0]; // e.g. 'video/mp4' or 'video/webm'
             const blob = new Blob(chunks, { type: rawMime });
 
-            // Disconnect recorder from the synth
+            // Disconnect recorder and stop synth audio once video compilation finishes
             if (synthRef.current) {
                 synthRef.current.disconnectRecorder();
+                synthRef.current.stop();
             }
+            setIsMusicPlaying(false);
 
             const fileName = `wordle_weekly_wrapped.${extension}`;
             const file = new File([blob], fileName, { type: rawMime });
@@ -1240,6 +1246,10 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     };
 
     const shareGeneratedVideo = async () => {
+        setIsMusicPlaying(false);
+        if (synthRef.current) {
+            synthRef.current.stop();
+        }
         if (!generatedVideoFile) return;
 
         if (navigator.canShare && navigator.canShare({ files: [generatedVideoFile] })) {
@@ -1259,6 +1269,10 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     };
 
     const downloadGeneratedVideo = async () => {
+        setIsMusicPlaying(false);
+        if (synthRef.current) {
+            synthRef.current.stop();
+        }
         if (!generatedVideoFile) return;
 
         const url = URL.createObjectURL(generatedVideoFile);
