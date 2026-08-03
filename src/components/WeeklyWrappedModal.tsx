@@ -721,7 +721,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             ctx.font = '30px sans-serif';
             ctx.fillText('Tap to review your word journey...', width / 2, height * 0.72);
 
-        } else if (index === totalSlides - 2) {
+        } else if (index === totalSlides - 3) {
             // Slide: Stats Summary
             ctx.fillStyle = '#38bdf8'; // sky-400
             ctx.font = 'bold 36px sans-serif';
@@ -867,6 +867,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
         } else {
             // Daily Slides (1 to N)
             const dayScore = weeklyScores[index - 1];
+            if (!dayScore || !dayScore.game_date) return;
             const dayName = getDayName(dayScore.game_date).toUpperCase();
 
             ctx.fillStyle = '#ec4899'; // pink-500
@@ -1634,6 +1635,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                     // Daily Slides (1 to N)
                                     (() => {
                                         const score = weeklyScores[currentSlide - 1];
+                                        if (!score || !score.game_date) return null;
                                         const dateLabel = score.game_date;
                                         const dayName = getDayName(score.game_date);
                                         const wordLength = score.guesses[0]?.length || 0;
