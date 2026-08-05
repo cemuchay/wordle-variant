@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { loadWordLists } from '../../../data/words';
+import { checkGuess, calculateSkillIndex, isHintDisabled, getHint } from '../../../lib/game-logic';
 
 export interface MoveAnalysis {
   turn: number;
@@ -32,6 +33,16 @@ export interface MoveAnalysis {
   scrutinyReason: string;
 }
 
+export interface BotSimulationResult {
+  guesses: any[][];
+  attempts: number;
+  won: boolean;
+  usedHint: boolean;
+  hintRecord: { index: number; letter: string; row: number } | null;
+  skillScore: number;
+  botLineWords: string[];
+}
+
 export interface GameAnalysisResult {
   accuracyScore: number; // 0 - 100%
   gradeTitle: string;
@@ -53,6 +64,15 @@ export interface GameAnalysisResult {
   hintPenalty: number;
   hintQuality?: 'strategic' | 'tactical' | 'unnecessary' | 'wasteful';
   hintSummaryText?: string;
+  // Bot vs User Match Comparison
+  userSkillScore: number;
+  botSkillScore: number;
+  botSimulation: BotSimulationResult;
+  matchOutcome: {
+    winner: 'user' | 'bot' | 'tie';
+    scoreDiff: number;
+    text: string;
+  };
 }
 
 export interface AnalysisOptions {
@@ -148,8 +168,165 @@ function findBestEntropyStarter(
 }
 
 /**
+ * Simulates a full bot game starting with the USER'S starter word.
+ * The bot plays blind without knowing the answer and can use hints (-100 pts penalty) if stuck.
+ */
+export async function simulateBotGame(
+  userStarterWord: string,
+  targetWord: string
+): Promise<BotSimulationResult> {
+  const uppercaseTarget = targetWord.trim().toUpperCase();
+  const wordLength = uppercaseTarget.length || 5;
+
+  let officialWords: string[] = [];
+  let allowedWords: string[] = [];
+
+  try {
+    const data = await loadWordLists(wordLength, false);
+    officialWords = data.official.map((w) => w.toUpperCase());
+    allowedWords = Array.from(data.valid).map((w) => w.toUpperCase());
+  } catch (e) {
+    console.error('Failed to load wordlists for bot simulation:', e);
+  }
+
+  let currentPool = officialWords.includes(uppercaseTarget)
+    ? [...officialWords]
+    : [...allowedWords];
+
+  if (currentPool.length === 0) {
+    currentPool = [uppercaseTarget];
+  }
+
+  const botGuesses: any[][] = [];
+  const botLineWords: string[] = [];
+  let usedHint = false;
+  let hintRecord: { index: number; letter: string; row: number } | null = null;
+
+  // Turn 1: Bot MUST play the User's starter word
+  const starter = userStarterWord.trim().toUpperCase();
+  botLineWords.push(starter);
+  const turn1Feedback = checkGuess(starter, uppercaseTarget);
+  botGuesses.push(turn1Feedback);
+
+  if (starter === uppercaseTarget) {
+    const scoreRes = calculateSkillIndex({
+      attempts: 1,
+      maxAttempts: 6,
+      usedHint: false,
+      guesses: botGuesses,
+    });
+    return {
+      guesses: botGuesses,
+      attempts: 1,
+      won: true,
+      usedHint: false,
+      hintRecord: null,
+      skillScore: scoreRes.finalScore,
+      botLineWords,
+    };
+  }
+
+  const statuses1 = turn1Feedback.map((c) => c.status);
+  currentPool = currentPool.filter((w) => isCandidateValid(w, starter, statuses1));
+
+  // Turns 2 to 6
+  for (let turn = 1; turn < 6; turn++) {
+    const poolBefore = [...currentPool];
+    if (poolBefore.length === 0) break;
+
+    // Strategic Bot Hint logic:
+    // If bot has >= 4 candidates remaining on turn >= 2 and hint is not disabled, bot can take a hint!
+    // Using a hint applies the official -100 pts penalty (SCORING.HINT_PENALTY).
+    if (!usedHint && turn >= 2 && poolBefore.length >= 4 && !isHintDisabled(uppercaseTarget, botGuesses)) {
+      const hintData = getHint(uppercaseTarget, botGuesses);
+      if (hintData) {
+        usedHint = true;
+        hintRecord = { index: hintData.index, letter: hintData.letter, row: turn + 1 };
+      }
+    }
+
+    let nextGuess = uppercaseTarget;
+
+    if (poolBefore.length === 1) {
+      nextGuess = poolBefore[0];
+    } else if (poolBefore.length <= 35) {
+      const charCountsInPool = new Map<string, number>();
+      poolBefore.forEach((w) => {
+        new Set(w.split('')).forEach((c) => {
+          charCountsInPool.set(c, (charCountsInPool.get(c) || 0) + 1);
+        });
+      });
+
+      const distinguishingChars = Array.from(charCountsInPool.entries())
+        .filter(([, count]) => count > 0 && count < poolBefore.length)
+        .map(([char]) => char);
+
+      let bestTestWord = poolBefore[0];
+      let maxScore = -1;
+
+      const candidateList = poolBefore.length <= 8
+        ? poolBefore
+        : allowedWords.length > 0
+        ? allowedWords
+        : poolBefore;
+
+      for (const w of candidateList) {
+        const uniqueChars = new Set(w.split(''));
+        let distinguishingTested = 0;
+        distinguishingChars.forEach((ch) => {
+          if (uniqueChars.has(ch)) distinguishingTested++;
+        });
+
+        if (distinguishingTested === 0 && poolBefore.length > 1) continue;
+
+        const isCandidate = poolBefore.includes(w);
+        const score = distinguishingTested * 10 + (isCandidate ? 15 : 0) + uniqueChars.size * 0.5;
+
+        if (score > maxScore) {
+          maxScore = score;
+          bestTestWord = w;
+        }
+      }
+      nextGuess = bestTestWord;
+    } else {
+      nextGuess = findBestEntropyStarter(poolBefore, wordLength);
+    }
+
+    botLineWords.push(nextGuess);
+    const feedback = checkGuess(nextGuess, uppercaseTarget);
+    botGuesses.push(feedback);
+
+    const statuses = feedback.map((c) => c.status);
+    currentPool = currentPool.filter((w) => isCandidateValid(w, nextGuess, statuses));
+
+    if (nextGuess === uppercaseTarget) {
+      break;
+    }
+  }
+
+  const botWon = botGuesses[botGuesses.length - 1]?.every((c: any) => c.status === 'correct');
+
+  const scoreResult = calculateSkillIndex({
+    attempts: botGuesses.length,
+    maxAttempts: 6,
+    usedHint,
+    guesses: botGuesses,
+    hintRecord,
+  });
+
+  return {
+    guesses: botGuesses,
+    attempts: botGuesses.length,
+    won: botWon,
+    usedHint,
+    hintRecord,
+    skillScore: scoreResult.finalScore,
+    botLineWords,
+  };
+}
+
+/**
  * Main game analysis entry point.
- * Features strategic hint evaluation (praising bottleneck-breaking hints, penalizing unnecessary/wasteful hints).
  */
 export async function analyzeGame(
   guesses: any[],
@@ -199,7 +376,6 @@ export async function analyzeGame(
   const totalTurns = guesses.length;
   const targetTurnIndex = rawHintRow >= 0 ? rawHintRow : totalTurns - 1;
 
-  // Track candidate pool size at hint usage turn for strategic evaluation
   let poolAtHintTurn = 0;
 
   for (let turn = 0; turn < totalTurns; turn++) {
@@ -312,7 +488,6 @@ export async function analyzeGame(
     // Tough Move Rating calculation (0.0 to 10.0)
     let moveRating = 7.0;
 
-    // Check repeated gray letter
     let repeatedGrayLetter = false;
     if (turn > 0) {
       const knownAbsent = new Set<string>();
@@ -356,7 +531,6 @@ export async function analyzeGame(
     }
 
     const isThisHintRow = hintsUsed && turn === targetTurnIndex;
-
     const agreementScore = Math.max(10, Math.min(99, Math.round(moveRating * 9.5)));
 
     // Strict Move Classification
@@ -407,6 +581,8 @@ export async function analyzeGame(
       } else {
         scrutinyReason = `🎯 Target word solved cleanly with precision.`;
       }
+    } else if (isThisHintRow) {
+      scrutinyReason = `💡 Hint used on this turn: penalizes strategic evaluation (-2.0 pts).`;
     } else if (repeatedGrayLetter) {
       scrutinyReason = `⚠️ Suboptimal move: includes letter(s) already confirmed gray in previous turns.`;
     } else if (poolAfterCount === 1) {
@@ -453,28 +629,23 @@ export async function analyzeGame(
     const turnsRemainingAfterHint = isWin ? totalTurns - (targetTurnIndex + 1) : 99;
 
     if (poolAtHintTurn >= 5 && isWin && turnsRemainingAfterHint <= 1) {
-      // Strategic Hint Breakthrough: Took hint when candidate pool was large (>=5) and solved immediately on next turn!
       hintQuality = 'strategic';
-      hintPenalty = 0; // 0% penalty for strategic breakthrough!
+      hintPenalty = 0;
       hintSummaryText = `💡 Strategic Hint Breakthrough: Used hint to break a ${poolAtHintTurn}-candidate bottleneck & solved immediately!`;
     } else if (poolAtHintTurn >= 3 && isWin && turnsRemainingAfterHint <= 2) {
-      // Tactical Hint: Solid tactical choice when pool was 3-4 candidates, leading to a quick solve
       hintQuality = 'tactical';
       hintPenalty = 4;
       hintSummaryText = `💡 Tactical Hint: Helpful discovery assisting a quick solve within ${turnsRemainingAfterHint + 1} turn(s).`;
     } else if (poolAtHintTurn <= 2) {
-      // Unnecessary Hint: Used hint when candidate pool was already down to 1-2 words
       hintQuality = 'unnecessary';
       hintPenalty = 12;
       hintSummaryText = `⚠️ Unnecessary Hint: Used hint when only ${poolAtHintTurn} candidate(s) remained.`;
     } else {
-      // Wasteful / Suboptimal Hint: Used hint but took many more attempts without capitalizing
       hintQuality = 'wasteful';
       hintPenalty = 15;
       hintSummaryText = `⚠️ Suboptimal Hint: Hint was taken but did not lead to a swift solve.`;
     }
 
-    // Apply specific notice to the move row where hint occurred
     if (moves[targetTurnIndex]) {
       moves[targetTurnIndex].hintAnalysisNotice = hintSummaryText;
       if (hintQuality === 'unnecessary' || hintQuality === 'wasteful') {
@@ -485,12 +656,10 @@ export async function analyzeGame(
     }
   }
 
-  // Tough & Objective Overall Efficiency Score Calculation
+  // Overall Efficiency Score Calculation
   const avgMoveRating = moves.length > 0 ? totalRatingSum / moves.length : 0;
   let rawScore = avgMoveRating * 10;
 
-  // Tough Attempt Count Caps:
-  // 1/6: 100%, 2/6: 95%, 3/6: 88%, 4/6: 76%, 5/6: 60%, 6/6: 48%, Fail: 20%
   const attemptCaps: Record<number, number> = {
     1: 100,
     2: 95,
@@ -503,12 +672,11 @@ export async function analyzeGame(
   const cap = isWin ? attemptCaps[totalTurns] || 48 : 20;
   let accuracyScore = Math.min(cap, Math.round(rawScore * (cap / 100)));
 
-  // Deduct calculated hint penalty (0% for Strategic, 4% for Tactical, 12-15% for Unnecessary/Wasteful)
   if (hintsUsed) {
     accuracyScore = Math.max(10, accuracyScore - hintPenalty);
   }
 
-  // Tough Strategic Grade Titles
+  // Strategic Grade Titles
   let gradeTitle = 'Tactician';
   if (accuracyScore >= 95) gradeTitle = 'Grandmaster Strategy 👑';
   else if (accuracyScore >= 85) gradeTitle = 'Master Tactician 🧠';
@@ -517,6 +685,32 @@ export async function analyzeGame(
   else if (accuracyScore >= 42) gradeTitle = 'Scraped By ⚠️';
   else if (isWin) gradeTitle = 'Lucky Escape 🎲';
   else gradeTitle = 'Defeated 💥';
+
+  // --- BOT SIMULATION & SKILL INDEX MATCH COMPARISON ---
+  const userStarterWord = moves[0]?.guessWord || 'CRANE';
+  const botSimulation = await simulateBotGame(userStarterWord, uppercaseTarget);
+
+  const userSkillResult = calculateSkillIndex({
+    attempts: totalTurns,
+    maxAttempts: 6,
+    usedHint: hintsUsed,
+    guesses,
+    hintRecord: options.hintRecord,
+  });
+  const userSkillScore = userSkillResult.finalScore;
+  const botSkillScore = botSimulation.skillScore;
+
+  let matchWinner: 'user' | 'bot' | 'tie' = 'tie';
+  let scoreDiff = Math.abs(userSkillScore - botSkillScore);
+  let outcomeText = `🤝 Tied Match (${userSkillScore} pts)`;
+
+  if (userSkillScore > botSkillScore) {
+    matchWinner = 'user';
+    outcomeText = `🎉 You Beat the Bot! (+${scoreDiff} pts)`;
+  } else if (botSkillScore > userSkillScore) {
+    matchWinner = 'bot';
+    outcomeText = `🤖 Bot Outplayed You (+${scoreDiff} pts)`;
+  }
 
   return {
     accuracyScore,
@@ -530,5 +724,13 @@ export async function analyzeGame(
     hintPenalty,
     hintQuality,
     hintSummaryText,
+    userSkillScore,
+    botSkillScore,
+    botSimulation,
+    matchOutcome: {
+      winner: matchWinner,
+      scoreDiff,
+      text: outcomeText,
+    },
   };
 }

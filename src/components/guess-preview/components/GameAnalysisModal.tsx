@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from 'react';
-import { X, Loader2, Sparkles, ChevronDown, ChevronUp, Bot, Target, Lightbulb } from 'lucide-react';
+import { X, Loader2, Sparkles, ChevronDown, ChevronUp, Bot, Target, Lightbulb, Swords, Trophy } from 'lucide-react';
 import { analyzeGame, type GameAnalysisResult, type MoveAnalysis } from '../logic/gameAnalysisLogic';
 import { getTileSizeClass } from '../types';
 import { applyTheme } from '../../../utils/theme';
@@ -92,7 +92,7 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
             <div className="py-20 flex flex-col items-center justify-center gap-4">
               <Loader2 className="animate-spin text-amber-400" size={36} />
               <p className="text-sm font-black text-white uppercase tracking-widest animate-pulse">
-                Analyzing moves & word candidates...
+                Simulating Bot match & analyzing moves...
               </p>
             </div>
           ) : !analysis ? (
@@ -207,6 +207,88 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
                       ?? {analysis.moveCounts.blunder} Blunder
                     </span>
                   )}
+                </div>
+              </div>
+
+              {/* PLAYER VS BOT MATCH SIMULATION CARD */}
+              <div className="bg-gradient-to-r from-gray-950 via-indigo-950/40 to-gray-950 border border-indigo-500/30 rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
+                <div className="flex items-center justify-between border-b border-indigo-500/20 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Swords size={18} className="text-amber-400" />
+                    <h4 className="text-xs font-black uppercase tracking-wider text-white">
+                      Player vs Bot Match Simulation
+                    </h4>
+                  </div>
+                  <span className="text-[10px] font-bold text-indigo-300 uppercase font-mono">
+                    Same Starter Word
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-center">
+                  {/* User Skill Score */}
+                  <div className="bg-black/40 border border-gray-800 rounded-xl p-3 flex flex-col items-center justify-center">
+                    <span className="text-[10px] font-black uppercase text-gray-300">You ({username})</span>
+                    <span className="text-xl sm:text-2xl font-black text-amber-400 font-mono mt-0.5">
+                      {analysis.userSkillScore} <span className="text-xs font-normal text-white">pts</span>
+                    </span>
+                    <span className="text-[10px] font-bold text-white mt-1">
+                      {guesses.length}/6 attempts {analysis.hintsUsed ? '(Hint used)' : ''}
+                    </span>
+                  </div>
+
+                  {/* Bot Skill Score */}
+                  <div className="bg-black/40 border border-gray-800 rounded-xl p-3 flex flex-col items-center justify-center">
+                    <span className="text-[10px] font-black uppercase text-indigo-300 flex items-center gap-1">
+                      <Bot size={12} className="text-indigo-400" />
+                      Bot Simulation
+                    </span>
+                    <span className="text-xl sm:text-2xl font-black text-cyan-300 font-mono mt-0.5">
+                      {analysis.botSkillScore} <span className="text-xs font-normal text-white">pts</span>
+                    </span>
+                    <span className="text-[10px] font-bold text-white mt-1">
+                      {analysis.botSimulation.attempts}/6 attempts{' '}
+                      {analysis.botSimulation.usedHint ? '(Hint used -100pts)' : ''}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Outcome Banner */}
+                <div className="text-center pt-1">
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border shadow-md ${
+                      analysis.matchOutcome.winner === 'user'
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                        : analysis.matchOutcome.winner === 'bot'
+                        ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
+                        : 'bg-gray-800 text-white border-gray-700'
+                    }`}
+                  >
+                    <Trophy size={14} className="shrink-0" />
+                    <span>{analysis.matchOutcome.text}</span>
+                  </span>
+                </div>
+
+                {/* Bot Played Line */}
+                <div className="bg-black/30 p-2.5 rounded-xl border border-white/5 text-[11px] font-mono flex flex-wrap items-center justify-center gap-1.5 text-gray-200">
+                  <span className="text-indigo-400 font-bold text-[10px] uppercase font-sans">Bot Line:</span>
+                  {analysis.botSimulation.botLineWords.map((word, idx) => (
+                    <React.Fragment key={idx}>
+                      <span
+                        className={`font-black tracking-wider px-1.5 py-0.5 rounded ${
+                          idx === 0
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            : word === analysis.targetWord
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-white/10 text-white'
+                        }`}
+                      >
+                        {word}
+                      </span>
+                      {idx < analysis.botSimulation.botLineWords.length - 1 && (
+                        <span className="text-gray-500">→</span>
+                      )}
+                    </React.Fragment>
+                  ))}
                 </div>
               </div>
 
