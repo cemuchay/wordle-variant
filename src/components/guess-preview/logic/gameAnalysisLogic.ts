@@ -589,7 +589,7 @@ export async function analyzeGame(
       poolAfterCount,
       eliminatedCount,
       eliminationPercentage: Number(eliminationPercentage.toFixed(1)),
-      moveRating,
+      moveRating: Number(moveRating.toFixed(2)),
       classification,
       classificationColor,
       agreementScore,

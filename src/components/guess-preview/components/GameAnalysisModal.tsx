@@ -349,7 +349,7 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
                         <div className="flex items-center gap-3">
                           <div className="text-right">
                             <span className="text-sm font-mono font-black text-amber-400 block">
-                              {move.moveRating}/10
+                              {Number(move.moveRating).toFixed(2)}/10
                             </span>
                             <span className="text-[10px] font-bold text-white block">
                               {move.agreementScore}% Agreement
