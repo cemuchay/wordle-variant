@@ -168,8 +168,105 @@ function findBestEntropyStarter(
 }
 
 /**
+ * Finds the optimal bot move for a state. Supports strategic elimination moves
+ * that intentionally drop green/yellow letters to clear candidate traps.
+ */
+export function findOptimalBotMove(
+  poolBefore: string[],
+  allowedWords: string[],
+  wordLength: number,
+  turn: number
+): { word: string; reason: string; expectedPoolReduction: string } {
+  const poolBeforeCount = poolBefore.length;
+
+  if (poolBeforeCount === 1) {
+    return {
+      word: poolBefore[0],
+      reason: 'Only 1 candidate word remains. Direct solve is optimal.',
+      expectedPoolReduction: '100%',
+    };
+  }
+
+  if (turn === 0) {
+    const starter = findBestEntropyStarter(poolBefore, wordLength);
+    return {
+      word: starter,
+      reason: 'High entropy starter testing common vowels and high-frequency consonants.',
+      expectedPoolReduction: '85%+',
+    };
+  }
+
+  // Find distinguishing letters among remaining candidates
+  const charCountsInPool = new Map<string, number>();
+  poolBefore.forEach((w) => {
+    new Set(w.split('')).forEach((c) => {
+      charCountsInPool.set(c, (charCountsInPool.get(c) || 0) + 1);
+    });
+  });
+
+  const distinguishingChars = Array.from(charCountsInPool.entries())
+    .filter(([, count]) => count > 0 && count < poolBeforeCount)
+    .map(([char]) => char);
+
+  if (distinguishingChars.length === 0) {
+    return {
+      word: poolBefore[0],
+      reason: 'Candidate answer chosen from remaining pool.',
+      expectedPoolReduction: `${Math.round(((poolBeforeCount - 1) / poolBeforeCount) * 100)}%`,
+    };
+  }
+
+  let bestTestWord = poolBefore[0];
+  let maxScore = -1;
+
+  const candidateList = allowedWords.length > 0 ? allowedWords : poolBefore;
+
+  for (const w of candidateList) {
+    const uniqueChars = new Set(w.split(''));
+    let distinguishingTested = 0;
+    distinguishingChars.forEach((ch) => {
+      if (uniqueChars.has(ch)) distinguishingTested++;
+    });
+
+    if (distinguishingTested === 0 && poolBeforeCount > 1) continue;
+
+    const isCandidate = poolBefore.includes(w);
+    const candidateBonus = poolBeforeCount <= 2 ? 18 : poolBeforeCount === 3 ? 12 : 7;
+    const score = distinguishingTested * 12 + (isCandidate ? candidateBonus : 0) + uniqueChars.size * 0.5;
+
+    if (score > maxScore) {
+      maxScore = score;
+      bestTestWord = w;
+    }
+  }
+
+  const isCandidate = poolBefore.includes(bestTestWord);
+  const testedList = Array.from(new Set(bestTestWord.split(''))).filter((c) =>
+    distinguishingChars.includes(c)
+  );
+  const testedStr =
+    testedList.length > 0 ? testedList.join(', ') : distinguishingChars.slice(0, 4).join(', ');
+
+  let botReason = '';
+  if (isCandidate) {
+    botReason = `Candidate answer testing key letter(s) (${testedStr}) from remaining ${poolBeforeCount} possibilities.`;
+  } else {
+    botReason = `Strategic elimination play: intentionally drops green/yellow letters to test ${testedList.length} distinguishing letters (${testedStr}) simultaneously across ${poolBeforeCount} candidates.`;
+  }
+
+  const expectedPoolReduction = `${Math.min(99, Math.round(((poolBeforeCount - 1) / poolBeforeCount) * 100))}%`;
+
+  return {
+    word: bestTestWord,
+    reason: botReason,
+    expectedPoolReduction,
+  };
+}
+
+/**
  * Simulates a full bot game starting with the USER'S starter word.
- * The bot plays blind without knowing the answer and can use hints (-100 pts penalty) if stuck.
+ * The bot plays blind without knowing the answer, can use strategic elimination moves,
+ * and can use hints (-100 pts penalty) if stuck.
  */
 export async function simulateBotGame(
   userStarterWord: string,
@@ -235,8 +332,6 @@ export async function simulateBotGame(
     if (poolBefore.length === 0) break;
 
     // Strategic Bot Hint logic:
-    // If bot has >= 4 candidates remaining on turn >= 2 and hint is not disabled, bot can take a hint!
-    // Using a hint applies the official -100 pts penalty (SCORING.HINT_PENALTY).
     if (!usedHint && turn >= 2 && poolBefore.length >= 4 && !isHintDisabled(uppercaseTarget, botGuesses)) {
       const hintData = getHint(uppercaseTarget, botGuesses);
       if (hintData) {
@@ -245,52 +340,8 @@ export async function simulateBotGame(
       }
     }
 
-    let nextGuess = uppercaseTarget;
-
-    if (poolBefore.length === 1) {
-      nextGuess = poolBefore[0];
-    } else if (poolBefore.length <= 35) {
-      const charCountsInPool = new Map<string, number>();
-      poolBefore.forEach((w) => {
-        new Set(w.split('')).forEach((c) => {
-          charCountsInPool.set(c, (charCountsInPool.get(c) || 0) + 1);
-        });
-      });
-
-      const distinguishingChars = Array.from(charCountsInPool.entries())
-        .filter(([, count]) => count > 0 && count < poolBefore.length)
-        .map(([char]) => char);
-
-      let bestTestWord = poolBefore[0];
-      let maxScore = -1;
-
-      const candidateList = poolBefore.length <= 8
-        ? poolBefore
-        : allowedWords.length > 0
-        ? allowedWords
-        : poolBefore;
-
-      for (const w of candidateList) {
-        const uniqueChars = new Set(w.split(''));
-        let distinguishingTested = 0;
-        distinguishingChars.forEach((ch) => {
-          if (uniqueChars.has(ch)) distinguishingTested++;
-        });
-
-        if (distinguishingTested === 0 && poolBefore.length > 1) continue;
-
-        const isCandidate = poolBefore.includes(w);
-        const score = distinguishingTested * 10 + (isCandidate ? 15 : 0) + uniqueChars.size * 0.5;
-
-        if (score > maxScore) {
-          maxScore = score;
-          bestTestWord = w;
-        }
-      }
-      nextGuess = bestTestWord;
-    } else {
-      nextGuess = findBestEntropyStarter(poolBefore, wordLength);
-    }
+    const optimalMove = findOptimalBotMove(poolBefore, allowedWords, wordLength, turn);
+    const nextGuess = optimalMove.word;
 
     botLineWords.push(nextGuess);
     const feedback = checkGuess(nextGuess, uppercaseTarget);
@@ -414,76 +465,11 @@ export async function analyzeGame(
       luckBonus = 1.0;
     }
 
-    // Bot Recommendation logic
-    let botWord = uppercaseTarget;
-    let botReason = '';
-    let expectedPoolReduction = '';
-
-    if (poolBeforeCount === 1) {
-      botWord = poolBefore[0];
-      botReason = 'Only 1 candidate word remains. Direct solve is optimal.';
-      expectedPoolReduction = '100%';
-    } else if (turn === 0) {
-      botWord = findBestEntropyStarter(poolBefore, wordLength);
-      botReason = 'High entropy starter testing common vowels and high-frequency consonants.';
-      expectedPoolReduction = '85%+';
-    } else if (poolBeforeCount <= 35) {
-      const charCountsInPool = new Map<string, number>();
-      poolBefore.forEach((w) => {
-        new Set(w.split('')).forEach((c) => {
-          charCountsInPool.set(c, (charCountsInPool.get(c) || 0) + 1);
-        });
-      });
-
-      const distinguishingChars = Array.from(charCountsInPool.entries())
-        .filter(([, count]) => count > 0 && count < poolBeforeCount)
-        .map(([char]) => char);
-
-      let bestTestWord = poolBefore[0];
-      let maxScore = -1;
-
-      const candidateList = poolBeforeCount <= 8
-        ? poolBefore
-        : allowedWords.length > 0
-        ? allowedWords
-        : poolBefore;
-
-      for (const w of candidateList) {
-        const uniqueChars = new Set(w.split(''));
-        let distinguishingTested = 0;
-        distinguishingChars.forEach((ch) => {
-          if (uniqueChars.has(ch)) distinguishingTested++;
-        });
-
-        if (distinguishingTested === 0 && poolBeforeCount > 1) continue;
-
-        const isCandidate = poolBefore.includes(w);
-        const score = distinguishingTested * 10 + (isCandidate ? 15 : 0) + uniqueChars.size * 0.5;
-
-        if (score > maxScore) {
-          maxScore = score;
-          bestTestWord = w;
-        }
-      }
-
-      botWord = bestTestWord;
-      const testedList = Array.from(new Set(bestTestWord.split(''))).filter((c) =>
-        distinguishingChars.includes(c)
-      );
-      const testedStr =
-        testedList.length > 0 ? testedList.join(', ') : distinguishingChars.slice(0, 4).join(', ');
-
-      if (poolBefore.includes(bestTestWord)) {
-        botReason = `Candidate answer testing key letter(s) (${testedStr}) from remaining ${poolBeforeCount} possibilities.`;
-      } else {
-        botReason = `Optimal move testing key distinguishing letters (${testedStr}) across ${poolBeforeCount} candidates.`;
-      }
-      expectedPoolReduction = `${Math.min(99, Math.round(((poolBeforeCount - 1) / poolBeforeCount) * 100))}%`;
-    } else {
-      botWord = findBestEntropyStarter(poolBefore, wordLength);
-      botReason = 'Strategic word maximizing unique letter discovery across remaining pool.';
-      expectedPoolReduction = '75%+';
-    }
+    // Bot Recommendation logic using findOptimalBotMove
+    const botMove = findOptimalBotMove(poolBefore, allowedWords, wordLength, turn);
+    const botWord = botMove.word;
+    const botReason = botMove.reason;
+    const expectedPoolReduction = botMove.expectedPoolReduction;
 
     // Tough Move Rating calculation (0.0 to 10.0)
     let moveRating = 7.0;
