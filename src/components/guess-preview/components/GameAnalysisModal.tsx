@@ -57,11 +57,11 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 pb-16 sm:pb-8 animate-in fade-in duration-200"
+      className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="bg-gray-900 border border-gray-700 w-full max-w-xl rounded-2xl p-5 sm:p-6 shadow-2xl relative max-h-[78vh] sm:max-h-[82vh] mb-10 sm:mb-4 flex flex-col flex-1 min-h-0 h-full overflow-hidden text-white"
+        className="bg-gray-900 border border-gray-700 w-full max-w-xl rounded-2xl p-4 sm:p-6 shadow-2xl relative max-h-[86vh] h-full flex flex-col flex-1 min-h-0 overflow-hidden text-white"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -87,7 +87,7 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
         </div>
 
         {/* Modal Scroll Content */}
-        <div className="flex-1 min-h-0 overflow-y-auto py-2 px-1 space-y-5 scrollbar-hide">
+        <div className="flex-1 min-h-0 overflow-y-auto py-2 px-1 space-y-5 scrollbar-none scrollbar-hide [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {loading ? (
             <div className="py-20 flex flex-col items-center justify-center gap-4">
               <Loader2 className="animate-spin text-amber-400" size={36} />
