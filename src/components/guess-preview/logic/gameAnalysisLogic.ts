@@ -86,7 +86,7 @@ export interface AnalysisOptions {
 export function isCandidateValid(
   candidate: string,
   guessWord: string,
-  statuses: ('correct' | 'present' | 'absent')[]
+  statuses: ('correct' | 'present' | 'absent' | 'empty' | string)[]
 ): boolean {
   const L = candidate.length;
   if (candidate.length !== L || guessWord.length !== L) return false;
