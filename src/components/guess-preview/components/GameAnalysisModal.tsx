@@ -4,6 +4,7 @@ import { X, Loader2, Sparkles, ChevronDown, ChevronUp, Bot, Target, Lightbulb, S
 import { analyzeGame, type GameAnalysisResult, type MoveAnalysis } from '../logic/gameAnalysisLogic';
 import { getTileSizeClass } from '../types';
 import { applyTheme } from '../../../utils/theme';
+import formatUsername from '@/utils/formatUsername';
 
 interface GameAnalysisModalProps {
   guesses: any[];
@@ -36,7 +37,6 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
 
   useEffect(() => {
     let isMounted = true;
-    setLoading(true);
 
     analyzeGame(guesses, targetWord, { hintsUsed, hintRecord })
       .then((res) => {
@@ -57,15 +57,15 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200"
+      className="fixed inset-0 z-100 bg-black/90 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-200 overflow-hidden"
       onClick={onClose}
     >
       <div
-        className="bg-gray-900 border border-gray-700 w-full max-w-xl rounded-2xl p-4 sm:p-6 shadow-2xl relative max-h-[86vh] h-full flex flex-col flex-1 min-h-0 overflow-hidden text-white"
+        className="bg-gray-900 border border-gray-700 w-full max-w-xl rounded-2xl p-6 sm:p-6 shadow-2xl relative h-full flex flex-col flex-1 min-h-0 overflow-hidden text-white"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-800 pb-3 mb-3 shrink-0">
+        <div className="flex items-center justify-between border-b border-gray-800 p-3 pt-7 mb-3 shrink-0">
           <div className="flex items-center gap-2.5">
             <span className="text-2xl">♟️</span>
             <div>
@@ -73,7 +73,7 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
                 Game Analysis
               </h2>
               <p className="text-xs font-bold text-white opacity-90">
-                Objective Move Scrutiny for {username}
+                Objective Move Scrutiny for {formatUsername(username)}
               </p>
             </div>
           </div>
@@ -125,10 +125,10 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
                       />
                     </svg>
                     <div className="absolute text-center">
-                      <span className="text-base sm:text-lg font-black text-white block leading-none">
+                      <span className="text-[14px] sm:text-lg font-black text-white block leading-none">
                         {analysis.accuracyScore}%
                       </span>
-                      <span className="text-[9px] font-bold text-white uppercase tracking-wider block mt-0.5">
+                      <span className="text-[7px] sm:text-[9px] font-bold text-white uppercase tracking-wider block mt-0.5">
                         Efficiency
                       </span>
                     </div>
@@ -155,25 +155,24 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
                 <div className="grid grid-cols-2 sm:grid-cols-2 gap-2 w-full sm:w-auto text-xs font-black">
                   {analysis.hintsUsed && (
                     <span
-                      className={`px-2.5 py-1 rounded-xl text-center flex items-center justify-center gap-1 col-span-2 ${
-                        analysis.hintQuality === 'strategic'
-                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                          : analysis.hintQuality === 'tactical'
+                      className={`px-2.5 py-1 rounded-xl text-center flex items-center justify-center gap-1 col-span-2 ${analysis.hintQuality === 'strategic'
+                        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                        : analysis.hintQuality === 'tactical'
                           ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
                           : analysis.hintQuality === 'unnecessary'
-                          ? 'bg-amber-500/30 text-amber-300 border border-amber-500/50'
-                          : 'bg-rose-500/30 text-rose-300 border border-rose-500/50'
-                      }`}
+                            ? 'bg-amber-500/30 text-amber-300 border border-amber-500/50'
+                            : 'bg-rose-500/30 text-rose-300 border border-rose-500/50'
+                        }`}
                     >
                       <Lightbulb size={12} className="shrink-0" />
                       <span>
                         {analysis.hintQuality === 'strategic'
                           ? 'Strategic Hint (0% Penalty)'
                           : analysis.hintQuality === 'tactical'
-                          ? 'Tactical Hint (-4%)'
-                          : analysis.hintQuality === 'unnecessary'
-                          ? 'Unnecessary Hint (-12%)'
-                          : 'Suboptimal Hint (-15%)'}
+                            ? 'Tactical Hint (-4%)'
+                            : analysis.hintQuality === 'unnecessary'
+                              ? 'Unnecessary Hint (-12%)'
+                              : 'Suboptimal Hint (-15%)'}
                       </span>
                     </span>
                   )}
@@ -211,7 +210,7 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
               </div>
 
               {/* PLAYER VS BOT MATCH SIMULATION CARD */}
-              <div className="bg-gradient-to-r from-gray-950 via-indigo-950/40 to-gray-950 border border-indigo-500/30 rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
+              <div className="bg-linear-to-r from-gray-950 via-indigo-950/40 to-gray-950 border border-indigo-500/30 rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
                 <div className="flex items-center justify-between border-b border-indigo-500/20 pb-2">
                   <div className="flex items-center gap-2">
                     <Swords size={18} className="text-amber-400" />
@@ -255,13 +254,12 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
                 {/* Outcome Banner */}
                 <div className="text-center pt-1">
                   <span
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border shadow-md ${
-                      analysis.matchOutcome.winner === 'user'
-                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                        : analysis.matchOutcome.winner === 'bot'
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border shadow-md ${analysis.matchOutcome.winner === 'user'
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                      : analysis.matchOutcome.winner === 'bot'
                         ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
                         : 'bg-gray-800 text-white border-gray-700'
-                    }`}
+                      }`}
                   >
                     <Trophy size={14} className="shrink-0" />
                     <span>{analysis.matchOutcome.text}</span>
@@ -274,13 +272,12 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
                   {analysis.botSimulation.botLineWords.map((word, idx) => (
                     <React.Fragment key={idx}>
                       <span
-                        className={`font-black tracking-wider px-1.5 py-0.5 rounded ${
-                          idx === 0
-                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                            : word === analysis.targetWord
+                        className={`font-black tracking-wider px-1.5 py-0.5 rounded ${idx === 0
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          : word === analysis.targetWord
                             ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                             : 'bg-white/10 text-white'
-                        }`}
+                          }`}
                       >
                         {word}
                       </span>
@@ -305,7 +302,7 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
                   return (
                     <div
                       key={move.turn}
-                      className="bg-gray-950 border border-gray-800 rounded-2xl overflow-hidden transition-all duration-200"
+                      className="bg-gray-950 border border-gray-800 rounded-2xl transition-all duration-200"
                     >
                       {/* Accordion Header */}
                       <button
@@ -325,13 +322,12 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
                                   key={idx}
                                   className={`flex items-center justify-center font-black uppercase shadow-inner ${getTileSizeClass(
                                     move.targetWord.length
-                                  )} ${
-                                    cell.status === 'correct'
-                                      ? 'bg-correct text-white'
-                                      : cell.status === 'present'
+                                  )} ${cell.status === 'correct'
+                                    ? 'bg-correct text-white'
+                                    : cell.status === 'present'
                                       ? 'bg-present text-white'
                                       : 'bg-gray-800 text-white border border-gray-700'
-                                  }`}
+                                    } `}
                                 >
                                   {cell.letter}
                                 </div>
@@ -390,13 +386,12 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
                           {/* Strategic Hint Notice */}
                           {move.isHintRow && move.hintAnalysisNotice && (
                             <div
-                              className={`flex items-center gap-2 text-xs font-black p-3 rounded-xl border ${
-                                analysis.hintQuality === 'strategic'
-                                  ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30'
-                                  : analysis.hintQuality === 'tactical'
+                              className={`flex items-center gap-2 text-xs font-black p-3 rounded-xl border ${analysis.hintQuality === 'strategic'
+                                ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30'
+                                : analysis.hintQuality === 'tactical'
                                   ? 'bg-blue-500/10 text-blue-300 border-blue-500/30'
                                   : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                              }`}
+                                }`}
                             >
                               <Lightbulb size={16} className="shrink-0" />
                               <span>{move.hintAnalysisNotice}</span>
@@ -439,7 +434,7 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="mt-3 pt-3 border-t border-gray-800 shrink-0">
+        <div className="border-t border-gray-800 shrink-0">
           <button
             onClick={onClose}
             className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-colors cursor-pointer"
