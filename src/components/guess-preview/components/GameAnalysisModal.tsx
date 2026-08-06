@@ -37,7 +37,6 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
 
   useEffect(() => {
     let isMounted = true;
-    setLoading(true);
 
     analyzeGame(guesses, targetWord, { hintsUsed, hintRecord })
       .then((res) => {
@@ -58,7 +57,7 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-200 overflow-hidden"
+      className="fixed inset-0 z-100 bg-black/90 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-200 overflow-hidden"
       onClick={onClose}
     >
       <div
@@ -211,7 +210,7 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
               </div>
 
               {/* PLAYER VS BOT MATCH SIMULATION CARD */}
-              <div className="bg-gradient-to-r from-gray-950 via-indigo-950/40 to-gray-950 border border-indigo-500/30 rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
+              <div className="bg-linear-to-r from-gray-950 via-indigo-950/40 to-gray-950 border border-indigo-500/30 rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
                 <div className="flex items-center justify-between border-b border-indigo-500/20 pb-2">
                   <div className="flex items-center gap-2">
                     <Swords size={18} className="text-amber-400" />
@@ -435,7 +434,7 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="mt-3 pt-3 border-t border-gray-800 shrink-0">
+        <div className="border-t border-gray-800 shrink-0">
           <button
             onClick={onClose}
             className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-colors cursor-pointer"

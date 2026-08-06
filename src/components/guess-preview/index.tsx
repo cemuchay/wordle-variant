@@ -441,6 +441,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
         fetchGuesses();
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     targetDate,
     entry.id,
@@ -710,11 +711,11 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
             )}
 
             {/* Game Analysis Button */}
-            {canSeeDetails && gameData?.guesses && gameData.guesses.length > 0 && targetWordToUse && (
+            {revealTargetWord && gameData?.guesses && gameData.guesses.length > 0 && targetWordToUse && (
               <div className="mb-3">
                 <button
                   onClick={() => setShowGameAnalysis(true)}
-                  className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-500/20 via-indigo-500/20 to-purple-500/20 hover:from-amber-500/30 hover:via-indigo-500/30 hover:to-purple-500/30 border border-amber-500/30 hover:border-amber-500/50 text-amber-300 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer group"
+                  className="w-full py-2.5 px-4 bg-linear-to-r from-amber-500/20 via-indigo-500/20 to-purple-500/20 hover:from-amber-500/30 hover:via-indigo-500/30 hover:to-purple-500/30 border border-amber-500/30 hover:border-amber-500/50 text-amber-300 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer group"
                 >
                   <span className="text-sm group-hover:scale-110 transition-transform">♟️</span>
                   <span>Analyze Game (Beta)</span>
@@ -778,7 +779,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
 
         <ShowScoringInfo showScoringInfo={showScoringInfo} setShowScoringInfo={setShowScoringInfo} />
 
-        {showGameAnalysis && gameData?.guesses && targetWordToUse && (
+        {showGameAnalysis && revealTargetWord && gameData?.guesses && targetWordToUse && (
           <GameAnalysisModal
             guesses={gameData.guesses}
             targetWord={targetWordToUse}
