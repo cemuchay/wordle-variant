@@ -65,7 +65,7 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-800 p-3 pt-7 mb-3 shrink-0">
+        <div className="flex items-center justify-between border-b border-gray-800 p-3 pt-7 mt-7 mb-3 shrink-0">
           <div className="flex items-center gap-2.5">
             <span className="text-2xl">♟️</span>
             <div>
@@ -87,7 +87,7 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
         </div>
 
         {/* Modal Scroll Content */}
-        <div className="flex-1 min-h-0 overflow-y-auto py-2 px-1 space-y-5 scrollbar-none scrollbar-hide [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex-1 min-h-0 overflow-y-auto py-4 px-1 space-y-5 scrollbar-none scrollbar-hide [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {loading ? (
             <div className="py-20 flex flex-col items-center justify-center gap-4">
               <Loader2 className="animate-spin text-amber-400" size={36} />
