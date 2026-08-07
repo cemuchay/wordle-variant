@@ -52,6 +52,7 @@ const AdminPage = safeLazy(() => import("./components/admin/AdminPage").then(m =
 const UnsubscribePage = safeLazy(() => import("./components/UnsubscribePage").then(m => ({ default: m.UnsubscribePage })));
 const WeeklyWrappedModal = safeLazy(() => import("./components/WeeklyWrappedModal").then(m => ({ default: m.WeeklyWrappedModal })));
 const WelcomeScreen = safeLazy(() => import("./components/WelcomeScreen").then(m => ({ default: m.WelcomeScreen })));
+const WordFinderPage = safeLazy(() => import("./components/dev/WordFinderPage").then(m => ({ default: m.WordFinderPage })));
 
 const fadeVariants = {
   initial: {
@@ -65,7 +66,7 @@ const fadeVariants = {
   },
 };
 
-export default function App() {
+function MainApp() {
   const { user, loading: isAuthLoading } = useAuth();
 
   const [guestOptedIn, setGuestOptedIn] = useState(() =>
@@ -874,29 +875,6 @@ export default function App() {
     }
   }, [isChallengeOpen, activeNavigationItem, isPlayingChallenge, isWordUpOpen, moreGameMode]);
 
-const WordFinderPage = safeLazy(() => import("./components/dev/WordFinderPage").then(m => ({ default: m.WordFinderPage })));
-
-  const isPageAdmin = window.location.pathname === "/admin";
-
-  if (isPageAdmin) {
-    return <AdminPage />;
-  }
-
-  const isPageWordFinder = window.location.pathname === "/word-finder" || window.location.pathname === "/finder";
-
-  if (isPageWordFinder) {
-    return (
-      <Suspense fallback={<div className="min-h-screen bg-slate-950 text-amber-400 font-bold p-8 flex items-center justify-center">Loading Word Finder...</div>}>
-        <WordFinderPage />
-      </Suspense>
-    );
-  }
-
-  const isPageUnsubscribe = window.location.pathname === "/unsubscribe";
-
-  if (isPageUnsubscribe) {
-    return <UnsubscribePage />;
-  }
 
   const handleNavigation = (
     item: "play" | "chat" | "leaderboard" | "challenges" | "wordup" | "more",
@@ -1536,4 +1514,37 @@ const WordFinderPage = safeLazy(() => import("./components/dev/WordFinderPage").
       <NotificationPermissionPrompt />
     </AppLayout>
   );
+}
+
+export default function App() {
+  const path = typeof window !== "undefined" ? window.location.pathname.toLowerCase().replace(/\/$/, "") : "";
+  const isPageWordFinder = path === "/word-finder" || path === "/finder";
+  const isPageAdmin = path === "/admin";
+  const isPageUnsubscribe = path === "/unsubscribe";
+
+  if (isPageWordFinder) {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-slate-950 text-amber-400 font-bold p-8 flex items-center justify-center">Loading Word Finder...</div>}>
+        <WordFinderPage />
+      </Suspense>
+    );
+  }
+
+  if (isPageAdmin) {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-gray-900 text-white font-bold p-8 flex items-center justify-center">Loading Admin...</div>}>
+        <AdminPage />
+      </Suspense>
+    );
+  }
+
+  if (isPageUnsubscribe) {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-gray-900 text-white font-bold p-8 flex items-center justify-center">Loading...</div>}>
+        <UnsubscribePage />
+      </Suspense>
+    );
+  }
+
+  return <MainApp />;
 }

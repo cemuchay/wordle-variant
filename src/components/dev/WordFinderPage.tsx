@@ -33,6 +33,13 @@ export const WordFinderPage: React.FC = () => {
     }
     return Array(5).fill('');
   });
+  const [yellowSlots, setYellowSlots] = useState<string[]>(() => {
+    const saved = sessionStorage.getItem('wf_yellowSlots');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+    }
+    return Array(5).fill('');
+  });
 
   // Common Filters
   const [excludeLetters, setExcludeLetters] = useState<string>(() => {
@@ -51,13 +58,22 @@ export const WordFinderPage: React.FC = () => {
   useEffect(() => { sessionStorage.setItem('wf_mode1Type', mode1Type); }, [mode1Type]);
   useEffect(() => { sessionStorage.setItem('wf_mode1Letters', mode1Letters); }, [mode1Letters]);
   useEffect(() => { sessionStorage.setItem('wf_slots', JSON.stringify(slots)); }, [slots]);
+  useEffect(() => { sessionStorage.setItem('wf_yellowSlots', JSON.stringify(yellowSlots)); }, [yellowSlots]);
   useEffect(() => { sessionStorage.setItem('wf_excludeLetters', excludeLetters); }, [excludeLetters]);
   useEffect(() => { sessionStorage.setItem('wf_mustContainLetters', mustContainLetters); }, [mustContainLetters]);
   useEffect(() => { sessionStorage.setItem('wf_excludeWordsInput', excludeWordsInput); }, [excludeWordsInput]);
 
-  // Update slots array when word length changes
+  // Update slots arrays when word length changes
   useEffect(() => {
     setSlots((prev) => {
+      if (prev.length === wordLength) return prev;
+      const next = Array(wordLength).fill('');
+      for (let i = 0; i < Math.min(prev.length, wordLength); i++) {
+        next[i] = prev[i];
+      }
+      return next;
+    });
+    setYellowSlots((prev) => {
       if (prev.length === wordLength) return prev;
       const next = Array(wordLength).fill('');
       for (let i = 0; i < Math.min(prev.length, wordLength); i++) {
@@ -155,11 +171,23 @@ export const WordFinderPage: React.FC = () => {
         if (actualCount !== exactCount) return false;
       }
 
-      // Fill-in-the-blanks positional match
+      // Fill-in-the-blanks green positional match (correct position)
       for (let i = 0; i < wordLength; i++) {
         const slotChar = slots[i]?.trim().toUpperCase();
         if (slotChar && slotChar !== word[i]) {
           return false;
+        }
+      }
+
+      // Fill-in-the-blanks yellow positional match (in word, but NOT in position i)
+      for (let i = 0; i < wordLength; i++) {
+        const yellowChars = yellowSlots[i]?.trim().toUpperCase();
+        if (yellowChars) {
+          for (let j = 0; j < yellowChars.length; j++) {
+            const ch = yellowChars[j];
+            if (!word.includes(ch)) return false;
+            if (word[i] === ch) return false;
+          }
         }
       }
 
@@ -185,7 +213,7 @@ export const WordFinderPage: React.FC = () => {
 
       return true;
     });
-  }, [words, loading, mode1Letters, mode1Type, slots, wordLength, excludeLetters, mustContainLetters, excludedWordsSet]);
+  }, [words, loading, mode1Letters, mode1Type, slots, yellowSlots, wordLength, excludeLetters, mustContainLetters, excludedWordsSet]);
 
   const handleSlotChange = (index: number, val: string) => {
     const char = val.slice(-1).toUpperCase();
@@ -194,23 +222,30 @@ export const WordFinderPage: React.FC = () => {
     setSlots(next);
   };
 
+  const handleYellowSlotChange = (index: number, val: string) => {
+    const chars = val.toUpperCase().replace(/[^A-Z]/g, '');
+    const next = [...yellowSlots];
+    next[index] = chars;
+    setYellowSlots(next);
+  };
+
   const clearAll = () => {
     setMode1Letters('');
     setSlots(Array(wordLength).fill(''));
+    setYellowSlots(Array(wordLength).fill(''));
     setExcludeLetters('');
     setMustContainLetters('');
     setExcludeWordsInput('');
-    ['wf_mode1Letters', 'wf_slots', 'wf_excludeLetters', 'wf_mustContainLetters', 'wf_excludeWordsInput'].forEach((k) => sessionStorage.removeItem(k));
+    ['wf_mode1Letters', 'wf_slots', 'wf_yellowSlots', 'wf_excludeLetters', 'wf_mustContainLetters', 'wf_excludeWordsInput'].forEach((k) => sessionStorage.removeItem(k));
   };
 
-  // Unique words test & elimination candidates when remaining words < 45
+  // Unique words test & elimination candidates when remaining words < 100
   const eliminationCandidates = useMemo(() => {
-    if (loading || filteredWords.length < 2 || filteredWords.length >= 45) {
+    if (loading || filteredWords.length < 2 || filteredWords.length >= 100) {
       return null;
     }
 
     // 1. Identify letters that differ among remaining possible candidate words
-    // For each letter position, check if there are different characters across words
     const letterPositions = Array.from({ length: wordLength }, (_, i) => i);
     const variablePositions: number[] = [];
     const distinguishingLetters = new Set<string>();
@@ -226,11 +261,17 @@ export const WordFinderPage: React.FC = () => {
     });
 
     // Find letters that are NOT shared by ALL remaining words (distinguishing letters)
+    const distinguishingLetterInfo: Array<{ char: string; count: number }> = [];
+
     candidateLetterCounts.forEach((count, char) => {
       if (count > 0 && count < filteredWords.length) {
         distinguishingLetters.add(char);
+        distinguishingLetterInfo.push({ char, count });
       }
     });
+
+    // Sort by count descending (most common distinguishing letters first)
+    distinguishingLetterInfo.sort((a, b) => b.count - a.count || a.char.localeCompare(b.char));
 
     // Determine variable slot indices
     letterPositions.forEach((pos) => {
@@ -240,38 +281,56 @@ export const WordFinderPage: React.FC = () => {
       }
     });
 
-    // 2. Search full word dictionary for optimal elimination words that contain the maximum number of distinguishing letters
-    const distinguishingArr = Array.from(distinguishingLetters);
+    // 2. Search full word dictionary for optimal elimination words based on strategic pool reduction (information gain)
+    const numCandidates = filteredWords.length;
 
-    // Score every word in the dictionary by how many distinct target distinguishing letters it tests
     const scoredEliminationWords = words
       .map((w) => {
         const uniqueChars = new Set(w.split(''));
-        let testScore = 0;
-        const testedChars: string[] = [];
+        let strategicScore = 0;
+        let testedCount = 0;
+        const testedCharsWithCounts: string[] = [];
 
-        distinguishingArr.forEach((ch) => {
-          if (uniqueChars.has(ch)) {
-            testScore += 1;
-            testedChars.push(ch);
+        distinguishingLetterInfo.forEach(({ char, count }) => {
+          if (uniqueChars.has(char)) {
+            testedCount += 1;
+            // Information theory partition efficiency: count * (numCandidates - count)
+            // Letters present in ~50% of candidate words maximize entropy reduction
+            const partitionEfficiency = count * (numCandidates - count);
+            strategicScore += partitionEfficiency;
+            testedCharsWithCounts.push(`${char} (x${count})`);
           }
         });
 
+        const isCandidate = filteredWords.includes(w);
+
         return {
           word: w,
-          score: testScore,
-          testedChars,
-          isCandidate: filteredWords.includes(w),
+          score: testedCount,
+          strategicScore,
+          testedCharsWithCounts,
+          isCandidate,
         };
       })
-      .filter((item) => item.score > 0)
-      .sort((a, b) => b.score - a.score || (b.isCandidate ? 1 : 0) - (a.isCandidate ? 1 : 0));
+      .filter((item) => item.strategicScore > 0)
+      .sort((a, b) => {
+        // 1. Highest strategic expected pool reduction score
+        if (b.strategicScore !== a.strategicScore) {
+          return b.strategicScore - a.strategicScore;
+        }
+        // 2. Prefer words that are themselves possible candidate answers (direct win chance)
+        if (b.isCandidate !== a.isCandidate) {
+          return b.isCandidate ? 1 : -1;
+        }
+        // 3. Number of distinct distinguishing letters tested
+        return b.score - a.score;
+      });
 
     // Deduplicate & pick top 10 best elimination words
     const topEliminationWords = scoredEliminationWords.slice(0, 10);
 
     return {
-      distinguishingLetters: distinguishingArr,
+      distinguishingLetterInfo,
       variablePositions,
       topEliminationWords,
     };
@@ -387,31 +446,63 @@ export const WordFinderPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 2: Fill-in-the-Blanks Search */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+        {/* Section 2: Fill-in-the-Blanks Search (Green & Yellow Grids) */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
               <Filter size={16} className="text-emerald-400" />
               Fill-in-the-Blanks Positional Search
             </div>
             <button
-              onClick={() => setSlots(Array(wordLength).fill(''))}
+              onClick={() => {
+                setSlots(Array(wordLength).fill(''));
+                setYellowSlots(Array(wordLength).fill(''));
+              }}
               className="text-[10px] font-bold text-slate-500 hover:text-slate-300 uppercase tracking-wider"
             >
-              Clear Slots
+              Clear Grid
             </button>
           </div>
-          <div className="flex flex-wrap justify-center gap-2 py-2">
-            {slots.map((char, idx) => (
-              <input
-                key={idx}
-                type="text"
-                maxLength={1}
-                value={char}
-                onChange={(e) => handleSlotChange(idx, e.target.value)}
-                className="w-11 h-12 sm:w-14 sm:h-14 bg-slate-950 border-2 border-slate-700 focus:border-emerald-400 text-center text-xl font-black uppercase text-emerald-400 rounded-xl focus:outline-none transition-colors shadow-inner"
-              />
-            ))}
+
+          {/* Green Slots Row */}
+          <div className="space-y-2">
+            <label className="block text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
+              Green Row (Correct position):
+            </label>
+            <div className="flex flex-wrap justify-center gap-2">
+              {slots.map((char, idx) => (
+                <input
+                  key={idx}
+                  type="text"
+                  maxLength={1}
+                  value={char}
+                  placeholder={`${idx + 1}`}
+                  onChange={(e) => handleSlotChange(idx, e.target.value)}
+                  className="w-11 h-12 sm:w-14 sm:h-14 bg-slate-950 border-2 border-emerald-500/40 focus:border-emerald-400 text-center text-xl font-black uppercase text-emerald-400 placeholder:text-slate-700 placeholder:text-xs rounded-xl focus:outline-none transition-colors shadow-inner"
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Yellow Slots Row */}
+          <div className="space-y-2 pt-3 border-t border-slate-800/80">
+            <label className="block text-[11px] font-bold text-amber-400 uppercase tracking-wider">
+              Yellow Row (In word, but NOT in this position):
+            </label>
+            <div className="flex flex-wrap justify-center gap-2">
+              {yellowSlots.map((chars, idx) => (
+                <input
+                  key={idx}
+                  type="text"
+                  maxLength={5}
+                  value={chars}
+                  placeholder="🚫"
+                  onChange={(e) => handleYellowSlotChange(idx, e.target.value)}
+                  className="w-11 h-12 sm:w-14 sm:h-14 bg-slate-950 border-2 border-amber-500/40 focus:border-amber-400 text-center text-xs sm:text-sm font-black uppercase text-amber-400 placeholder:text-slate-700 placeholder:text-xs rounded-xl focus:outline-none transition-colors shadow-inner tracking-widest"
+                  title={`Letters NOT at position ${idx + 1}, but present in word`}
+                />
+              ))}
+            </div>
           </div>
         </div>
 
@@ -471,7 +562,7 @@ export const WordFinderPage: React.FC = () => {
         </div>
 
         {/* Unique Words Test / Optimal Elimination Words Section (< 45 words) */}
-        {eliminationCandidates && eliminationCandidates.distinguishingLetters.length > 0 && (
+        {eliminationCandidates && eliminationCandidates.distinguishingLetterInfo.length > 0 && (
           <div className="bg-slate-900 border border-amber-500/40 rounded-2xl p-5 shadow-xl space-y-4 animate-in fade-in duration-300">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
@@ -486,22 +577,23 @@ export const WordFinderPage: React.FC = () => {
                 </div>
               </div>
               <span className="px-2.5 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-black uppercase rounded-lg">
-                {eliminationCandidates.distinguishingLetters.length} Key Letters to Test
+                {eliminationCandidates.distinguishingLetterInfo.length} Key Letters to Test
               </span>
             </div>
 
-            {/* Distinguishing Letters Pool */}
+            {/* Distinguishing Letters Pool with Word Counts eg C (x3) */}
             <div>
               <p className="text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2">
-                Distinguishing Letters to Test (e.g., M, R, B):
+                Distinguishing Letters to Test (frequency in remaining candidate words):
               </p>
               <div className="flex flex-wrap gap-1.5">
-                {eliminationCandidates.distinguishingLetters.map((ch) => (
+                {eliminationCandidates.distinguishingLetterInfo.map(({ char, count }) => (
                   <span
-                    key={ch}
-                    className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 font-black flex items-center justify-center text-sm shadow-sm"
+                    key={char}
+                    className="px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 font-black flex items-center justify-center text-xs shadow-sm gap-1"
                   >
-                    {ch}
+                    <span>{char}</span>
+                    <span className="text-[10px] text-amber-400/80 font-bold">(x{count})</span>
                   </span>
                 ))}
               </div>
@@ -529,7 +621,7 @@ export const WordFinderPage: React.FC = () => {
                     <div className="flex items-center gap-1">
                       <span className="text-[10px] font-bold text-slate-400">Tests ({item.score}):</span>
                       <span className="text-xs font-black text-amber-300 tracking-wider">
-                        {item.testedChars.join(', ')}
+                        {item.testedCharsWithCounts.join(', ')}
                       </span>
                     </div>
                   </div>
