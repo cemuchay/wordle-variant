@@ -230,6 +230,33 @@ function generateQuestion(
          qObj.imageUrl = String(meta.flag_code).toLowerCase();
       }
    }
+
+   // ── Relational Tautology Guard: Prevent self-referential choices or answers ──
+   if (qObj && qObj.prompt && qObj.answer && entity?.label) {
+      const promptLower = (qObj.prompt || "").toLowerCase();
+      const entityLabelLower = (entity.label || "").toLowerCase();
+
+      const isRelational = promptLower.includes("same continent") ||
+         promptLower.includes("shares the same") ||
+         promptLower.includes("in the same") ||
+         promptLower.includes("shares a border with");
+
+      if (isRelational) {
+         if (qObj.answer.toLowerCase() === entityLabelLower) {
+            const validChoices = (qObj.choices || []).filter((c: string) => c.toLowerCase() !== entityLabelLower);
+            if (validChoices.length > 0) {
+               qObj.answer = validChoices[0];
+               if (qObj.explanation) {
+                  qObj.explanation = qObj.explanation.replace(new RegExp(entity.label, "gi"), qObj.answer);
+               }
+            }
+         }
+         if (Array.isArray(qObj.choices)) {
+            qObj.choices = qObj.choices.filter((c: string) => c.toLowerCase() !== entityLabelLower);
+         }
+      }
+   }
+
    return qObj;
 }
 
@@ -336,11 +363,11 @@ function _generateQuestion(
           // Rule: Make distractors sensible (prefer countries from the same continent or sharing currency)
           if (!answerKey && meta.continent) {
              const sameContinentEntities = allEntities.filter(
-                (e) => e.id !== entity.id && e.metadata?.continent === meta.continent
+                (e) => e.label !== label && e.id !== entity.id && e.metadata?.continent === meta.continent
              );
              if (sameContinentEntities.length >= 3) {
                 distractors = seededShuffle(
-                   sameContinentEntities.map((e) => e.label).filter((l) => l !== answerVal),
+                   sameContinentEntities.map((e) => e.label).filter((l) => l !== answerVal && l !== label),
                    rng
                 ).slice(0, 3);
              }
@@ -351,15 +378,15 @@ function _generateQuestion(
        if (categoryType === "flag_bearer" && template.id === "flag_same_continent") {
           const continent = meta.continent;
           const sameContPeers = allEntities.filter(
-             (e) => e.id !== entity.id && e.metadata?.continent === continent
+             (e) => e.label !== label && e.id !== entity.id && e.metadata?.continent === continent
           );
           const diffContPeers = allEntities.filter(
-             (e) => e.metadata?.continent && e.metadata.continent !== continent
+             (e) => e.label !== label && e.id !== entity.id && e.metadata?.continent && e.metadata.continent !== continent
           );
           if (sameContPeers.length >= 1 && diffContPeers.length >= 3) {
              answerVal = seededShuffle(sameContPeers, rng)[0].label;
              distractors = seededShuffle(
-                [...new Set(diffContPeers.map((e) => e.label))],
+                [...new Set(diffContPeers.map((e) => e.label).filter((l) => l !== label && l !== answerVal))],
                 rng
              ).slice(0, 3);
              explanationText = `${answerVal} is located in ${continent}, sharing the same continent as ${label}.`;
@@ -371,15 +398,15 @@ function _generateQuestion(
        if (categoryType === "flag_bearer" && template.id === "flag_not_same_continent") {
           const continent = meta.continent;
           const sameContPeers = allEntities.filter(
-             (e) => e.id !== entity.id && e.metadata?.continent === continent
+             (e) => e.label !== label && e.id !== entity.id && e.metadata?.continent === continent
           );
           const diffContPeers = allEntities.filter(
-             (e) => e.metadata?.continent && e.metadata.continent !== continent
+             (e) => e.label !== label && e.id !== entity.id && e.metadata?.continent && e.metadata.continent !== continent
           );
           if (sameContPeers.length >= 2 && diffContPeers.length >= 1) {
              answerVal = seededShuffle(diffContPeers, rng)[0].label;
              const sameContLabels = seededShuffle(
-                [...new Set([label, ...sameContPeers.map((e) => e.label)])],
+                [...new Set(sameContPeers.map((e) => e.label).filter((l) => l !== answerVal && l !== label))],
                 rng
              ).slice(0, 3);
              distractors = sameContLabels;

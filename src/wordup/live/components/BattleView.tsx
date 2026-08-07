@@ -18,6 +18,7 @@ import { ScoreBar } from "../../shared/ScoreBar";
 import { SignalBar } from "../../shared/SignalBar";
 import { CATEGORIES } from "../../shared/constants";
 import { getQuestionDuration } from "../hooks/useGameEngine.core";
+import { useLiveStore } from "../store/useLiveStore";
 
 interface MatchData {
    p1_score?: number;
@@ -163,7 +164,9 @@ export const BattleView = ({
 
    // Resolve opponent choice
    const oppAnswers = isP1 ? matchData?.p2_answers : matchData?.p1_answers;
-   const oppChoice = oppAnswers?.[currentIdx]?.choice;
+   const oppChoiceFromAnswers = oppAnswers?.[currentIdx]?.choice;
+   const oppChoiceFromStore = useLiveStore((s) => s.opponentChoice);
+   const oppChoice = oppChoiceFromAnswers || (isP1 ? oppChoiceFromStore : selectedAnswer);
 
    const onChoiceSelect = (choice: string) => {
       handleAnswerSelect(choice);

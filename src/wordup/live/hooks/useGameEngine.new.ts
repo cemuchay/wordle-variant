@@ -335,8 +335,22 @@ export function useGameEngine(props: EngineProps) {
             });
         }
 
-        setMyScore((s) => s + myCurrentPointsRef.current);
-        setOpponentScore((s) => s + opponentCurrentPointsRef.current);
+        const addMy = myCurrentPointsRef.current;
+        const addOpp = opponentCurrentPointsRef.current;
+
+        const newMyScore = myScoreRef.current + addMy;
+        const newOppScore = opponentScoreRef.current + addOpp;
+
+        myScoreRef.current = newMyScore;
+        opponentScoreRef.current = newOppScore;
+
+        setMyScore(newMyScore);
+        setOpponentScore(newOppScore);
+
+        if (matchDataRef.current) {
+            matchDataRef.current.p1_score = isP1 ? newMyScore : newOppScore;
+            matchDataRef.current.p2_score = isP1 ? newOppScore : newMyScore;
+        }
 
         setCurrentRound(next);
         myChoiceRef.current = null;
@@ -549,13 +563,22 @@ export function useGameEngine(props: EngineProps) {
                             const br = simulateBotResponse(bq, botProfileRef.current, bDur);
                             const botChoice = pickBotChoice(bq, br.correct);
                             const pts = calcPoints(br.correct, br.time_taken, bDur, (currentRoundRef.current + 1) % 7 === 0);
+                            opponentTimeTakenRef.current = br.time_taken;
+                            opponentChoiceRef.current = botChoice;
+                            opponentCurrentPointsRef.current = pts;
                             setOpponentChoice(botChoice);
                             setOpponentCurrentPoints(pts);
                         } else {
+                            opponentTimeTakenRef.current = 0;
+                            opponentChoiceRef.current = "";
+                            opponentCurrentPointsRef.current = 0;
                             setOpponentChoice("");
                             setOpponentCurrentPoints(0);
                         }
                     } else {
+                        opponentTimeTakenRef.current = 0;
+                        opponentChoiceRef.current = "";
+                        opponentCurrentPointsRef.current = 0;
                         setOpponentChoice("");
                         setOpponentCurrentPoints(0);
                     }
@@ -584,6 +607,9 @@ export function useGameEngine(props: EngineProps) {
                     if (opponentChoiceRef.current !== null) return;
                     const botChoice = pickBotChoice(bq, br.correct);
                     const pts = calcPoints(br.correct, br.time_taken, bDur, (currentRoundRef.current + 1) % 7 === 0);
+                    opponentTimeTakenRef.current = br.time_taken;
+                    opponentChoiceRef.current = botChoice;
+                    opponentCurrentPointsRef.current = pts;
                     setOpponentChoice(botChoice);
                     setOpponentCurrentPoints(pts);
                 }, botMs);
@@ -640,10 +666,18 @@ export function useGameEngine(props: EngineProps) {
             const showRunning = phase === "playing" || phase === "reveal";
             const runningMy = myScore + (showRunning ? myCurrentPoints : 0);
             const runningOpp = opponentScore + (showRunning ? opponentCurrentPoints : 0);
+
+            const isP1 = roleRef.current === "player1";
+            const p1Score = isP1 ? runningMy : runningOpp;
+            const p2Score = isP1 ? runningOpp : runningMy;
+
+            matchDataRef.current.p1_score = p1Score;
+            matchDataRef.current.p2_score = p2Score;
+
             s.setMatchData({
                 ...matchDataRef.current,
-                p1_score: roleRef.current === "player1" ? runningMy : runningOpp,
-                p2_score: roleRef.current === "player1" ? runningOpp : runningMy,
+                p1_score: p1Score,
+                p2_score: p2Score,
             });
         }
     }, [
@@ -693,6 +727,7 @@ export function useGameEngine(props: EngineProps) {
 
         myTimeTakenRef.current = timeTaken;
         myChoiceRef.current = choice;
+        myCurrentPointsRef.current = pts;
         setMyChoice(choice);
         setMyCurrentPoints(pts);
 
@@ -730,6 +765,7 @@ export function useGameEngine(props: EngineProps) {
             );
             opponentTimeTakenRef.current = br.time_taken;
             opponentChoiceRef.current = botChoice;
+            opponentCurrentPointsRef.current = botPts;
             setOpponentChoice(botChoice);
             setOpponentCurrentPoints(botPts);
         }
@@ -748,6 +784,8 @@ export function useGameEngine(props: EngineProps) {
         const pts = calcPoints(correct, timeTaken, duration, (currentRoundRef.current + 1) % 7 === 0);
 
         opponentTimeTakenRef.current = timeTaken;
+        opponentChoiceRef.current = choice;
+        opponentCurrentPointsRef.current = pts;
         setOpponentChoice(choice);
         setOpponentCurrentPoints(pts);
     }, []);

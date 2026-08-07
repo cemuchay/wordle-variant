@@ -31,12 +31,43 @@ export function baseQuestionToWordUpQuestion(
     ? (typeHint as WordUpQuestion["type"])
     : "definition";
 
+  let prompt = base.question;
+  let choices = [...(base.options || [])];
+  let answer = base.answer;
+  let explanation = base.explanation;
+
+  // Guard against self-referential / tautological choices in relational questions
+  if (prompt && answer) {
+    const promptLower = prompt.toLowerCase();
+    const isRelational = promptLower.includes("same continent") ||
+      promptLower.includes("shares the same") ||
+      promptLower.includes("in the same") ||
+      promptLower.includes("shares a border with");
+
+    if (isRelational) {
+      const match = prompt.match(/(?:as|with|and)\s+([A-Z][a-z0-9\s]+?)(?:\?|\.|$|\))/i);
+      const targetEntity = match ? match[1].trim().toLowerCase() : "";
+
+      if (targetEntity) {
+        if (answer.toLowerCase() === targetEntity) {
+          const valid = choices.filter((c) => c.toLowerCase() !== targetEntity);
+          if (valid.length > 0) {
+            answer = valid[0];
+            if (explanation) explanation = explanation.replace(new RegExp(targetEntity, "gi"), answer);
+          }
+        }
+        choices = choices.filter((c) => c.toLowerCase() !== targetEntity);
+        if (!choices.includes(answer)) choices.push(answer);
+      }
+    }
+  }
+
   return {
     type,
-    prompt: base.question,
-    choices: base.options,
-    answer: base.answer,
-    explanation: base.explanation,
+    prompt,
+    choices,
+    answer,
+    explanation,
     imageUrl: base.imageUrl,
     imageUrls: base.imageUrls,
   };
