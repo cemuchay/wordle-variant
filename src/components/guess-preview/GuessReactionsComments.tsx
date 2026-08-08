@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect, useRef } from 'react';
-import { MessageCircle, Heart, Send, X, Edit2, Trash2, Smile } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { MessageCircle, Heart, Send, X, Edit2, Trash2, Smile, Loader2, CornerDownRight } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../hooks/useAuth';
 import formatUsername from '../../utils/formatUsername';
@@ -11,6 +11,8 @@ interface GuessReactionsCommentsProps {
     guessIndex: number;
     commentsDisabledByTarget: boolean;
     formattedTime?: string | null;
+    row?: any[];
+    canSeeDetails?: boolean;
 }
 
 interface Comment {
@@ -21,6 +23,7 @@ interface Comment {
     author_username?: string;
     is_edited: boolean;
     is_deleted: boolean;
+    parent_id?: string | null;
 }
 
 interface Reaction {
@@ -34,7 +37,16 @@ interface CommentReaction {
     user_id: string;
 }
 
-const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
+const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '👀'];
+
+const getCommenterBgColor = (authorId: string) => {
+    let hash = 0;
+    for (let i = 0; i < authorId.length; i++) {
+        hash = authorId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = Math.abs(hash % 360);
+    return `hsl(${hue}, 45%, 15%)`;
+};
 
 export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
     targetUserId,
@@ -42,6 +54,8 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
     guessIndex,
     commentsDisabledByTarget,
     formattedTime,
+    row,
+    canSeeDetails,
 }) => {
     const { user: currentUser } = useAuth();
     const [comments, setComments] = useState<Comment[]>([]);
@@ -52,7 +66,9 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [newComment, setNewComment] = useState('');
     const [submittingComment, setSubmittingComment] = useState(false);
+    const [replyToComment, setReplyToComment] = useState<Comment | null>(null);
     const longPressTimer = useRef<any>(null);
+    const commentInputRef = useRef<HTMLInputElement>(null);
 
     // Edit state
     const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
@@ -61,68 +77,75 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
     const [selectedEmojiFilter, setSelectedEmojiFilter] = useState<string | null>(null);
 
     const fetchData = async () => {
-        // Fetch reactions
-        const { data: rxData } = await supabase
-            .from('guess_reactions')
-            .select('reaction, user_id')
-            .eq('target_user_id', targetUserId)
-            .eq('game_date', gameDate)
-            .eq('guess_index', guessIndex);
+        // Parallelized fetch of reactions and comments
+        const fetchReactionsPromise = async () => {
+            const { data: rxData } = await supabase
+                .from('guess_reactions')
+                .select('reaction, user_id')
+                .eq('target_user_id', targetUserId)
+                .eq('game_date', gameDate)
+                .eq('guess_index', guessIndex);
 
-        if (rxData) {
-            setReactions(rxData);
-            const rxUserIds = Array.from(new Set(rxData.map(r => r.user_id)));
-            if (rxUserIds.length > 0) {
-                const { data: rxProfiles } = await supabase
-                    .from('profiles')
-                    .select('id, username')
-                    .in('id', rxUserIds);
-                const rxProfileMap = new Map(rxProfiles?.map(p => [p.id, p.username]));
-                setReactionUsernames(
-                    rxData.map(r => ({
-                        reaction: r.reaction,
-                        username: rxProfileMap.get(r.user_id) || 'Someone'
-                    }))
-                );
-            } else {
-                setReactionUsernames([]);
+            if (rxData) {
+                setReactions(rxData);
+                const rxUserIds = Array.from(new Set(rxData.map(r => r.user_id)));
+                if (rxUserIds.length > 0) {
+                    const { data: rxProfiles } = await supabase
+                        .from('profiles')
+                        .select('id, username')
+                        .in('id', rxUserIds);
+                    const rxProfileMap = new Map(rxProfiles?.map(p => [p.id, p.username]));
+                    setReactionUsernames(
+                        rxData.map(r => ({
+                            reaction: r.reaction,
+                            username: rxProfileMap.get(r.user_id) || 'Someone'
+                        }))
+                    );
+                } else {
+                    setReactionUsernames([]);
+                }
             }
-        }
+        };
 
-        // Fetch comments if not disabled
-        if (!commentsDisabledByTarget) {
+        const fetchCommentsPromise = async () => {
+            if (commentsDisabledByTarget) return;
+
             const { data: cmData } = await supabase
                 .from('guess_comments')
-                .select('id, content, author_id, created_at, is_edited, is_deleted')
+                .select('id, content, author_id, created_at, is_edited, is_deleted, parent_id')
                 .eq('target_user_id', targetUserId)
                 .eq('game_date', gameDate)
                 .eq('guess_index', guessIndex)
                 .order('created_at', { ascending: true });
 
             if (cmData) {
-                // Fetch usernames for authors
                 const authorIds = Array.from(new Set(cmData.map(c => c.author_id)));
                 if (authorIds.length > 0) {
-                    const { data: authors } = await supabase
-                        .from('profiles')
-                        .select('id, username')
-                        .in('id', authorIds);
+                    // Parallelized fetch of authors and comment reactions
+                    const [authorsResult, cRxResult] = await Promise.all([
+                        supabase
+                            .from('profiles')
+                            .select('id, username')
+                            .in('id', authorIds),
+                        supabase
+                            .from('comment_reactions')
+                            .select('comment_id, reaction, user_id')
+                            .in('comment_id', cmData.map(c => c.id))
+                    ]);
+
+                    const authors = authorsResult.data;
+                    const cRxData = cRxResult.data;
 
                     const authorMap = new Map(authors?.map(a => [a.id, a.username]));
                     const commentsWithUsernames = cmData.map(c => ({
                         ...c,
                         author_username: authorMap.get(c.author_id) || 'Someone',
                         is_edited: c.is_edited || false,
-                        is_deleted: c.is_deleted || false
+                        is_deleted: c.is_deleted || false,
+                        parent_id: c.parent_id || null
                     }));
                     setComments(commentsWithUsernames);
 
-                    // Fetch comment reactions
-                    const commentIds = cmData.map(c => c.id);
-                    const { data: cRxData } = await supabase
-                        .from('comment_reactions')
-                        .select('comment_id, reaction, user_id')
-                        .in('comment_id', commentIds);
                     if (cRxData) {
                         setCommentReactions(cRxData);
                     }
@@ -131,7 +154,9 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
                     setCommentReactions([]);
                 }
             }
-        }
+        };
+
+        await Promise.all([fetchReactionsPromise(), fetchCommentsPromise()]);
     };
 
     // Fetch comments and reactions
@@ -195,6 +220,21 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [targetUserId, gameDate, guessIndex, commentsDisabledByTarget]);
 
+    // Handle custom event to open the comment drawer
+    useEffect(() => {
+        const handleOpenComments = (e: CustomEvent) => {
+            const { guessIndex: targetIdx } = e.detail || {};
+            if (targetIdx === guessIndex) {
+                setShowCommentDrawer(true);
+            }
+        };
+
+        window.addEventListener('open-row-comments' as any, handleOpenComments);
+        return () => {
+            window.removeEventListener('open-row-comments' as any, handleOpenComments);
+        };
+    }, [guessIndex]);
+
     const handleReact = async (emoji: string) => {
         if (!currentUser) return;
         setShowEmojiPicker(false);
@@ -238,6 +278,8 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
         if (!currentUser || !newComment.trim() || commentsDisabledByTarget || submittingComment) return;
 
         setSubmittingComment(true);
+        const parentId = replyToComment ? (replyToComment.parent_id || replyToComment.id) : null;
+
         const { error } = await supabase
             .from('guess_comments')
             .insert({
@@ -245,13 +287,23 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
                 game_date: gameDate,
                 guess_index: guessIndex,
                 author_id: currentUser.id,
-                content: newComment.trim()
+                content: newComment.trim(),
+                parent_id: parentId
             });
 
         if (!error) {
             setNewComment('');
+            setReplyToComment(null);
+            fetchData();
         }
         setSubmittingComment(false);
+    };
+
+    const handleStartReply = (comment: Comment) => {
+        setReplyToComment(comment);
+        if (commentInputRef.current) {
+            commentInputRef.current.focus();
+        }
     };
 
     const handleStartEdit = (comment: Comment) => {
@@ -320,6 +372,19 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
         fetchData();
     };
 
+    // Threading computation
+    const rootComments = useMemo(() => comments.filter(c => !c.parent_id), [comments]);
+    const repliesByParent = useMemo(() => {
+        const map: Record<string, Comment[]> = {};
+        comments.forEach(c => {
+            if (c.parent_id) {
+                if (!map[c.parent_id]) map[c.parent_id] = [];
+                map[c.parent_id].push(c);
+            }
+        });
+        return map;
+    }, [comments]);
+
     // Calculate aggregated reactions count
     const reactionCounts = EMOJIS.map(emoji => ({
         emoji,
@@ -343,6 +408,149 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
         }
     };
 
+    // Reusable single comment renderer
+    const renderCommentBox = (c: Comment, isReply = false) => {
+        const isAuthor = currentUser?.id === c.author_id;
+        const isEditing = editingCommentId === c.id;
+
+        // Comment reactions calculation
+        const cReactions = commentReactions.filter(r => r.comment_id === c.id);
+        const cReactionCounts = EMOJIS.map(emoji => ({
+            emoji,
+            count: cReactions.filter(r => r.reaction === emoji).length,
+            hasReacted: cReactions.some(r => r.user_id === currentUser?.id && r.reaction === emoji)
+        })).filter(r => r.count > 0);
+
+        const commenterBg = getCommenterBgColor(c.author_id);
+
+        return (
+            <div
+                key={c.id}
+                className="p-2.5 rounded-xl text-left relative group border border-white/5"
+                style={{ backgroundColor: commenterBg }}
+            >
+                <div className="flex justify-between items-center mb-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[11px] font-black text-white">@{formatUsername(c.author_username || '')}</span>
+                        {isReply && (
+                            <span className="text-[9px] text-white/70 font-semibold italic">reply</span>
+                        )}
+                        {c.is_edited && !c.is_deleted && (
+                            <span className="text-[7.5px] bg-white/20 px-1 rounded-sm text-white font-bold uppercase">Edited</span>
+                        )}
+                    </div>
+                    <span className="text-[10px] text-white/80">{new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+
+                {isEditing ? (
+                    <div className="flex flex-col gap-1.5 mt-1.5">
+                        <input
+                            type="text"
+                            value={editCommentText}
+                            onChange={(e) => setEditCommentText(e.target.value)}
+                            className="bg-gray-900 border border-gray-800 rounded-lg px-2 py-1 text-xs text-white focus:outline-none"
+                        />
+                        <div className="flex gap-2 justify-end">
+                            <button
+                                onClick={() => setEditingCommentId(null)}
+                                className="text-[9px] uppercase font-black text-gray-400 hover:text-white px-2 py-1 bg-white/5 rounded-md"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => handleSaveEdit(c.id)}
+                                className="text-[9px] uppercase font-black text-white px-2 py-1 bg-indigo-600 rounded-md"
+                            >
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        <p className={`text-xs wrap-break-word font-medium ${c.is_deleted ? 'text-white/60 italic' : 'text-white'}`}>{c.content}</p>
+
+                        {/* Reactions on Comment */}
+                        {cReactionCounts.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                                {cReactionCounts.map(({ emoji, count, hasReacted }) => (
+                                    <button
+                                        key={emoji}
+                                        onClick={() => handleCommentReact(c.id, emoji)}
+                                        className={`flex items-center gap-0.5 px-1 py-0.2 rounded-full text-[8px] ${hasReacted
+                                            ? 'bg-correct/20 border border-correct/30 text-correct'
+                                            : 'bg-white/5 border border-white/5 text-gray-400'
+                                            }`}
+                                    >
+                                        <span>{emoji}</span>
+                                        <span className="font-bold">{count}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Actions bar */}
+                        {currentUser && !c.is_deleted && (
+                            <div className="flex items-center justify-end gap-2 mt-1.5 pt-1 border-t border-white/10">
+                                {/* Reply button */}
+                                <button
+                                    onClick={() => handleStartReply(c)}
+                                    className="text-white/60 hover:text-white transition-colors mr-auto"
+                                    title="Reply"
+                                >
+                                    <CornerDownRight size={10} />
+                                </button>
+
+                                {/* React button */}
+                                <div className="relative">
+                                    <button
+                                        onClick={() => setActiveCommentReactionPicker(activeCommentReactionPicker === c.id ? null : c.id)}
+                                        className="text-white/60 hover:text-white transition-colors"
+                                        title="React to comment"
+                                    >
+                                        <Smile size={10} />
+                                    </button>
+
+                                    {activeCommentReactionPicker === c.id && (
+                                        <div className="absolute right-0 bottom-4 bg-gray-950 border border-gray-800 rounded-xl p-1 flex gap-1 z-50 shadow-2xl animate-in zoom-in-95 duration-100">
+                                            {EMOJIS.slice(0, 3).map(emoji => (
+                                                <button
+                                                    key={emoji}
+                                                    onClick={() => handleCommentReact(c.id, emoji)}
+                                                    className="text-sm p-1 hover:bg-white/10 rounded-md"
+                                                >
+                                                    {emoji}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {isAuthor && (
+                                    <>
+                                        <button
+                                            onClick={() => handleStartEdit(c)}
+                                            className="text-white/60 hover:text-white transition-colors"
+                                            title="Edit"
+                                        >
+                                            <Edit2 size={10} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteComment(c.id)}
+                                            className="text-white/60 hover:text-red-400 transition-colors"
+                                            title="Delete"
+                                        >
+                                            <Trash2 size={10} />
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+        );
+    };
+
     return (
         <div
             className="flex flex-col w-full relative mt-1 select-none"
@@ -357,8 +565,8 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
                             key={emoji}
                             onClick={() => setSelectedEmojiFilter(emoji)}
                             className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] transition-all ${hasReacted
-                                    ? 'bg-correct/20 border border-correct/30 text-correct'
-                                    : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10'
+                                ? 'bg-correct/20 border border-correct/30 text-correct'
+                                : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10'
                                 }`}
                         >
                             <span>{emoji}</span>
@@ -421,7 +629,26 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
                     <div className="absolute inset-0" onClick={() => setShowCommentDrawer(false)} />
                     <div className="relative w-full max-w-sm bg-gray-950 border border-gray-800 rounded-2xl p-4 flex flex-col max-h-[75vh] z-10 animate-in zoom-in-95 duration-200">
                         <div className="flex items-center justify-between border-b border-gray-900 pb-2 mb-3">
-                            <span className="text-[10px] uppercase font-black tracking-widest text-indigo-400">Comments</span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] uppercase font-black tracking-widest text-indigo-400">Comments</span>
+                                {row && (
+                                    <div className="flex gap-0.5">
+                                        {row.map((cell: any, idx: number) => (
+                                            <div
+                                                key={idx}
+                                                className={`w-5 h-5 rounded-[4px] flex items-center justify-center font-black uppercase text-[9px] shadow-inner ${cell.status === "correct"
+                                                        ? "bg-correct text-white"
+                                                        : cell.status === "present"
+                                                            ? "bg-present text-white"
+                                                            : "bg-gray-800 text-white border border-gray-700"
+                                                    }`}
+                                            >
+                                                {canSeeDetails ? cell.letter : ""}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                             <button onClick={() => setShowCommentDrawer(false)} className="text-gray-500 hover:text-white">
                                 <X size={16} />
                             </button>
@@ -432,129 +659,19 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
                             {comments.length === 0 ? (
                                 <p className="text-[10px] text-gray-600 uppercase tracking-wider text-center py-8">No comments yet. Say something nice!</p>
                             ) : (
-                                comments.map(c => {
-                                    const isAuthor = currentUser?.id === c.author_id;
-                                    const isEditing = editingCommentId === c.id;
+                                rootComments.map(c => (
+                                    <div key={c.id} className="space-y-2">
+                                        {/* Parent comment */}
+                                        {renderCommentBox(c, false)}
 
-                                    // Comment reactions calculation
-                                    const cReactions = commentReactions.filter(r => r.comment_id === c.id);
-                                    const cReactionCounts = EMOJIS.map(emoji => ({
-                                        emoji,
-                                        count: cReactions.filter(r => r.reaction === emoji).length,
-                                        hasReacted: cReactions.some(r => r.user_id === currentUser?.id && r.reaction === emoji)
-                                    })).filter(r => r.count > 0);
-
-                                    return (
-                                        <div key={c.id} className="bg-white/5 border border-white/5 p-2 rounded-xl text-left relative group">
-                                            <div className="flex justify-between items-center mb-0.5">
-                                                <div className="flex items-center gap-1.5 flex-wrap">
-                                                    <span className="text-[9px] font-black text-indigo-300">@{formatUsername(c.author_username || '')}</span>
-                                                    {c.is_edited && !c.is_deleted && (
-                                                        <span className="text-[7.5px] bg-white/10 px-1 rounded-sm text-gray-400 font-bold uppercase">Edited</span>
-                                                    )}
-                                                </div>
-                                                <span className="text-[8px] text-gray-500">{new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                        {/* Nested replies */}
+                                        {repliesByParent[c.id]?.length > 0 && (
+                                            <div className="pl-4 ml-3 border-l-2 border-indigo-500/20 space-y-2">
+                                                {repliesByParent[c.id].map(reply => renderCommentBox(reply, true))}
                                             </div>
-
-                                            {isEditing ? (
-                                                <div className="flex flex-col gap-1.5 mt-1.5">
-                                                    <input
-                                                        type="text"
-                                                        value={editCommentText}
-                                                        onChange={(e) => setEditCommentText(e.target.value)}
-                                                        className="bg-gray-900 border border-gray-800 rounded-lg px-2 py-1 text-xs text-white focus:outline-none"
-                                                    />
-                                                    <div className="flex gap-2 justify-end">
-                                                        <button
-                                                            onClick={() => setEditingCommentId(null)}
-                                                            className="text-[9px] uppercase font-black text-gray-400 hover:text-white px-2 py-1 bg-white/5 rounded-md"
-                                                        >
-                                                            Cancel
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleSaveEdit(c.id)}
-                                                            className="text-[9px] uppercase font-black text-white px-2 py-1 bg-indigo-600 rounded-md"
-                                                        >
-                                                            Save
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    <p className={`text-xs wrap-break-word ${c.is_deleted ? 'text-gray-500 italic' : 'text-white'}`}>{c.content}</p>
-
-                                                    {/* Reactions on Comment */}
-                                                    {cReactionCounts.length > 0 && (
-                                                        <div className="flex flex-wrap items-center gap-1 mt-1.5">
-                                                            {cReactionCounts.map(({ emoji, count, hasReacted }) => (
-                                                                <button
-                                                                    key={emoji}
-                                                                    onClick={() => handleCommentReact(c.id, emoji)}
-                                                                    className={`flex items-center gap-0.5 px-1 py-0.2 rounded-full text-[8px] ${hasReacted
-                                                                            ? 'bg-correct/20 border border-correct/30 text-correct'
-                                                                            : 'bg-white/5 border border-white/5 text-gray-400'
-                                                                        }`}
-                                                                >
-                                                                    <span>{emoji}</span>
-                                                                    <span className="font-bold">{count}</span>
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    )}
-
-                                                    {/* Hover / Actions bar */}
-                                                    {currentUser && !c.is_deleted && (
-                                                        <div className="flex items-center justify-end gap-2 mt-1.5 pt-1 border-t border-white/2">
-                                                            {/* React button */}
-                                                            <div className="relative">
-                                                                <button
-                                                                    onClick={() => setActiveCommentReactionPicker(activeCommentReactionPicker === c.id ? null : c.id)}
-                                                                    className="text-gray-500 hover:text-white transition-colors"
-                                                                    title="React to comment"
-                                                                >
-                                                                    <Smile size={10} />
-                                                                </button>
-
-                                                                {activeCommentReactionPicker === c.id && (
-                                                                    <div className="absolute right-0 bottom-4 bg-gray-950 border border-gray-800 rounded-xl p-1 flex gap-1 z-50 shadow-2xl animate-in zoom-in-95 duration-100">
-                                                                        {EMOJIS.slice(0, 3).map(emoji => (
-                                                                            <button
-                                                                                key={emoji}
-                                                                                onClick={() => handleCommentReact(c.id, emoji)}
-                                                                                className="text-sm p-1 hover:bg-white/10 rounded-md"
-                                                                            >
-                                                                                {emoji}
-                                                                            </button>
-                                                                        ))}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-
-                                                            {isAuthor && (
-                                                                <>
-                                                                    <button
-                                                                        onClick={() => handleStartEdit(c)}
-                                                                        className="text-gray-500 hover:text-white transition-colors"
-                                                                        title="Edit"
-                                                                    >
-                                                                        <Edit2 size={10} />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleDeleteComment(c.id)}
-                                                                        className="text-gray-500 hover:text-red-400 transition-colors"
-                                                                        title="Delete"
-                                                                    >
-                                                                        <Trash2 size={10} />
-                                                                    </button>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </>
-                                            )}
-                                        </div>
-                                    );
-                                })
+                                        )}
+                                    </div>
+                                ))
                             )}
                         </div>
 
@@ -564,22 +681,41 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
                                 Sign in to leave a comment
                             </div>
                         ) : (
-                            <form onSubmit={handleSendComment} className="flex gap-2 border-t border-gray-900 pt-3 mt-2">
-                                <input
-                                    type="text"
-                                    value={newComment}
-                                    onChange={(e) => setNewComment(e.target.value)}
-                                    placeholder="Add a comment..."
-                                    className="flex-1 bg-gray-900 border border-gray-800 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-indigo-500/50 text-white placeholder-gray-600"
-                                />
-                                <button
-                                    type="submit"
-                                    disabled={!newComment.trim() || submittingComment}
-                                    className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white p-2 rounded-xl transition-all cursor-pointer"
-                                >
-                                    <Send size={14} />
-                                </button>
-                            </form>
+                            <div className="border-t border-gray-900 pt-3 mt-2 flex flex-col gap-1.5">
+                                {/* Reply indicator banner */}
+                                {replyToComment && (
+                                    <div className="flex items-center justify-between bg-white/5 border border-white/5 rounded-lg px-2.5 py-1 text-[10px] text-gray-400">
+                                        <span className="flex items-center gap-1">
+                                            <CornerDownRight size={10} className="text-indigo-400" />
+                                            <span>Replying to <span className="text-indigo-300 font-bold">@{formatUsername(replyToComment.author_username || '')}</span></span>
+                                        </span>
+                                        <button onClick={() => setReplyToComment(null)} className="text-gray-500 hover:text-white p-0.5">
+                                            <X size={10} />
+                                        </button>
+                                    </div>
+                                )}
+                                <form onSubmit={handleSendComment} className="flex gap-2">
+                                    <input
+                                        ref={commentInputRef}
+                                        type="text"
+                                        value={newComment}
+                                        onChange={(e) => setNewComment(e.target.value)}
+                                        placeholder={replyToComment ? `Reply to @${formatUsername(replyToComment.author_username || '')}...` : "Add a comment..."}
+                                        className="flex-1 bg-gray-900 border border-gray-800 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-indigo-500/50 text-white placeholder-gray-600"
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={!newComment.trim() || submittingComment}
+                                        className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white p-2 rounded-xl transition-all cursor-pointer flex items-center justify-center min-w-[34px]"
+                                    >
+                                        {submittingComment ? (
+                                            <Loader2 size={14} className="animate-spin text-white" />
+                                        ) : (
+                                            <Send size={14} />
+                                        )}
+                                    </button>
+                                </form>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -614,4 +750,3 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
         </div>
     );
 };
-

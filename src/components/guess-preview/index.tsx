@@ -605,6 +605,16 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
     };
   }, [entry.user_id, entry.user?.id, entry.profiles?.id, targetDate, isChallenge, commentsDisabledByTarget]);
 
+  const handleCommentClick = (guessIndex: number) => {
+    const rowEl = document.getElementById(`guess-row-${guessIndex}`);
+    if (rowEl) {
+      rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('open-row-comments', { detail: { guessIndex } }));
+    }, 300);
+  };
+
   return (
     <div
       className="bg-gray-900 border border-gray-700 w-full max-w-xl mx-auto rounded-2xl p-4 sm:p-6 shadow-2xl relative flex flex-col flex-1 min-h-0 h-full overflow-hidden"
@@ -698,7 +708,11 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
                 <p className="text-[9px] uppercase font-black tracking-widest text-indigo-400">Latest Comments</p>
                 <div className="space-y-2.5">
                   {latestComments.map(c => (
-                    <div key={c.id} className="text-xs leading-relaxed border-b border-white/3 pb-1.5 last:border-b-0 last:pb-0">
+                    <div
+                      key={c.id}
+                      onClick={() => handleCommentClick(c.guess_index)}
+                      className="text-xs leading-relaxed border-b border-white/3 pb-1.5 last:border-b-0 last:pb-0 cursor-pointer hover:bg-white/5 p-1 rounded-lg transition-colors"
+                    >
                       <div className="flex justify-between items-center mb-0.5">
                         <span className="font-black text-[10px] text-indigo-300">@{formatUsername(c.author_username || '')}</span>
                         <span className="text-[8px] text-gray-500 font-mono">Row {c.guess_index + 1}</span>

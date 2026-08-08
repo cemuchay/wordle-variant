@@ -16,7 +16,6 @@ import GuessPreviewModal from './guess-preview';
 // type Timeframe = 'today' | 'weekly' | 'monthly' | 'all';
 type Timeframe = 'today' | 'yesterday' | 'weekly' | 'monthly'
 
-
 interface GameStats {
   gamesPlayed: number;
   gamesWon: number;
@@ -555,12 +554,23 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex
       return;
     }
 
-    // Fetch distinct reactions and who made them
-    const { data: rxData } = await supabase
-      .from('guess_reactions')
-      .select('reaction, user_id')
-      .eq('target_user_id', entry.user_id)
-      .eq('game_date', gameDate);
+    // Fetch distinct reactions and comments count in parallel
+    const [rxResult, commentsResult] = await Promise.all([
+      supabase
+        .from('guess_reactions')
+        .select('reaction, user_id')
+        .eq('target_user_id', entry.user_id)
+        .eq('game_date', gameDate),
+      supabase
+        .from('guess_comments')
+        .select('id', { count: 'exact', head: true })
+        .eq('target_user_id', entry.user_id)
+        .eq('game_date', gameDate)
+    ]);
+
+    const rxData = rxResult.data;
+    const count = commentsResult.count;
+
     if (rxData) {
       setReactions(rxData);
       const uIds = Array.from(new Set(rxData.map(r => r.user_id)));
@@ -581,12 +591,6 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex
       }
     }
 
-    // Fetch comments count
-    const { count } = await supabase
-      .from('guess_comments')
-      .select('id', { count: 'exact', head: true })
-      .eq('target_user_id', entry.user_id)
-      .eq('game_date', gameDate);
     if (count !== null) setCommentsCount(count);
   };
 
