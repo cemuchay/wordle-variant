@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, Phone, Users, Check, X, PhoneOff, MessageCircle, BellRing, Trophy } from 'lucide-react';
 import { ProtectedAvatar } from './chat/ProtectedAvatar';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
 import { AudioChatControls } from './challenge/AudioChatControls';
@@ -115,7 +115,7 @@ export const DynamicIslandStatus = () => {
             const detail = (e as CustomEvent)?.detail;
             if (detail && detail.message) {
                 // Briefly flash in Dynamic Island using triggerToast
-triggerToast(detail.message, TOAST_DURATION.VERY_LONG);
+                triggerToast(detail.message, TOAST_DURATION.VERY_LONG);
 
 
             }
@@ -192,7 +192,7 @@ triggerToast(detail.message, TOAST_DURATION.VERY_LONG);
     // Get the first active voice room to show in the island
     const currentVoiceSession = activeVoiceRooms[0];
 
-    const getStatusKey = () => {
+    const getStatusKey = useCallback(() => {
         if (isExpanded) return 'expanded';
         if (toast.show) return `toast-${toast.message}`;
         if (activeCall) return `call-${activeCall.status}`;
@@ -200,7 +200,7 @@ triggerToast(detail.message, TOAST_DURATION.VERY_LONG);
         if (mascot) return `mascot-${mascot.expression}`;
         if (otherOnlineUsers.length > 0) return 'online';
         return 'default';
-    };
+    }, [isExpanded, toast.show, toast.message, activeCall, currentVoiceSession, mascot, otherOnlineUsers.length]);
 
     // Watch status changes to trigger rainbow lightup & micro-expansion/scale animation
     useEffect(() => {
@@ -228,7 +228,7 @@ triggerToast(detail.message, TOAST_DURATION.VERY_LONG);
                 clearTimeout(scaleTimer);
             };
         }
-    }, [toast.show, toast.message, activeCall?.status, currentVoiceSession, mascot, otherOnlineUsers.length, isExpanded]);
+    }, [getStatusKey]);
 
     const handleGoToLobby = (e: React.MouseEvent, challengeId: string) => {
         e.stopPropagation();
@@ -245,18 +245,34 @@ triggerToast(detail.message, TOAST_DURATION.VERY_LONG);
         setIsExpanded(false);
     };
 
-    const sortedProfiles = [...allProfiles].sort((a, b) => {
-        const aOnline = onlineUsers.some(u => u.id === a.id);
-        const bOnline = onlineUsers.some(u => u.id === b.id);
+    const [oneMonthAgoCutoff, setOneMonthAgoCutoff] = useState(0);
 
-        if (aOnline && !bOnline) return -1;
-        if (!aOnline && bOnline) return 1;
+    useEffect(() => {
+        Promise.resolve().then(() => {
+            setOneMonthAgoCutoff(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        });
+    }, [resumeKey]);
 
-        const aTime = a.last_seen_at ? new Date(a.last_seen_at).getTime() : 0;
-        const bTime = b.last_seen_at ? new Date(b.last_seen_at).getTime() : 0;
+    const sortedProfiles = useMemo(() => {
+        return [...allProfiles]
+            .filter(p => {
+                if (p.id === user?.id) return true;
+                if (!p.last_seen_at) return false;
+                return new Date(p.last_seen_at).getTime() >= oneMonthAgoCutoff;
+            })
+            .sort((a, b) => {
+                const aOnline = onlineUsers.some(u => u.id === a.id);
+                const bOnline = onlineUsers.some(u => u.id === b.id);
 
-        return bTime - aTime;
-    });
+                if (aOnline && !bOnline) return -1;
+                if (!aOnline && bOnline) return 1;
+
+                const aTime = a.last_seen_at ? new Date(a.last_seen_at).getTime() : 0;
+                const bTime = b.last_seen_at ? new Date(b.last_seen_at).getTime() : 0;
+
+                return bTime - aTime;
+            });
+    }, [allProfiles, onlineUsers, user?.id, oneMonthAgoCutoff]);
 
     const isConnected = audioChat.isConnected;
 
@@ -334,7 +350,7 @@ triggerToast(detail.message, TOAST_DURATION.VERY_LONG);
                     <div className="absolute inset-[-1.5px] pointer-events-none z-0">
                         {/* Glow overlay - masked to bleed only outwards */}
                         <motion.div
-                            className="absolute inset-[-4px]"
+                            className="absolute -inset-1"
                             style={{
                                 borderRadius: isExpanded ? '37px' : '25px',
                                 padding: '5.5px',
@@ -443,7 +459,7 @@ triggerToast(detail.message, TOAST_DURATION.VERY_LONG);
                                                         username={activeCall.targetUser?.username || ''}
                                                         className="w-4 h-4 rounded-full border border-white/20 shrink-0"
                                                     />
-                                                    <span className="text-[8px] font-bold text-white truncate max-w-[80px]">
+                                                    <span className="text-[8px] font-bold text-white truncate max-w-20">
                                                         {activeCall.targetUser?.username} calls
                                                     </span>
                                                 </div>
@@ -466,7 +482,7 @@ triggerToast(detail.message, TOAST_DURATION.VERY_LONG);
                                             <div className="flex items-center justify-between w-full" onClick={(e) => e.stopPropagation()}>
                                                 <div className="flex items-center gap-1.5 min-w-0">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
-                                                    <span className="text-[8px] font-bold text-zinc-400 truncate max-w-[90px]">
+                                                    <span className="text-[8px] font-bold text-zinc-400 truncate max-w-22.5">
                                                         Calling {activeCall.targetUser?.username}...
                                                     </span>
                                                 </div>
@@ -501,7 +517,7 @@ triggerToast(detail.message, TOAST_DURATION.VERY_LONG);
                                         </div>
                                     ) : mascot ? (
                                         <div className="flex items-center gap-1.5 px-2.5 h-full w-full justify-center">
-                                            <span className="text-[8px] uppercase font-black tracking-[0.08em] text-white/90 truncate max-w-[110px] select-none">{mascot.label}</span>
+                                            <span className="text-[8px] uppercase font-black tracking-[0.08em] text-white/90 truncate max-w-27.5 select-none">{mascot.label}</span>
                                         </div>
                                     ) : (
                                         <div className="flex items-center gap-1.5 px-2.5 h-full w-full justify-center">

@@ -37,7 +37,7 @@ interface CommentReaction {
     user_id: string;
 }
 
-const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
+const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '👀'];
 
 const getCommenterBgColor = (authorId: string) => {
     let hash = 0;
@@ -636,13 +636,12 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
                                         {row.map((cell: any, idx: number) => (
                                             <div
                                                 key={idx}
-                                                className={`w-5 h-5 rounded-[4px] flex items-center justify-center font-black uppercase text-[9px] shadow-inner ${
-                                                    cell.status === "correct"
+                                                className={`w-5 h-5 rounded-[4px] flex items-center justify-center font-black uppercase text-[9px] shadow-inner ${cell.status === "correct"
                                                         ? "bg-correct text-white"
                                                         : cell.status === "present"
                                                             ? "bg-present text-white"
                                                             : "bg-gray-800 text-white border border-gray-700"
-                                                }`}
+                                                    }`}
                                             >
                                                 {canSeeDetails ? cell.letter : ""}
                                             </div>
