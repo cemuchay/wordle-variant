@@ -57,7 +57,8 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-100 bg-black/90 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-200 overflow-hidden"
+
+      className="fixed inset-0 z-100 bg-black/90 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-200 overflow-hidden h-full min-h-0"
       onClick={onClose}
     >
       <div
@@ -366,9 +367,8 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
                           <div className="flex items-center justify-between bg-black/50 p-3 rounded-xl border border-gray-800 text-xs">
                             <span className="text-white font-bold">Candidate Pool:</span>
                             <div className="flex items-center gap-2 font-mono font-black">
-                              <span className="text-white">{move.poolBeforeCount}</span>
                               <span className="text-white opacity-60">→</span>
-                              <span className="text-emerald-400">{move.poolAfterCount}</span>
+                              <span className="text-emerald-400">Now: {move.poolAfterCount}</span>
                               <span className="text-amber-400 font-bold ml-1">
                                 ({move.eliminationPercentage}% eliminated)
                               </span>

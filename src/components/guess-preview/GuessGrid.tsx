@@ -45,6 +45,7 @@ export const GuessGrid = memo(({
                 return (
                     <div
                         key={i}
+                        id={`guess-row-${i}`}
                         className="flex flex-col gap-2 p-3 bg-white/5 rounded-xl border border-white/10 w-full max-w-xs mx-auto"
                     >
                         <div className="flex items-center gap-3 justify-between">
@@ -110,6 +111,8 @@ export const GuessGrid = memo(({
                                 guessIndex={i}
                                 commentsDisabledByTarget={commentsDisabledByTarget}
                                 formattedTime={formattedTime}
+                                row={row}
+                                canSeeDetails={canSeeDetails}
                             />
                         </div>
                     </div>
