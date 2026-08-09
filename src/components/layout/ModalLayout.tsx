@@ -20,7 +20,7 @@ const maxWidthMap = {
   lg: 'max-w-lg',
   xl: 'max-w-xl',
   '2xl': 'max-w-2xl',
-  full: 'max-w-full',
+  full: 'max-w-full h-full',
 };
 
 export const ModalLayout: React.FC<ModalLayoutProps> = ({
@@ -79,6 +79,10 @@ export const ModalLayout: React.FC<ModalLayoutProps> = ({
           <div className="flex-1 flex flex-col min-h-0 overflow-y-auto scrollbar-hide">
             {children}
           </div>
+        )}
+
+        <div className="flex-1 flex flex-col min-h-0 overflow-y-auto scrollbar-hide">
+          {children}
         </div>
       </div>
     );
