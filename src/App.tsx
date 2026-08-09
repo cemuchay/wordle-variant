@@ -1087,25 +1087,41 @@ function MainApp() {
                     setIsChallengeOpen={setIsChallengeOpen}
                   />
                 ) : (
-                  <GameArea
-                    wordLength={config?.length ?? DEFAULT_WORD_LENGTH}
-                    maxAttempts={config?.maxAttempts ?? MAX_ATTEMPTS}
-                    guesses={state.guesses}
-                    currentGuess={state.currentGuess}
-                    cursorIndex={state.cursorIndex}
-                    editIndex={state.editIndex}
-                    letterStatuses={state.letterStatuses}
-                    hintRecord={state.hintRecord}
-                    isGameOver={state.isGameOver}
-                    isShake={state.isShake}
-                    isSaving={state.syncStatus === "syncing"}
-                    onChar={actions.onChar}
-                    onDelete={actions.onDelete}
-                    onEnter={actions.onEnter}
-                    onSetCursor={actions.onSetCursor}
-                    onSetEditIndex={actions.onSetEditIndex}
-                    isAlreadyPlayed={isAlreadyPlayedTodayOnLoad}
-                  />
+                  <div className="h-full flex flex-col relative min-h-0 w-full">
+                    {user && state.isGameOver && isAlreadyPlayedTodayOnLoad && (
+                      <div className="flex items-center justify-center pt-1 pb-1 z-30 shrink-0">
+                        <button
+                          onClick={() => {
+                            safeSessionStorage.removeItem("wordle_already_played_dismissed");
+                            setDismissedAlreadyPlayed(false);
+                          }}
+                          className="px-3.5 py-1.5 bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border border-indigo-400/60 rounded-xl text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
+                        >
+                          <Trophy size={14} className="text-amber-300" />
+                          <span>Daily Hub & Archives</span>
+                        </button>
+                      </div>
+                    )}
+                    <GameArea
+                      wordLength={config?.length ?? DEFAULT_WORD_LENGTH}
+                      maxAttempts={config?.maxAttempts ?? MAX_ATTEMPTS}
+                      guesses={state.guesses}
+                      currentGuess={state.currentGuess}
+                      cursorIndex={state.cursorIndex}
+                      editIndex={state.editIndex}
+                      letterStatuses={state.letterStatuses}
+                      hintRecord={state.hintRecord}
+                      isGameOver={state.isGameOver}
+                      isShake={state.isShake}
+                      isSaving={state.syncStatus === "syncing"}
+                      onChar={actions.onChar}
+                      onDelete={actions.onDelete}
+                      onEnter={actions.onEnter}
+                      onSetCursor={actions.onSetCursor}
+                      onSetEditIndex={actions.onSetEditIndex}
+                      isAlreadyPlayed={isAlreadyPlayedTodayOnLoad}
+                    />
+                  </div>
                 )}
               </main>
             )}
