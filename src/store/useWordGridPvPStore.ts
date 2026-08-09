@@ -7,6 +7,7 @@ import { DEFAULT_GRID_SIZE } from "../utils/wordgrid/constants";
 import { generateInitialTileBag, drawBalancedRack } from "../utils/wordgrid/bagBalancing";
 import { WordGridPvPEngine } from "../utils/wordgrid/WordGridPvPEngine";
 import { safeLocalStorage } from "../utils/storage";
+import { sendWordGridChallengeNotification, sendWordGridTurnNotification } from "../lib/clientPush";
 
 export type WordGridPvPViewType = "lobby" | "matchmaking" | "active" | "completed";
 
@@ -358,25 +359,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
     const playerName = currentPlayer?.username || "Your opponent";
 
     if (nextTurnUserId && isUuid(nextTurnUserId) && nextTurnUserId !== userId) {
-      supabase
-        .from("notifications")
-        .insert({
-          user_id: nextTurnUserId,
-          type: "CHALLENGE_INVITE",
-          title: isCompleted ? "WordGrid Match Completed! 🏆" : "Your Turn in WordGrid! 🔠",
-          message: isCompleted
-            ? `${playerName} played the final move! Check out the final scores.`
-            : `${playerName} played a word! It is now your turn.`,
-          data: {
-            mode: "wordgrid",
-            matchId: state.matchId,
-            turnUserId: nextTurnUserId,
-          },
-          is_read: false,
-        })
-        .then(({ error: notifErr }) => {
-          if (notifErr) console.warn("[WordGridPvP] Move turn notification error:", notifErr);
-        });
+      sendWordGridTurnNotification(nextTurnUserId, playerName, state.matchId, isCompleted, false);
     }
 
     return true;
@@ -434,23 +417,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
     const playerName = currentPlayer?.username || "Your opponent";
 
     if (nextTurnUserId && isUuid(nextTurnUserId) && nextTurnUserId !== userId) {
-      supabase
-        .from("notifications")
-        .insert({
-          user_id: nextTurnUserId,
-          type: "CHALLENGE_INVITE",
-          title: "Your Turn in WordGrid! 🔠",
-          message: `${playerName} swapped tiles! It is now your turn.`,
-          data: {
-            mode: "wordgrid",
-            matchId: state.matchId,
-            turnUserId: nextTurnUserId,
-          },
-          is_read: false,
-        })
-        .then(({ error: notifErr }) => {
-          if (notifErr) console.warn("[WordGridPvP] Swap turn notification error:", notifErr);
-        });
+      sendWordGridTurnNotification(nextTurnUserId, playerName, state.matchId, false, true);
     }
   },
 
@@ -460,6 +427,27 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
     set({ status: "completed", view: "completed" });
     savePvPSnapshot(matchId, { ...get(), status: "completed" });
     supabase.from("wordgrid_matches").update({ status: "completed" }).eq("id", matchId);
+  },
+
+  resetGame: () => {
+    set({
+      matchId: null,
+      gridSize: DEFAULT_GRID_SIZE,
+      maxPlayers: 2,
+      role: null,
+      status: "lobby",
+      view: "lobby",
+      board: [],
+      tileBag: [],
+      players: [],
+      currentTurnIndex: 0,
+      currentTurn: null,
+      moves: [],
+      placedTiles: [],
+      rack: [],
+      loading: false,
+      error: null,
+    });
   },
 
   startQueue: async (userId, _isRated, gridSize, targetPlayers, _triggerToast) => {
@@ -472,7 +460,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
       const payload = {
         id: matchId,
         player1_id: userId,
-        status: "active",
+        status: "pending",
         grid_size: gridSize,
         max_players: targetPlayers,
         board: [],
@@ -532,23 +520,9 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
 
       get().updateFromMatchRecord(data, userId);
 
-      // Send challenge notification to opponent
+      // Send challenge notification to opponent via clientPush
       const challengerName = (data as any)?.player1?.username || "A player";
-      supabase.from("notifications").insert({
-        user_id: opponentId,
-        type: "CHALLENGE_INVITE",
-        title: "WordGrid Arena Challenge 🔠",
-        message: `${challengerName} has challenged you to a WordGrid game (${gridSize}×${gridSize})!`,
-        data: {
-          mode: "wordgrid",
-          matchId,
-          challengerId: userId,
-          gridSize,
-        },
-        is_read: false,
-      }).then(({ error: notifErr }) => {
-        if (notifErr) console.warn("[WordGridPvP] Challenge notification warning:", notifErr);
-      });
+      sendWordGridChallengeNotification(opponentId, challengerName, gridSize, matchId);
 
       triggerToast("Direct challenge started!");
     } catch (e: any) {

@@ -43,6 +43,7 @@ import MoreGamesList from "./components/MoreGamesList";
 import AppLoadingSkeleton from "./components/app/AppLoadingSkeleton";
 import DisconnectedUI from "./components/app/DisconnectedUI";
 import { initTelemetry } from "./lib/telemetry";
+import { flushNotificationQueue } from "./lib/clientPush";
 
 const ChatRoom = safeLazy(() => import("./components/chatRoom"));
 const StatsModal = safeLazy(() => import("./components/StatsModal").then(m => ({ default: m.StatsModal })));
@@ -566,6 +567,7 @@ function MainApp() {
 
   // Listen to custom event to open auth modal
   useEffect(() => {
+    flushNotificationQueue();
     const handleOpenAuth = () => setIsAuthOpen(true);
     window.addEventListener("open-auth-modal", handleOpenAuth);
     return () => window.removeEventListener("open-auth-modal", handleOpenAuth);
