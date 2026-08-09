@@ -39,6 +39,7 @@ import formatUsername from './utils/formatUsername';
 import { TIMEOUT } from './constants/game';
 import { motion, AnimatePresence } from "framer-motion";
 import { AlreadyPlayedScreen } from "./components/AlreadyPlayedScreen";
+import { FreePlayModal } from "./components/freeplay/FreePlayModal";
 import MoreGamesList from "./components/MoreGamesList";
 import AppLoadingSkeleton from "./components/app/AppLoadingSkeleton";
 import DisconnectedUI from "./components/app/DisconnectedUI";
@@ -250,6 +251,8 @@ function MainApp() {
   const [moreGameMode, setMoreGameMode] = useState<'select' | 'wordup' | 'wordgrid'>('select');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [viewedProfileId, setViewedProfileId] = useState<string | null>(null);
+  const [isFreePlayOpen, setIsFreePlayOpen] = useState(false);
+  const [freePlayMode, setFreePlayMode] = useState<'guest' | 'archive'>('archive');
 
   const [dismissedAlreadyPlayed, setDismissedAlreadyPlayed] = useState(() => {
     return safeSessionStorage.getItem("wordle_already_played_dismissed") === "true";
@@ -1073,6 +1076,10 @@ function MainApp() {
                       safeSessionStorage.setItem("wordle_already_played_dismissed", "true");
                       setDismissedAlreadyPlayed(true);
                     }}
+                    onOpenFreePlay={(selectedMode) => {
+                      setFreePlayMode(selectedMode);
+                      setIsFreePlayOpen(true);
+                    }}
                     activeDailyMarathons={activeDailyMarathons}
                     isMarathonLoading={isMarathonLoading}
                     isMarathonError={isMarathonError}
@@ -1534,6 +1541,11 @@ function MainApp() {
       <ImageModal />
       <PWAInstallBanner />
       <NotificationPermissionPrompt />
+      <FreePlayModal
+        isOpen={isFreePlayOpen}
+        initialMode={freePlayMode}
+        onClose={() => setIsFreePlayOpen(false)}
+      />
     </AppLayout>
   );
 }

@@ -1,13 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Eye, Swords, HelpCircle, X, } from "lucide-react";
+import { Gamepad2, Calendar, Trophy, Eye, Swords, HelpCircle, X } from "lucide-react";
 import { MarathonBanner } from "./common/MarathonBanner";
 import CountDown from "./common/CountDown"
 
 interface AlreadyPlayedScreenProps {
   onNavigate: (item: "play" | "chat" | "leaderboard" | "challenges" | "wordup") => void;
   onAdmirePuzzle: () => void;
+  onOpenFreePlay?: (mode: 'guest' | 'archive') => void;
   activeDailyMarathons: any[];
   isMarathonLoading?: boolean;
   isMarathonError?: boolean;
@@ -25,6 +26,7 @@ interface OptionDetail {
 export const AlreadyPlayedScreen = ({
   onNavigate,
   onAdmirePuzzle,
+  onOpenFreePlay,
   activeDailyMarathons,
   isMarathonLoading = false,
   isMarathonError = false,
@@ -56,7 +58,7 @@ export const AlreadyPlayedScreen = ({
 
   return (
     <div className="h-full w-full overflow-y-auto scrollbar-hide px-4 sm:px-6 flex flex-col justify-center items-center select-none text-white bg-dark">
-      <div className="w-full max-w-md mx-auto flex flex-col justify-center items-center space-y-6 overflow-hidden">
+      <div className="w-full max-w-md mx-auto flex flex-col justify-center items-center space-y-6 overflow-hidden py-6">
         {/* Title block */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -71,6 +73,46 @@ export const AlreadyPlayedScreen = ({
             You have completed today's puzzle!.
           </p>
         </motion.div>
+
+        {/* Free Play & Archive Action Cards */}
+        {onOpenFreePlay && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.05, duration: 0.3 }}
+            className="w-full grid grid-cols-2 gap-3"
+          >
+            <button
+              onClick={() => onOpenFreePlay('guest')}
+              className="p-3.5 bg-linear-to-br from-emerald-950/80 to-teal-950/80 border border-emerald-500/40 hover:border-emerald-400 rounded-2xl flex flex-col items-start justify-between gap-2 transition-all duration-300 shadow-xl group cursor-pointer active:scale-98"
+            >
+              <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/30 text-emerald-400 group-hover:scale-110 transition-transform">
+                <Gamepad2 size={20} />
+              </div>
+              <div className="text-left">
+                <h4 className="text-xs font-black uppercase tracking-wider text-white group-hover:text-emerald-300">
+                  Play Guest Game
+                </h4>
+                <p className="text-[10px] text-gray-400 font-medium">Daily local free-play</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => onOpenFreePlay('archive')}
+              className="p-3.5 bg-linear-to-br from-indigo-950/80 to-purple-950/80 border border-indigo-500/40 hover:border-indigo-400 rounded-2xl flex flex-col items-start justify-between gap-2 transition-all duration-300 shadow-xl group cursor-pointer active:scale-98"
+            >
+              <div className="p-2 bg-indigo-500/20 rounded-xl border border-indigo-500/30 text-indigo-400 group-hover:scale-110 transition-transform">
+                <Calendar size={20} />
+              </div>
+              <div className="text-left">
+                <h4 className="text-xs font-black uppercase tracking-wider text-white group-hover:text-indigo-300">
+                  Play Archive
+                </h4>
+                <p className="text-[10px] text-gray-400 font-medium">Past daily puzzles</p>
+              </div>
+            </button>
+          </motion.div>
+        )}
 
         {/* Main Options Grid */}
         <motion.div
