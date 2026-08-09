@@ -69,15 +69,23 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
   useEffect(() => {
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
     if (!userId || !isUuid || view !== 'lobby') return;
-    loadMatchesList(userId);
+
+    useWordGridStore.getState().loadMatchesList(userId);
 
     const channel = supabase
-      .channel('wordgrid_lobby_matches')
+      .channel(`wordgrid_lobby_${userId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'wordgrid_matches' },
+        { event: '*', schema: 'public', table: 'wordgrid_matches', filter: `player1_id=eq.${userId}` },
         () => {
-          loadMatchesList(userId);
+          useWordGridStore.getState().loadMatchesList(userId);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'wordgrid_matches', filter: `player2_id=eq.${userId}` },
+        () => {
+          useWordGridStore.getState().loadMatchesList(userId);
         }
       )
       .subscribe();
@@ -85,7 +93,7 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, view, loadMatchesList]);
+  }, [userId, view]);
 
   const [isLaunching, setIsLaunching] = useState(false);
 

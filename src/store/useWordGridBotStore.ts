@@ -681,12 +681,14 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
          });
    },
 
-   loadBotMatchesList: async (_userId) => {
+   loadBotMatchesList: async (userId) => {
+      if (!userId) return;
       try {
          const { data } = await supabase
             .from("wordgrid_matches")
             .select("*")
             .eq("is_bot_match", true)
+            .eq("player1_id", userId)
             .order("created_at", { ascending: false });
          set({ botMatchesList: data || [] });
       } catch (e) {

@@ -82,7 +82,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
 
 
 
-  // Resubscribe to match updates when matchId changes
+  // Subscribe to match updates when matchId changes
   useEffect(() => {
     if (!matchId || !effectiveUserId) return;
 
@@ -97,9 +97,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
           filter: `id=eq.${matchId}`,
         },
         (payload) => {
-          if (typeof updateFromMatchRecord === 'function') {
-            updateFromMatchRecord(payload.new, effectiveUserId);
-          }
+          useWordGridStore.getState().updateFromMatchRecord(payload.new, effectiveUserId);
         }
       )
       .subscribe();
@@ -107,7 +105,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [matchId, effectiveUserId, updateFromMatchRecord]);
+  }, [matchId, effectiveUserId]);
 
   // Auto-play bot move when it's the bot's turn
   useEffect(() => {
