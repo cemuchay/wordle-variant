@@ -1,7 +1,5 @@
 // src/utils/guestFreePlay.ts
 
-import { safeLocalStorage } from './storage';
-
 export interface GuestFreePlayState {
   date: string; // Today's date YYYY-MM-DD
   word: string;
@@ -16,17 +14,22 @@ export interface GuestFreePlayState {
 const GUEST_FREEPLAY_KEY = 'wordle_guest_freeplay_state_v1';
 
 export function getTodayDateString(): string {
-  return new Date().toISOString().split('T')[0];
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export function getGuestFreePlayState(): GuestFreePlayState | null {
   try {
-    const raw = safeLocalStorage.getItem(GUEST_FREEPLAY_KEY);
+    if (typeof window === 'undefined' || !window.localStorage) return null;
+    const raw = window.localStorage.getItem(GUEST_FREEPLAY_KEY);
     if (!raw) return null;
     const parsed: GuestFreePlayState = JSON.parse(raw);
     const today = getTodayDateString();
     
-    // Auto-clear if the saved state is from a previous day
+    // Auto-clear only if the saved state is from a previous date
     if (parsed.date !== today) {
       clearGuestFreePlayState();
       return null;
@@ -40,13 +43,14 @@ export function getGuestFreePlayState(): GuestFreePlayState | null {
 
 export function saveGuestFreePlayState(state: Omit<GuestFreePlayState, 'date' | 'savedAt'>): void {
   try {
+    if (typeof window === 'undefined' || !window.localStorage) return;
     const today = getTodayDateString();
     const fullState: GuestFreePlayState = {
       ...state,
       date: today,
       savedAt: new Date().toISOString(),
     };
-    safeLocalStorage.setItem(GUEST_FREEPLAY_KEY, JSON.stringify(fullState));
+    window.localStorage.setItem(GUEST_FREEPLAY_KEY, JSON.stringify(fullState));
   } catch (err) {
     console.warn('[guestFreePlay] saveGuestFreePlayState error:', err);
   }
@@ -54,7 +58,8 @@ export function saveGuestFreePlayState(state: Omit<GuestFreePlayState, 'date' | 
 
 export function clearGuestFreePlayState(): void {
   try {
-    safeLocalStorage.removeItem(GUEST_FREEPLAY_KEY);
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    window.localStorage.removeItem(GUEST_FREEPLAY_KEY);
   } catch (err) {
     console.warn('[guestFreePlay] clearGuestFreePlayState error:', err);
   }
