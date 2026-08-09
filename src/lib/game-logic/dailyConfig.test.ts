@@ -97,6 +97,60 @@ async function runTests() {
 
   console.log(`   ✅ Success! Weekly pool composition and non-adjacent constraints verified.`);
 
+  // Test 5: Verify Balanced Weekly Rotation starting August 10, 2026
+  console.log("\n5. Verifying Balanced Weekly Rotation starting August 10, 2026...");
+  
+  const balancedWeeks = [
+    { start: "2026-08-10", end: "2026-08-16", name: "Week 33" },
+    { start: "2026-08-17", end: "2026-08-23", name: "Week 34" },
+    { start: "2026-08-24", end: "2026-08-30", name: "Week 35" },
+  ];
+
+  for (const week of balancedWeeks) {
+    const lengths: number[] = [];
+    const current = new Date(week.start);
+    const endDate = new Date(week.end);
+
+    while (current <= endDate) {
+      const dateStr = current.toISOString().split("T")[0];
+      const config = await getDailyConfig(true, dateStr);
+      lengths.push(config.length);
+
+      current.setDate(current.getDate() + 1);
+    }
+
+    console.log(`   ${week.name} (${week.start} to ${week.end}) lengths:`, lengths);
+
+    // Verify 7-day composition: 1x 4L, 3x 5L, 2x 6L, 1x 7L
+    const count4 = lengths.filter(l => l === 4).length;
+    const count5 = lengths.filter(l => l === 5).length;
+    const count6 = lengths.filter(l => l === 6).length;
+    const count7 = lengths.filter(l => l === 7).length;
+
+    if (count4 !== 1 || count5 !== 3 || count6 !== 2 || count7 !== 1) {
+      throw new Error(`Balanced pool composition mismatch for ${week.name}! Got: 4L:${count4}, 5L:${count5}, 6L:${count6}, 7L:${count7}`);
+    }
+
+    // Verify Monday (index 0) is 5L or 6L only
+    if (lengths[0] !== 5 && lengths[0] !== 6) {
+      throw new Error(`Monday length rule violation in ${week.name}: got ${lengths[0]}L`);
+    }
+
+    // Verify Tuesday (index 1) is 4L, 5L, or 6L (no 7L)
+    if (lengths[1] === 7) {
+      throw new Error(`Tuesday length rule violation in ${week.name}: got 7L`);
+    }
+
+    // Verify no adjacent matching lengths
+    for (let i = 0; i < lengths.length - 1; i++) {
+      if (lengths[i] === lengths[i + 1]) {
+        throw new Error(`Adjacent duplicate length violation in ${week.name} at index ${i}: ${lengths[i]}L and ${lengths[i + 1]}L`);
+      }
+    }
+  }
+
+  console.log(`   ✅ Success! Balanced weekly rotation rules verified.`);
+
   console.log("\n-----------------------------------------");
   console.log("🎉 ALL DAILY CONFIG TESTS PASSED!");
   console.log("-----------------------------------------");

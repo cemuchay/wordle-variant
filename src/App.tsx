@@ -13,7 +13,7 @@ import PWAInstallBanner from "./components/PWAInstallBanner";
 import NotificationPermissionPrompt from "./components/NotificationPermissionPrompt";
 import FloatingChatBubble from "./components/chat/FloatingChatBubble";
 import { NotificationsManager } from "./components/notifications/NotificationsManager";
-import { Bell, Swords } from "lucide-react";
+import { Bell, Swords, Trophy } from "lucide-react";
 import { useLiveStore } from "./wordup/live/store/useLiveStore";
 import { useAsyncStore } from "./wordup/async/store/useAsyncStore";
 import { subscribeToPush } from "./lib/pushService";
@@ -39,9 +39,13 @@ import formatUsername from './utils/formatUsername';
 import { TIMEOUT } from './constants/game';
 import { motion, AnimatePresence } from "framer-motion";
 import { AlreadyPlayedScreen } from "./components/AlreadyPlayedScreen";
+import { FreePlayModal } from "./components/freeplay/FreePlayModal";
 import MoreGamesList from "./components/MoreGamesList";
 import AppLoadingSkeleton from "./components/app/AppLoadingSkeleton";
 import DisconnectedUI from "./components/app/DisconnectedUI";
+import { initTelemetry } from "./lib/telemetry";
+import { flushNotificationQueue } from "./lib/clientPush";
+import { useWordGridStore } from "./store/useWordGridStore";
 
 const ChatRoom = safeLazy(() => import("./components/chatRoom"));
 const StatsModal = safeLazy(() => import("./components/StatsModal").then(m => ({ default: m.StatsModal })));
@@ -68,6 +72,10 @@ const fadeVariants = {
 
 function MainApp() {
   const { user, loading: isAuthLoading } = useAuth();
+
+  useEffect(() => {
+    initTelemetry();
+  }, []);
 
   const [guestOptedIn, setGuestOptedIn] = useState(() =>
     safeLocalStorage.getItem('wordle_guest_opted_in') === 'true',
@@ -244,6 +252,8 @@ function MainApp() {
   const [moreGameMode, setMoreGameMode] = useState<'select' | 'wordup' | 'wordgrid'>('select');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [viewedProfileId, setViewedProfileId] = useState<string | null>(null);
+  const [isFreePlayOpen, setIsFreePlayOpen] = useState(false);
+  const [freePlayMode, setFreePlayMode] = useState<'guest' | 'archive'>('archive');
 
   const [dismissedAlreadyPlayed, setDismissedAlreadyPlayed] = useState(() => {
     return safeSessionStorage.getItem("wordle_already_played_dismissed") === "true";
@@ -544,8 +554,24 @@ function MainApp() {
       window.removeEventListener("open-stats-modal", handleOpenStats);
   }, [setStatsActiveTab, setIsStatsOpen]);
 
+  // Listen to custom event to open WordGrid match directly
+  useEffect(() => {
+    const handleOpenWordGrid = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      setIsMoreOpen(true);
+      setMoreGameMode("wordgrid");
+      if (detail?.matchId && user?.id) {
+        useWordGridStore.getState().loadMatch(detail.matchId, user.id);
+      }
+    };
+    window.addEventListener("open-wordgrid-match", handleOpenWordGrid);
+    return () =>
+      window.removeEventListener("open-wordgrid-match", handleOpenWordGrid);
+  }, [user]);
+
   // Listen to custom event to open auth modal
   useEffect(() => {
+    flushNotificationQueue();
     const handleOpenAuth = () => setIsAuthOpen(true);
     window.addEventListener("open-auth-modal", handleOpenAuth);
     return () => window.removeEventListener("open-auth-modal", handleOpenAuth);
@@ -958,7 +984,7 @@ function MainApp() {
     <AppLayout
       theme={currentTheme}
       hideHeader={hideHeader}
-      hideNavigation={isPlayingChallenge || isBattlePlaying}
+      hideNavigation={isPlayingChallenge || isBattlePlaying || isFreePlayOpen}
       headerProps={{
         hideGameplayActions: activeNavigationItem !== "play",
         onOpenSettings: () => setIsSettingsOpen(true),
@@ -1051,6 +1077,10 @@ function MainApp() {
                       safeSessionStorage.setItem("wordle_already_played_dismissed", "true");
                       setDismissedAlreadyPlayed(true);
                     }}
+                    onOpenFreePlay={(selectedMode) => {
+                      setFreePlayMode(selectedMode);
+                      setIsFreePlayOpen(true);
+                    }}
                     activeDailyMarathons={activeDailyMarathons}
                     isMarathonLoading={isMarathonLoading}
                     isMarathonError={isMarathonError}
@@ -1058,25 +1088,41 @@ function MainApp() {
                     setIsChallengeOpen={setIsChallengeOpen}
                   />
                 ) : (
-                  <GameArea
-                    wordLength={config?.length ?? DEFAULT_WORD_LENGTH}
-                    maxAttempts={config?.maxAttempts ?? MAX_ATTEMPTS}
-                    guesses={state.guesses}
-                    currentGuess={state.currentGuess}
-                    cursorIndex={state.cursorIndex}
-                    editIndex={state.editIndex}
-                    letterStatuses={state.letterStatuses}
-                    hintRecord={state.hintRecord}
-                    isGameOver={state.isGameOver}
-                    isShake={state.isShake}
-                    isSaving={state.syncStatus === "syncing"}
-                    onChar={actions.onChar}
-                    onDelete={actions.onDelete}
-                    onEnter={actions.onEnter}
-                    onSetCursor={actions.onSetCursor}
-                    onSetEditIndex={actions.onSetEditIndex}
-                    isAlreadyPlayed={isAlreadyPlayedTodayOnLoad}
-                  />
+                  <div className="h-full flex flex-col relative min-h-0 w-full">
+                    {user && state.isGameOver && isAlreadyPlayedTodayOnLoad && (
+                      <div className="flex items-center justify-center pt-1 pb-1 z-30 shrink-0">
+                        <button
+                          onClick={() => {
+                            safeSessionStorage.removeItem("wordle_already_played_dismissed");
+                            setDismissedAlreadyPlayed(false);
+                          }}
+                          className="px-3.5 py-1.5 bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border border-indigo-400/60 rounded-xl text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
+                        >
+                          <Trophy size={14} className="text-amber-300" />
+                          <span>Daily Hub & Archives</span>
+                        </button>
+                      </div>
+                    )}
+                    <GameArea
+                      wordLength={config?.length ?? DEFAULT_WORD_LENGTH}
+                      maxAttempts={config?.maxAttempts ?? MAX_ATTEMPTS}
+                      guesses={state.guesses}
+                      currentGuess={state.currentGuess}
+                      cursorIndex={state.cursorIndex}
+                      editIndex={state.editIndex}
+                      letterStatuses={state.letterStatuses}
+                      hintRecord={state.hintRecord}
+                      isGameOver={state.isGameOver}
+                      isShake={state.isShake}
+                      isSaving={state.syncStatus === "syncing"}
+                      onChar={actions.onChar}
+                      onDelete={actions.onDelete}
+                      onEnter={actions.onEnter}
+                      onSetCursor={actions.onSetCursor}
+                      onSetEditIndex={actions.onSetEditIndex}
+                      isAlreadyPlayed={isAlreadyPlayedTodayOnLoad}
+                    />
+                  </div>
                 )}
               </main>
             )}
@@ -1435,7 +1481,7 @@ function MainApp() {
                         event: 'wordup_async_invite_later',
                         payload: { matchId: invite.matchId }
                       });
-          setTimeout(() => supabase.removeChannel(laterChannel), TIMEOUT.CHANNEL_CLEANUP);
+                      setTimeout(() => supabase.removeChannel(laterChannel), TIMEOUT.CHANNEL_CLEANUP);
                     }
                   });
                   triggerToast("Challenge saved as pending. Play when ready!", TOAST_DURATION.DEFAULT);
@@ -1456,7 +1502,7 @@ function MainApp() {
                         event: 'wordup_async_invite_declined',
                         payload: { matchId: invite.matchId }
                       });
-                       setTimeout(() => supabase.removeChannel(declineChannel), TIMEOUT.CHANNEL_CLEANUP);
+                      setTimeout(() => supabase.removeChannel(declineChannel), TIMEOUT.CHANNEL_CLEANUP);
                     }
                   });
                   await supabase.from("wordup_async_matches").update({ status: "declined" }).eq("id", invite.matchId);
@@ -1512,6 +1558,11 @@ function MainApp() {
       <ImageModal />
       <PWAInstallBanner />
       <NotificationPermissionPrompt />
+      <FreePlayModal
+        isOpen={isFreePlayOpen}
+        initialMode={freePlayMode}
+        onClose={() => setIsFreePlayOpen(false)}
+      />
     </AppLayout>
   );
 }

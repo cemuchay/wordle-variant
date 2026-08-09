@@ -30,8 +30,9 @@ import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabaseClient';
 import TopicHub from './TopicHub';
 import GameStats from './GameStats';
-import { BarChart2 } from 'lucide-react';
+import { BarChart2, Activity } from 'lucide-react';
 import { useTopics, useSaveTopicMutation, useToggleTopicActiveMutation, useToggleTopicSuspendedMutation, type WordUpTopic } from '../../hooks/queries/useTopics';
+import AnonymizedTelemetrySection from './AnonymizedTelemetrySection';
 
 
 
@@ -1358,7 +1359,7 @@ export const AdminPage: React.FC = () => {
     const { isAdmin, loading: adminLoading } = useAdminStatus(user?.id);
 
     // Navigation state
-    const [activeTab, setActiveTab] = useState<'words' | 'marathon' | 'wordup' | 'topics' | 'dynamic_topics' | 'stats' | 'broadcast'>('words');
+    const [activeTab, setActiveTab] = useState<'words' | 'marathon' | 'wordup' | 'topics' | 'dynamic_topics' | 'stats' | 'telemetry' | 'broadcast'>('words');
 
 
 
@@ -2165,6 +2166,15 @@ const WordUpTopicsManager = ({ triggerToast }: { triggerToast: (text: string, ty
                         <BarChart2 size={14} /> Game Stats
                     </button>
                     <button
+                        onClick={() => setActiveTab('telemetry')}
+                        className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'telemetry'
+                            ? 'bg-correct text-black shadow-lg shadow-correct/25'
+                            : 'text-gray-500 hover:text-white'
+                            }`}
+                    >
+                        <Activity size={14} /> Telemetry
+                    </button>
+                    <button
                         onClick={() => setActiveTab('broadcast')}
                         className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'broadcast'
                             ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
@@ -2589,6 +2599,8 @@ SELECT create_admin_user(
                     <TopicHub triggerToast={triggerToast} />
                 ) : activeTab === 'dynamic_topics' ? (
                     <WordUpTopicsManager triggerToast={triggerToast} />
+                ) : activeTab === 'telemetry' ? (
+                    <AnonymizedTelemetrySection triggerToast={triggerToast} />
                 ) : activeTab === 'broadcast' ? (
 
                     <AdminCustomNotificationBroadcaster triggerToast={triggerToast} />

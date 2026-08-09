@@ -129,6 +129,12 @@ export const NotificationModal = memo(() => {
                     setPendingAsyncMatchId(matchId);
                     setIsNotificationsOpen(false);
                 }
+            } else if (n.data?.mode === 'wordgrid') {
+                const matchId = n.data?.matchId;
+                if (matchId) {
+                    window.dispatchEvent(new CustomEvent('open-wordgrid-match', { detail: { matchId } }));
+                    setIsNotificationsOpen(false);
+                }
             } else {
                 const challengeId = n.data?.challenge_id;
                 if (challengeId) {

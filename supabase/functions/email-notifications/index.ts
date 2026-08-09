@@ -164,6 +164,119 @@ const getLogsOnlyHtml = (action: string, logs: string[]) => {
    return getEmailHtml("Developer", "dev", `[Logs] ${action}`, content);
 };
 
+// Helper to query telemetry summary and send findings report to cemuchay@gmail.com
+const sendDailyTelemetryReport = async (
+   supabase: any,
+   sendEmailWithFallback: (to: string, subject: string, html: string) => Promise<boolean>,
+   log: (msg: string) => void,
+) => {
+   try {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const targetDate = yesterday.toISOString().split("T")[0];
+
+      log(`Fetching daily telemetry summary for ${targetDate}...`);
+      const { data, error } = await supabase.rpc("get_daily_telemetry_summary", {
+         p_target_date: targetDate,
+      });
+
+      if (error) {
+         log(`Error fetching telemetry summary: ${error.message}`);
+         return false;
+      }
+
+      const summary = data?.[0] || {};
+      const activeDevices = summary.total_active_devices || 0;
+      const appOpens = summary.total_app_opens || 0;
+      const avgOpens = summary.avg_app_opens_per_user || 0;
+      const avgTimeSec = summary.avg_time_spent_seconds || 0;
+      const bounceRate = summary.bounce_rate_pct || 0;
+      const topClicksMap = summary.top_clicks || {};
+      const topTimeMap = summary.top_time_spent || {};
+
+      const formatDuration = (totalSec: number) => {
+         const m = Math.floor(totalSec / 60);
+         const s = totalSec % 60;
+         return `${m}m ${s}s`;
+      };
+
+      const topClicksEntries = Object.entries(topClicksMap)
+         .sort((a: any, b: any) => b[1] - a[1])
+         .slice(0, 5);
+      const topClicksHtml = topClicksEntries.length > 0
+         ? topClicksEntries
+            .map(([section, count]) => `
+               <li style="margin-bottom: 6px; color: #f3f4f6;">
+                  <strong style="color: #6366f1;">${section}</strong>: ${count} clicks
+               </li>
+            `).join("")
+         : `<li style="color: #9ca3af;">No clicks recorded.</li>`;
+
+      const topTimeEntries = Object.entries(topTimeMap)
+         .sort((a: any, b: any) => b[1] - a[1])
+         .slice(0, 5);
+      const topTimeHtml = topTimeEntries.length > 0
+         ? topTimeEntries
+            .map(([section, sec]: any) => `
+               <li style="margin-bottom: 6px; color: #f3f4f6;">
+                  <strong style="color: #10b981;">${section}</strong>: ${formatDuration(sec)}
+               </li>
+            `).join("")
+         : `<li style="color: #9ca3af;">No active time recorded.</li>`;
+
+      const content = `
+         <p>Here is yesterday's anonymized telemetry findings report for <strong>${targetDate}</strong>:</p>
+
+         <div style="margin: 20px 0; background-color: #0b0f19; border: 1px solid #1f2937; border-radius: 16px; padding: 20px;">
+            <table style="width: 100%; border-collapse: collapse;">
+               <tr>
+                  <td style="padding: 10px; border-bottom: 1px solid #1f2937; color: #9ca3af; font-[12px]; text-transform: uppercase;">Active Devices</td>
+                  <td style="padding: 10px; border-bottom: 1px solid #1f2937; color: #6366f1; font-weight: bold; font-size: 16px; text-align: right;">${activeDevices}</td>
+               </tr>
+               <tr>
+                  <td style="padding: 10px; border-bottom: 1px solid #1f2937; color: #9ca3af; font-[12px]; text-transform: uppercase;">App Opens</td>
+                  <td style="padding: 10px; border-bottom: 1px solid #1f2937; color: #10b981; font-weight: bold; font-size: 16px; text-align: right;">${appOpens} (${avgOpens}/user)</td>
+               </tr>
+               <tr>
+                  <td style="padding: 10px; border-bottom: 1px solid #1f2937; color: #9ca3af; font-[12px]; text-transform: uppercase;">Avg Time Spent</td>
+                  <td style="padding: 10px; border-bottom: 1px solid #1f2937; color: #f59e0b; font-weight: bold; font-size: 16px; text-align: right;">${formatDuration(Math.round(avgTimeSec))}</td>
+               </tr>
+               <tr>
+                  <td style="padding: 10px; color: #9ca3af; font-[12px]; text-transform: uppercase;">Bounce Rate</td>
+                  <td style="padding: 10px; color: #ef4444; font-weight: bold; font-size: 16px; text-align: right;">${bounceRate}%</td>
+               </tr>
+            </table>
+         </div>
+
+         <div style="margin: 20px 0; background-color: #0b0f19; border: 1px solid #1f2937; border-radius: 16px; padding: 20px;">
+            <h3 style="color: #6366f1; font-size: 14px; font-weight: 800; margin: 0 0 12px 0; text-transform: uppercase;">🔥 Most Clicked Sections / Modals</h3>
+            <ul style="padding-left: 20px; margin: 0; font-size: 14px; line-height: 1.6;">
+               ${topClicksHtml}
+            </ul>
+         </div>
+
+         <div style="margin: 20px 0; background-color: #0b0f19; border: 1px solid #1f2937; border-radius: 16px; padding: 20px;">
+            <h3 style="color: #10b981; font-size: 14px; font-weight: 800; margin: 0 0 12px 0; text-transform: uppercase;">⏱️ Most Time Spent per Section</h3>
+            <ul style="padding-left: 20px; margin: 0; font-size: 14px; line-height: 1.6;">
+               ${topTimeHtml}
+            </ul>
+         </div>
+
+         <div style="margin: 28px 0 12px 0; text-align: center;">
+            <a href="${APP_URL}/admin" class="btn-primary">Open Admin Dashboard</a>
+         </div>
+      `;
+
+      const html = getEmailHtml("Admin", "admin", `📊 Daily Telemetry Digest [${targetDate}]`, content);
+      await sendEmailWithFallback("cemuchay@gmail.com", `📊 Daily Telemetry Report (${targetDate})`, html);
+      log(`Successfully dispatched telemetry digest for ${targetDate} to cemuchay@gmail.com`);
+      return true;
+   } catch (err: any) {
+      log(`Failed to generate telemetry report email: ${err?.message || err}`);
+      return false;
+   }
+};
+
 serve(async (req) => {
    if (req.method === "OPTIONS") {
       return new Response("ok", { headers: corsHeaders });
@@ -588,8 +701,26 @@ serve(async (req) => {
             );
          }
 
+         // Send daily telemetry digest report in parallel to cemuchay@gmail.com
+         log(`Triggering parallel daily telemetry digest email to cemuchay@gmail.com...`);
+         sendDailyTelemetryReport(supabase, sendEmailWithFallback, log).catch((err) => {
+            log(`Error in parallel telemetry digest: ${err?.message || err}`);
+         });
+
          return new Response(
             JSON.stringify({ success: true, action, emails_sent: sentCount }),
+            {
+               headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+         );
+      }
+
+      // ACTION: DAILY TELEMETRY DIGEST (Standalone endpoint)
+      if (action === "daily-telemetry-digest") {
+         log(`Starting action daily-telemetry-digest`);
+         await sendDailyTelemetryReport(supabase, sendEmailWithFallback, log);
+         return new Response(
+            JSON.stringify({ success: true, action }),
             {
                headers: { ...corsHeaders, "Content-Type": "application/json" },
             },

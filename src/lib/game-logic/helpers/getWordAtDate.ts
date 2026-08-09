@@ -47,6 +47,7 @@ const TRANSITION_DATE = "2026-05-03";
 const LENGTH_TRANSITION_DATE = "2026-05-11";
 const REMOVAL_3L_TRANSITION_DATE = "2026-06-08";
 export const UNPREDICTABLE_ROTATION_DATE = "2026-07-27";
+export const BALANCED_ROTATION_DATE = "2026-08-10";
 
 /**
  * Calculates ISO year, ISO week number, and day index (0 = Monday, ..., 6 = Sunday) for a given date.
@@ -103,10 +104,62 @@ export function getWeeklyLengthSchedule(year: number, weekNumber: number): (4 | 
 }
 
 /**
+ * Generates a balanced 7-day word length schedule starting August 10th, 2026.
+ * Pool: [4, 5, 5, 5, 6, 6, 7] (7L x1, 4L x1, 5L x3, 6L x2)
+ * Constraints:
+ * - Monday (dayIndex 0): 5L or 6L only
+ * - Tuesday (dayIndex 1): 4L, 5L, or 6L (no 7L)
+ * - Non-consecutive: No adjacent matching lengths
+ */
+export function getBalancedWeeklyLengthSchedule(year: number, weekNumber: number): (4 | 5 | 6 | 7)[] {
+   const pool: (4 | 5 | 6 | 7)[] = [4, 5, 5, 5, 6, 6, 7];
+   const seed = year * 1000 + weekNumber;
+   const random = mulberry32(seed);
+
+   let schedule: (4 | 5 | 6 | 7)[] = [];
+   let valid = false;
+   let attempts = 0;
+
+   while (!valid && attempts < 1000) {
+      attempts++;
+      schedule = [...pool];
+      for (let i = schedule.length - 1; i > 0; i--) {
+         const j = Math.floor(random() * (i + 1));
+         [schedule[i], schedule[j]] = [schedule[j], schedule[i]];
+      }
+
+      if (schedule[0] !== 5 && schedule[0] !== 6) continue;
+      if (schedule[1] === 7) continue;
+
+      let hasConsecutive = false;
+      for (let i = 0; i < schedule.length - 1; i++) {
+         if (schedule[i] === schedule[i + 1]) {
+            hasConsecutive = true;
+            break;
+         }
+      }
+
+      if (!hasConsecutive) {
+         valid = true;
+      }
+   }
+
+   if (!valid) {
+      schedule = [5, 4, 6, 5, 7, 5, 6];
+   }
+
+   return schedule;
+}
+
+/**
  * Returns the deterministic word length scheduled for any date starting July 27th, 2026.
  */
 export function getSeededWeeklyWordLength(dateStr: string): 4 | 5 | 6 | 7 {
    const { year, weekNumber, dayIndex } = getISOWeekInfo(dateStr);
+   if (dateStr >= BALANCED_ROTATION_DATE) {
+      const schedule = getBalancedWeeklyLengthSchedule(year, weekNumber);
+      return schedule[dayIndex];
+   }
    const schedule = getWeeklyLengthSchedule(year, weekNumber);
    return schedule[dayIndex];
 }

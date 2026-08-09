@@ -1,13 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Eye, Swords, HelpCircle, X, } from "lucide-react";
+import { Gamepad2, Calendar, Trophy, Eye, Swords, HelpCircle, X } from "lucide-react";
 import { MarathonBanner } from "./common/MarathonBanner";
 import CountDown from "./common/CountDown"
 
 interface AlreadyPlayedScreenProps {
   onNavigate: (item: "play" | "chat" | "leaderboard" | "challenges" | "wordup") => void;
   onAdmirePuzzle: () => void;
+  onOpenFreePlay?: (mode: 'guest' | 'archive') => void;
   activeDailyMarathons: any[];
   isMarathonLoading?: boolean;
   isMarathonError?: boolean;
@@ -25,6 +26,7 @@ interface OptionDetail {
 export const AlreadyPlayedScreen = ({
   onNavigate,
   onAdmirePuzzle,
+  onOpenFreePlay,
   activeDailyMarathons,
   isMarathonLoading = false,
   isMarathonError = false,
@@ -48,120 +50,173 @@ export const AlreadyPlayedScreen = ({
     },
     {
       title: "Play WordUp",
-      shortDesc: "Battle friends with quick fire questions and answers",
+      shortDesc: "Battle friends with quick fire questions and answers.",
       fullDesc: "WordUp is a fast-paced multiplayer game mode. Play live or async matches, guess words based on definitions, and challenge friends or bots.",
       icon: <Swords className="text-indigo-400" size={20} />,
     },
   ];
 
   return (
-    <div className="h-full w-full overflow-y-auto scrollbar-hide px-4 sm:px-6 flex flex-col justify-center items-center select-none text-white bg-dark">
-      <div className="w-full max-w-md mx-auto flex flex-col justify-center items-center space-y-6 overflow-hidden">
-        {/* Title block */}
+    <div className="h-full w-full overflow-y-auto scrollbar-hide px-4 sm:px-8 py-6 flex flex-col items-center justify-start select-none text-white bg-dark">
+      <div className="w-full max-w-3xl mx-auto flex flex-col space-y-6">
+        
+        {/* Top Header Block */}
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: -15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="text-center space-y-4"
+          transition={{ duration: 0.3 }}
+          className="text-center space-y-3 bg-slate-900/70 border border-white/10 rounded-3xl p-5 shadow-2xl backdrop-blur-md relative overflow-hidden"
         >
-          <div className="flex justify-center">
-          </div>
+          <div className="absolute -top-12 -left-12 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl pointer-events-none" />
+
           <CountDown isOpen={true} />
-          <p className="text-sm sm:text-base text-white font-medium max-w-xs mx-auto">
-            You have completed today's puzzle!.
-          </p>
+          
+          <div className="space-y-1">
+            <h2 className="text-lg sm:text-xl font-black uppercase tracking-wider text-white">
+              Daily Puzzle Completed! 🎉
+            </h2>
+            <p className="text-xs sm:text-sm text-gray-300 font-semibold max-w-md mx-auto">
+              You're all done with today's challenge. Jump into free play, browse the archive, or check your stats!
+            </p>
+          </div>
         </motion.div>
 
-        {/* Main Options Grid */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1, duration: 0.3 }}
-          className="w-full space-y-4"
-        >
-          {/* See Your Board */}
-          <div className="group relative flex items-center justify-between bg-slate-900/60 backdrop-blur-md border border-white/5 rounded-2xl p-4 hover:border-emerald-500/30 hover:bg-slate-900/80 transition-all duration-300 shadow-lg">
-            <div
-              onClick={onAdmirePuzzle}
-              className="flex-1 flex items-center gap-3 cursor-pointer"
-            >
-              <div className="p-2.5 bg-emerald-500/10 rounded-xl border border-emerald-500/20 group-hover:scale-105 transition-transform">
-                {options[0].icon}
-              </div>
-              <div className="text-left">
-                <h3 className="text-sm font-black uppercase tracking-wide text-white group-hover:text-emerald-400 transition-colors">
-                  {options[0].title}
-                </h3>
-                {/* <p className="text-[11px] text-gray-400 mt-0.5 font-medium leading-tight">
-                  {options[0].shortDesc}
-                </p> */}
-              </div>
+        {/* 2-Column Responsive Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch">
+          
+          {/* LEFT COLUMN: Free Play & Archive Modes */}
+          <motion.div
+            initial={{ opacity: 0, x: -15 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.05, duration: 0.3 }}
+            className="flex flex-col space-y-3 bg-slate-900/50 border border-white/5 rounded-3xl p-4 backdrop-blur-md shadow-xl"
+          >
+            <div className="flex items-center justify-between px-1 pb-1 border-b border-white/5">
+              <span className="text-xs font-black uppercase tracking-widest text-indigo-400">
+                🎮 Non-Competitive Modes
+              </span>
+              <span className="text-[10px] text-gray-400 font-bold">Local Play</span>
             </div>
-            <button
-              onClick={() => setSelectedDetail(options[0])}
-              className="p-2 text-gray-500 hover:text-white transition-colors cursor-pointer"
-              aria-label="Info"
-            >
-              <HelpCircle size={18} />
-            </button>
-          </div>
 
-          {/* See Leaderboard */}
-          <div className="group relative flex items-center justify-between bg-slate-900/60 backdrop-blur-md border border-white/5 rounded-2xl p-4 hover:border-amber-500/30 hover:bg-slate-900/80 transition-all duration-300 shadow-lg">
-            <div
-              onClick={() => onNavigate("leaderboard")}
-              className="flex-1 flex items-center gap-3 cursor-pointer"
-            >
-              <div className="p-2.5 bg-amber-500/10 rounded-xl border border-amber-500/20 group-hover:scale-105 transition-transform">
-                {options[1].icon}
-              </div>
-              <div className="text-left">
-                <h3 className="text-sm font-black uppercase tracking-wide text-white group-hover:text-amber-400 transition-colors">
-                  {options[1].title}
-                </h3>
-                {/* <p className="text-[11px] text-gray-400 mt-0.5 font-medium leading-tight">
-                  {options[1].shortDesc}
-                </p> */}
-              </div>
-            </div>
+            {/* Play Guest Game Card */}
             <button
-              onClick={() => setSelectedDetail(options[1])}
-              className="p-2 text-gray-500 hover:text-white transition-colors cursor-pointer"
-              aria-label="Info"
+              onClick={() => onOpenFreePlay?.('guest')}
+              className="p-4 bg-linear-to-br from-emerald-950/80 via-slate-900 to-slate-950 border border-emerald-500/30 hover:border-emerald-400 rounded-2xl flex items-center gap-3.5 transition-all duration-300 shadow-lg group cursor-pointer active:scale-98 text-left"
             >
-              <HelpCircle size={18} />
-            </button>
-          </div>
-
-          {/* Play WordUp */}
-          <div className="group relative flex items-center justify-between bg-slate-900/60 backdrop-blur-md border border-white/5 rounded-2xl p-4 hover:border-indigo-500/30 hover:bg-slate-900/80 transition-all duration-300 shadow-lg">
-            <div
-              onClick={() => onNavigate("wordup")}
-              className="flex-1 flex items-center gap-3 cursor-pointer"
-            >
-              <div className="p-2.5 bg-indigo-500/10 rounded-xl border border-indigo-500/20 group-hover:scale-105 transition-transform">
-                {options[2].icon}
+              <div className="p-3 bg-emerald-500/20 rounded-2xl border border-emerald-500/40 text-emerald-400 group-hover:scale-110 transition-transform shrink-0">
+                <Gamepad2 size={24} />
               </div>
-              <div className="text-left">
-                <h3 className="text-sm font-black uppercase tracking-wide text-white group-hover:text-indigo-400 transition-colors">
-                  {options[2].title}
-                </h3>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-sm font-black uppercase tracking-wider text-white group-hover:text-emerald-300 transition-colors">
+                  Play Guest Game
+                </h4>
                 <p className="text-[11px] text-gray-400 mt-0.5 font-medium leading-tight">
-                  {options[2].shortDesc}
+                  Free-play daily puzzle without cloud stats. Resets every midnight.
                 </p>
               </div>
-            </div>
-            <button
-              onClick={() => setSelectedDetail(options[2])}
-              className="p-2 text-gray-500 hover:text-white transition-colors cursor-pointer"
-              aria-label="Info"
-            >
-              <HelpCircle size={18} />
             </button>
-          </div>
-        </motion.div>
 
-        {/* Daily Bot Event Marathon Banner */}
+            {/* Play Archive Card */}
+            <button
+              onClick={() => onOpenFreePlay?.('archive')}
+              className="p-4 bg-linear-to-br from-indigo-950/80 via-slate-900 to-slate-950 border border-indigo-500/30 hover:border-indigo-400 rounded-2xl flex items-center gap-3.5 transition-all duration-300 shadow-lg group cursor-pointer active:scale-98 text-left"
+            >
+              <div className="p-3 bg-indigo-500/20 rounded-2xl border border-indigo-500/40 text-indigo-400 group-hover:scale-110 transition-transform shrink-0">
+                <Calendar size={24} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-sm font-black uppercase tracking-wider text-white group-hover:text-indigo-300 transition-colors">
+                  Play Archive
+                </h4>
+                <p className="text-[11px] text-gray-400 mt-0.5 font-medium leading-tight">
+                  Browse and play past daily puzzles with date picker & shuffle.
+                </p>
+              </div>
+            </button>
+          </motion.div>
+
+          {/* RIGHT COLUMN: Daily Options & Hub */}
+          <motion.div
+            initial={{ opacity: 0, x: 15 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.1, duration: 0.3 }}
+            className="flex flex-col space-y-3 bg-slate-900/50 border border-white/5 rounded-3xl p-4 backdrop-blur-md shadow-xl"
+          >
+            <div className="flex items-center justify-between px-1 pb-1 border-b border-white/5">
+              <span className="text-xs font-black uppercase tracking-widest text-amber-400">
+                🏆 Daily Hub & Stats
+              </span>
+              <span className="text-[10px] text-gray-400 font-bold">Community</span>
+            </div>
+
+            {/* See Your Board */}
+            <div className="group relative flex items-center justify-between bg-slate-900/70 border border-white/5 rounded-2xl p-3.5 hover:border-emerald-500/40 transition-all duration-300 shadow-md">
+              <div onClick={onAdmirePuzzle} className="flex-1 flex items-center gap-3 cursor-pointer">
+                <div className="p-2.5 bg-emerald-500/10 rounded-xl border border-emerald-500/20 group-hover:scale-105 transition-transform shrink-0">
+                  {options[0].icon}
+                </div>
+                <div className="text-left min-w-0">
+                  <h4 className="text-xs font-black uppercase tracking-wide text-white group-hover:text-emerald-400 transition-colors truncate">
+                    {options[0].title}
+                  </h4>
+                  <p className="text-[10px] text-gray-400 leading-tight truncate">Review grid & share results</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedDetail(options[0])}
+                className="p-1.5 text-gray-500 hover:text-white transition-colors cursor-pointer"
+              >
+                <HelpCircle size={16} />
+              </button>
+            </div>
+
+            {/* See Leaderboard */}
+            <div className="group relative flex items-center justify-between bg-slate-900/70 border border-white/5 rounded-2xl p-3.5 hover:border-amber-500/40 transition-all duration-300 shadow-md">
+              <div onClick={() => onNavigate("leaderboard")} className="flex-1 flex items-center gap-3 cursor-pointer">
+                <div className="p-2.5 bg-amber-500/10 rounded-xl border border-amber-500/20 group-hover:scale-105 transition-transform shrink-0">
+                  {options[1].icon}
+                </div>
+                <div className="text-left min-w-0">
+                  <h4 className="text-xs font-black uppercase tracking-wide text-white group-hover:text-amber-400 transition-colors truncate">
+                    {options[1].title}
+                  </h4>
+                  <p className="text-[10px] text-gray-400 leading-tight truncate">Check global stats & rank</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedDetail(options[1])}
+                className="p-1.5 text-gray-500 hover:text-white transition-colors cursor-pointer"
+              >
+                <HelpCircle size={16} />
+              </button>
+            </div>
+
+            {/* Play WordUp */}
+            <div className="group relative flex items-center justify-between bg-slate-900/70 border border-white/5 rounded-2xl p-3.5 hover:border-indigo-500/40 transition-all duration-300 shadow-md">
+              <div onClick={() => onNavigate("wordup")} className="flex-1 flex items-center gap-3 cursor-pointer">
+                <div className="p-2.5 bg-indigo-500/10 rounded-xl border border-indigo-500/20 group-hover:scale-105 transition-transform shrink-0">
+                  {options[2].icon}
+                </div>
+                <div className="text-left min-w-0">
+                  <h4 className="text-xs font-black uppercase tracking-wide text-white group-hover:text-indigo-400 transition-colors truncate">
+                    {options[2].title}
+                  </h4>
+                  <p className="text-[10px] text-gray-400 leading-tight truncate">Battle friends in multiplayer</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedDetail(options[2])}
+                className="p-1.5 text-gray-500 hover:text-white transition-colors cursor-pointer"
+              >
+                <HelpCircle size={16} />
+              </button>
+            </div>
+
+          </motion.div>
+        </div>
+
+        {/* BOTTOM SECTION: Daily Bot Event Marathon Banner */}
         {isMarathonLoading ? (
           <div className="w-full h-24 bg-slate-900/40 border border-white/5 rounded-2xl animate-pulse flex flex-col justify-center px-6 gap-2">
             <div className="h-3 bg-white/10 rounded-full w-24" />
@@ -184,8 +239,8 @@ export const AlreadyPlayedScreen = ({
           <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.3 }}
-            className="w-full border border-white/5 rounded-2xl overflow-hidden shadow-xl"
+            transition={{ delay: 0.15, duration: 0.3 }}
+            className="w-full border border-white/5 rounded-3xl overflow-hidden shadow-xl"
           >
             <MarathonBanner
               challenges={activeDailyMarathons}
@@ -201,7 +256,7 @@ export const AlreadyPlayedScreen = ({
       {/* Details / Help Modal */}
       <AnimatePresence>
         {selectedDetail && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}

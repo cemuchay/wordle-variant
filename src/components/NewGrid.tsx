@@ -421,7 +421,7 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
                   {guess.map((res, j) => (
                     <Cell
                       key={`past-${i}-${j}`}
-                      letter={res.letter}
+                      letter={res.letter || (res as any).char || ''}
                       status={res.status}
                       isRevealing={isRevealing}
                       revealIndex={j}
