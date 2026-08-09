@@ -82,12 +82,16 @@ export const ModalLayout: React.FC<ModalLayoutProps> = ({
         } w-full h-dvh min-h-dvh max-h-dvh flex flex-col flex-1 overflow-hidden select-none text-white transition-[padding-top] duration-200 ${className}`}
         style={{
           paddingTop: topPadding,
-          paddingBottom: isOverlay ? 'env(safe-area-inset-bottom, 0px)' : undefined,
           paddingLeft: isOverlay ? 'env(safe-area-inset-left, 0px)' : undefined,
           paddingRight: isOverlay ? 'env(safe-area-inset-right, 0px)' : undefined,
         }}
       >
-        <div className={`flex flex-col flex-1 h-full w-full min-h-0 relative overflow-hidden bg-slate-950 ${containerClassName}`}>
+        <div
+          className={`flex flex-col flex-1 h-full w-full min-h-0 relative overflow-hidden bg-slate-950 ${containerClassName}`}
+          style={{
+            paddingBottom: isOverlay ? 'env(safe-area-inset-bottom, 0px)' : undefined,
+          }}
+        >
           {(title || (onClose && showCloseButton)) && (
             <div className="flex items-center justify-between p-3 border-b border-white/10 shrink-0 relative bg-slate-900/90 backdrop-blur-md">
               {title ? (

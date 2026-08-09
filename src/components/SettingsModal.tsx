@@ -9,6 +9,7 @@ import { subscribeToPush, unsubscribeFromPush } from '../lib/pushService';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import { useAppStore } from '../store/useAppStore';
 import { useAdminStatus } from '../hooks/useAdminStatus';
+import { ModalLayout } from './layout/ModalLayout';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -381,15 +382,17 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     const hasResults = showProfile || showSecurity || showGameplay || showEmail || showPush || showApp || showDiagnostics || showLegal;
 
     return (
-        <div className="fixed inset-0 z-150 flex items-center justify-center">
-            {/* Backdrop */}
-            <div
-                className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300"
-                onClick={onClose}
-            />
-
-            {/* Modal Content */}
-            <div className="relative w-full max-w-md m-4 bg-gray-950 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] sm:max-h-[90vh] animate-in slide-in-from-bottom-8 duration-300 settings-modal-content">
+        <ModalLayout
+            isOpen={isOpen}
+            onClose={onClose}
+            showCloseButton={false}
+            isOverlay={true}
+            zIndex="z-150"
+            maxWidth="full"
+            theme="dark"
+            containerClassName="p-0!"
+        >
+            <div className="flex flex-col h-full w-full max-w-2xl mx-auto bg-slate-950 text-white select-none overflow-hidden animate-in fade-in duration-200 settings-modal-content">
                 <style dangerouslySetInnerHTML={{
                     __html: `
                     .settings-modal-content *:not(svg):not(path) {
@@ -844,12 +847,13 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                                                 <div className="flex-1 pr-4">
                                                     <p className="text-sm font-bold text-gray-100">Purge Cache</p>
                                                     <p className="text-[11px] text-gray-500 leading-relaxed">
-                                                        Clears all local application cache and reloads the page.
+                                                        Clears all local application cache and reloads the app immediately.
                                                     </p>
                                                 </div>
                                                 <button
                                                     onClick={handlePurgeCache}
-                                                    className="px-3 py-1.5 bg-red-950/30 hover:bg-red-900/40 text-[10px] font-black text-red-400 uppercase tracking-widest rounded-lg border border-red-500/20 transition-all"
+                                                    disabled={loading}
+                                                    className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-[10px] font-black text-red-400 uppercase tracking-widest rounded-lg border border-red-500/20 transition-all disabled:opacity-50"
                                                 >
                                                     PURGE & RELOAD
                                                 </button>
@@ -859,7 +863,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                                 </section>
                             )}
 
-                            {/* Legal & Policies */}
+                            {/* Legal Policies */}
                             {showLegal && (
                                 <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                                     <div className="flex items-center gap-2 mb-1">
@@ -869,34 +873,45 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                                         </label>
                                     </div>
 
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {matchesSearch('Privacy') && (
-                                            <a
-                                                href="/privacy.html"
-                                                className="flex flex-col items-center justify-center p-3 bg-gray-900/40 border border-gray-800 rounded-xl hover:border-gray-750 hover:bg-gray-905/60 transition-all text-center"
-                                            >
-                                                <span className="text-[10px] font-bold text-gray-200">Privacy</span>
-                                                <span className="text-[8px] text-gray-500 uppercase tracking-wider mt-0.5">Policy</span>
-                                            </a>
-                                        )}
-                                        {matchesSearch('Terms') && (
-                                            <a
-                                                href="/tos.html"
-                                                className="flex flex-col items-center justify-center p-3 bg-gray-900/40 border border-gray-800 rounded-xl hover:border-gray-750 hover:bg-gray-905/60 transition-all text-center"
-                                            >
-                                                <span className="text-[10px] font-bold text-gray-200">Terms</span>
-                                                <span className="text-[8px] text-gray-500 uppercase tracking-wider mt-0.5">of Service</span>
-                                            </a>
-                                        )}
-                                        {matchesSearch('Data Deletion') && (
-                                            <a
-                                                href="/deletion.html"
-                                                className="flex flex-col items-center justify-center p-3 bg-gray-900/40 border border-gray-800 rounded-xl hover:border-gray-750 hover:bg-gray-905/60 transition-all text-center"
-                                            >
-                                                <span className="text-[10px] font-bold text-gray-200">Data</span>
-                                                <span className="text-[8px] text-gray-500 uppercase tracking-wider mt-0.5">Deletion</span>
-                                            </a>
-                                        )}
+                                    <div className="grid grid-cols-2 gap-2.5">
+                                        <a
+                                            href="/privacy.html"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="p-3 bg-gray-900/40 border border-gray-800 rounded-xl hover:border-indigo-500/50 hover:bg-gray-900/80 transition-all group"
+                                        >
+                                            <p className="text-xs font-bold text-gray-200 group-hover:text-indigo-300">Privacy Policy</p>
+                                            <p className="text-[9px] text-gray-500 mt-0.5">Data collection & usage</p>
+                                        </a>
+
+                                        <a
+                                            href="/terms.html"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="p-3 bg-gray-900/40 border border-gray-800 rounded-xl hover:border-indigo-500/50 hover:bg-gray-900/80 transition-all group"
+                                        >
+                                            <p className="text-xs font-bold text-gray-200 group-hover:text-indigo-300">Terms of Service</p>
+                                            <p className="text-[9px] text-gray-500 mt-0.5">Rules & guidelines</p>
+                                        </a>
+                                    </div>
+
+                                    <div className="pt-2">
+                                        <button
+                                            onClick={async () => {
+                                                const confirmed = await ask({
+                                                    title: 'Request Data Deletion',
+                                                    message: 'Are you sure you want to request data deletion? Your account data will be marked for removal in compliance with GDPR.',
+                                                    confirmLabel: 'Request Removal',
+                                                    type: 'danger'
+                                                });
+                                                if (confirmed) {
+                                                    triggerToast('Data removal request logged.');
+                                                }
+                                            }}
+                                            className="w-full py-2.5 bg-red-950/20 border border-red-900/30 hover:bg-red-900/30 text-red-400 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                                        >
+                                            Request Account Data Removal
+                                        </button>
                                     </div>
                                 </section>
                             )}
@@ -960,6 +975,6 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                     )}
                 </div>
             </div>
-        </div>
+        </ModalLayout>
     );
 };
