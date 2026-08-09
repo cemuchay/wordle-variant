@@ -48,6 +48,39 @@ export const DynamicIslandStatus = () => {
     const isFirstRender = useRef(true);
     const lastStatusKey = useRef('');
 
+    const [currentTheme, setCurrentTheme] = useState<string>(() => {
+        if (typeof document !== 'undefined') {
+            return document.documentElement.getAttribute('data-theme') || 'dark';
+        }
+        return 'dark';
+    });
+
+    useEffect(() => {
+        if (typeof document === 'undefined') return;
+        const updateThemeFromDOM = () => {
+            const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+            setCurrentTheme(theme);
+        };
+        updateThemeFromDOM();
+        const observer = new MutationObserver(updateThemeFromDOM);
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+        return () => observer.disconnect();
+    }, []);
+
+    const getThemeIslandClasses = useCallback((theme: string) => {
+        if (theme === 'wordgrid') {
+            return 'bg-[#0c1427] border-2 border-indigo-500/90 shadow-[0_10px_35px_rgba(99,102,241,0.5)] text-white';
+        }
+        if (theme === 'wordup') {
+            return 'bg-[#18122c] border-2 border-purple-500/90 shadow-[0_10px_35px_rgba(168,85,247,0.5)] text-white';
+        }
+        if (theme === 'light') {
+            return 'bg-[#090d16] border-2 border-slate-700 shadow-[0_10px_35px_rgba(0,0,0,0.55)] text-white';
+        }
+        // Dark / default
+        return 'bg-[#0b101d] border-2 border-slate-700/90 shadow-[0_10px_35px_rgba(0,0,0,0.7)] text-white';
+    }, []);
+
     // Filter out the current user from the online count, cross-referencing with
     // freshly fetched profile last_seen_at to catch stale presence entries
     const [otherOnlineUsers, setOtherOnlineUsers] = useState<Array<{ id: string; username: string; avatar_url: string; activeVoiceRoomId?: string | null }>>([]);
@@ -293,11 +326,8 @@ export const DynamicIslandStatus = () => {
     const getPillWidth = () => {
         if (isExpanded) return 'min(95vw, 340px)';
         if (toast.show) {
-            const len = toast.message?.length || 0;
-            // Expand dynamically if text is long
-            const multiplier = len > 40 ? 6.5 : 5.5;
-            const dynamicWidth = Math.max(290, Math.min(450, 180 + len * multiplier));
-            return `min(95vw, ${dynamicWidth}px)`;
+            // Temporarily stretch width to 90% to call user's attention
+            return 'min(90vw, 440px)';
         }
         if (user && activeCall) {
             if (activeCall.status === 'ringing') return '250px';
@@ -328,11 +358,11 @@ export const DynamicIslandStatus = () => {
                     y: isExpanded ? 8 : 0,
                 }}
                 style={{
-                    borderRadius: isExpanded ? '32px' : '20px',
+                    borderRadius: isExpanded ? '32px' : '22px',
                     width: getPillWidth(),
-                    height: isExpanded ? 'min(75vh, 480px)' : isLongText ? 'auto' : '32px',
-                    minHeight: isLongText ? '48px' : '32px',
-                    padding: isLongText ? '8px 16px' : '0'
+                    height: isExpanded ? 'min(75vh, 480px)' : toast.show ? '46px' : '32px',
+                    minHeight: toast.show ? '46px' : '32px',
+                    padding: toast.show ? '6px 14px' : '0'
                 }}
                 transition={{
                     layout: {
@@ -354,9 +384,8 @@ export const DynamicIslandStatus = () => {
                 }}
                 className={`
                     pointer-events-auto cursor-pointer overflow-visible
-                    bg-black/20 backdrop-blur-md border border-white/10
-                    shadow-[0_8px_32px_rgba(0,0,0,0.5)]
-                    flex flex-col items-center justify-center
+                    ${getThemeIslandClasses(currentTheme)}
+                    flex flex-col items-center justify-center transition-colors duration-300
                 `}
             >
                 {showRainbowBorder && (
@@ -449,19 +478,19 @@ export const DynamicIslandStatus = () => {
                             {/* Middle/Right Section (Dynamic Content) */}
                             <div className="flex-1 flex items-center justify-center min-w-0">
                                 <AnimatePresence mode="wait">
-                                    {toast.show ? (
-                                        <motion.div
-                                            key="toast"
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, y: -10 }}
-                                            className={`flex items-center gap-2 w-full px-1 ${toast.isLarge ? 'flex-col sm:flex-row text-center sm:text-left' : ''}`}
-                                        >
-                                            <BellRing size={toast.isLarge ? 12 : 10} className="text-emerald-400 shrink-0 animate-bounce" />
-                                            <span className={`text-[8.5px] font-bold text-white flex-1 leading-relaxed ${toast.isLarge ? 'leading-tight' : 'truncate'}`}>
-                                                {toast.message}
-                                            </span>
-                                        </motion.div>
+                                     {toast.show ? (
+                                         <motion.div
+                                             key="toast"
+                                             initial={{ opacity: 0, scale: 0.9, y: 5 }}
+                                             animate={{ opacity: 1, scale: 1, y: 0 }}
+                                             exit={{ opacity: 0, scale: 0.9, y: -5 }}
+                                             className="flex items-center gap-2.5 w-full px-2"
+                                         >
+                                             <BellRing size={16} className="text-emerald-400 shrink-0 animate-bounce" />
+                                             <span className="text-xs sm:text-sm font-extrabold text-white flex-1 leading-tight tracking-wide truncate">
+                                                 {toast.message}
+                                             </span>
+                                         </motion.div>
                                     ) : activeCall ? (
                                         activeCall.status === 'ringing' ? (
                                             <div className="flex items-center justify-between w-full" onClick={(e) => e.stopPropagation()}>
