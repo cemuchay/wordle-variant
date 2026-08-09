@@ -65,30 +65,29 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
         className="bg-gray-900 border border-gray-700 w-full max-w-xl rounded-2xl p-6 sm:p-6 shadow-2xl relative h-full flex flex-col flex-1 min-h-0 overflow-hidden text-white"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-800 p-3 pt-7 mt-7 mb-3 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <span className="text-2xl">♟️</span>
-            <div>
-              <h2 className="text-base sm:text-lg font-black uppercase tracking-wider text-white flex items-center gap-2">
-                Game Analysis
-              </h2>
-              <p className="text-xs font-bold text-white opacity-90">
-                Objective Move Scrutiny for {formatUsername(username)}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-white hover:bg-white/10 p-1.5 rounded-full transition-colors cursor-pointer"
-            title="Close analysis"
-          >
-            <X size={20} />
-          </button>
-        </div>
 
         {/* Modal Scroll Content */}
         <div className="flex-1 min-h-0 overflow-y-auto py-4 px-1 space-y-5 scrollbar-none scrollbar-hide [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex items-center justify-between border-b border-gray-800 p-3 pt-7 mt-7 mb-3 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <span className="text-2xl">♟️</span>
+              <div>
+                <h2 className="text-base sm:text-lg font-black uppercase tracking-wider text-white flex items-center gap-2">
+                  Game Analysis
+                </h2>
+                <p className="text-xs font-bold text-white opacity-90">
+                  Objective Move Scrutiny for {formatUsername(username)}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-white hover:bg-white/10 p-1.5 rounded-full transition-colors cursor-pointer"
+              title="Close analysis"
+            >
+              <X size={20} />
+            </button>
+          </div>
           {loading ? (
             <div className="py-20 flex flex-col items-center justify-center gap-4">
               <Loader2 className="animate-spin text-amber-400" size={36} />
@@ -431,16 +430,15 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
               </div>
             </>
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="border-t border-gray-800 shrink-0">
-          <button
-            onClick={onClose}
-            className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-colors cursor-pointer"
-          >
-            Close Analysis
-          </button>
+          {/* Footer */}
+          <div className="border-t border-gray-800 shrink-0">
+            <button
+              onClick={onClose}
+              className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-colors cursor-pointer"
+            >
+              Close Analysis
+            </button>
+          </div>
         </div>
       </div>
     </div>

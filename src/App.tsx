@@ -4,7 +4,6 @@ import AppLayout from "./components/layout/AppLayout";
 import { ChatSkeleton } from "./components/common/Skeletons";
 import { GlobalAudioPlayer } from "./components/GlobalAudioPlayer";
 import { LandscapeBlocker } from "./components/LandscapeBlocker";
-
 import { GameArea } from "./components/layout/GameArea";
 import { ModalsManager } from "./components/layout/ModalsManager";
 import { ImageModal } from "./components/common/ImageModal";
@@ -1099,7 +1098,7 @@ function MainApp() {
                           className="px-3.5 py-1.5 bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border border-indigo-400/60 rounded-xl text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
                         >
                           <Trophy size={14} className="text-amber-300" />
-                          <span>Daily Hub & Archives</span>
+                          <span>Variant Archive & More</span>
                         </button>
                       </div>
                     )}
