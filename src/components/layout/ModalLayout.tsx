@@ -79,19 +79,19 @@ export const ModalLayout: React.FC<ModalLayoutProps> = ({
           isOverlay
             ? `fixed inset-0 ${zIndex} bg-slate-950`
             : 'relative flex-1 bg-slate-950'
-        } w-full h-dvh min-h-dvh max-h-dvh flex flex-col flex-1 overflow-hidden select-none text-white transition-[padding-top] duration-200 ${className}`}
-        style={{
-          paddingTop: topPadding,
-          paddingLeft: isOverlay ? 'env(safe-area-inset-left, 0px)' : undefined,
-          paddingRight: isOverlay ? 'env(safe-area-inset-right, 0px)' : undefined,
-        }}
+        } w-full h-dvh min-h-dvh max-h-dvh flex flex-col flex-1 overflow-hidden select-none text-white ${className}`}
       >
-        <div
-          className={`flex flex-col flex-1 h-full w-full min-h-0 relative overflow-hidden bg-slate-950 ${containerClassName}`}
-          style={{
-            paddingBottom: isOverlay ? 'env(safe-area-inset-bottom, 0px)' : undefined,
-          }}
-        >
+        {/* Top Spacer for Safe Area & Dynamic Island */}
+        {isOverlay && (
+          <div
+            style={{
+              height: topPadding || 'env(safe-area-inset-top, 0px)',
+            }}
+            className="w-full shrink-0 transition-[height] duration-200"
+          />
+        )}
+
+        <div className={`flex flex-col flex-1 h-full w-full min-h-0 relative overflow-hidden bg-slate-950 ${containerClassName}`}>
           {(title || (onClose && showCloseButton)) && (
             <div className="flex items-center justify-between p-3 border-b border-white/10 shrink-0 relative bg-slate-900/90 backdrop-blur-md">
               {title ? (
@@ -117,6 +117,16 @@ export const ModalLayout: React.FC<ModalLayoutProps> = ({
             {children}
           </div>
         </div>
+
+        {/* Bottom Spacer for Safe Area Bottom Inset */}
+        {isOverlay && (
+          <div
+            style={{
+              height: 'env(safe-area-inset-bottom, 0px)',
+            }}
+            className="w-full shrink-0"
+          />
+        )}
       </div>
     );
   }
@@ -127,10 +137,7 @@ export const ModalLayout: React.FC<ModalLayoutProps> = ({
         isOverlay
           ? `fixed inset-0 ${zIndex} bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200`
           : 'relative flex-1'
-      } w-full h-full min-h-0 overflow-hidden select-none text-white transition-[padding-top] duration-200 ${className}`}
-      style={{
-        paddingTop: topPadding,
-      }}
+      } w-full h-full min-h-0 overflow-hidden select-none text-white ${className}`}
     >
       <div
         className={`w-full ${maxWidthMap[maxWidth]} flex flex-col max-h-[90dvh] min-h-0 relative overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl p-4 sm:p-5 ${containerClassName}`}
