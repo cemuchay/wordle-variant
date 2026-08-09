@@ -13,7 +13,7 @@ import PWAInstallBanner from "./components/PWAInstallBanner";
 import NotificationPermissionPrompt from "./components/NotificationPermissionPrompt";
 import FloatingChatBubble from "./components/chat/FloatingChatBubble";
 import { NotificationsManager } from "./components/notifications/NotificationsManager";
-import { Bell, Swords } from "lucide-react";
+import { Bell, Swords, Trophy } from "lucide-react";
 import { useLiveStore } from "./wordup/live/store/useLiveStore";
 import { useAsyncStore } from "./wordup/async/store/useAsyncStore";
 import { subscribeToPush } from "./lib/pushService";
@@ -45,6 +45,7 @@ import AppLoadingSkeleton from "./components/app/AppLoadingSkeleton";
 import DisconnectedUI from "./components/app/DisconnectedUI";
 import { initTelemetry } from "./lib/telemetry";
 import { flushNotificationQueue } from "./lib/clientPush";
+import { useWordGridStore } from "./store/useWordGridStore";
 
 const ChatRoom = safeLazy(() => import("./components/chatRoom"));
 const StatsModal = safeLazy(() => import("./components/StatsModal").then(m => ({ default: m.StatsModal })));
@@ -983,7 +984,7 @@ function MainApp() {
     <AppLayout
       theme={currentTheme}
       hideHeader={hideHeader}
-      hideNavigation={isPlayingChallenge || isBattlePlaying}
+      hideNavigation={isPlayingChallenge || isBattlePlaying || isFreePlayOpen}
       headerProps={{
         hideGameplayActions: activeNavigationItem !== "play",
         onOpenSettings: () => setIsSettingsOpen(true),
@@ -1480,7 +1481,7 @@ function MainApp() {
                         event: 'wordup_async_invite_later',
                         payload: { matchId: invite.matchId }
                       });
-          setTimeout(() => supabase.removeChannel(laterChannel), TIMEOUT.CHANNEL_CLEANUP);
+                      setTimeout(() => supabase.removeChannel(laterChannel), TIMEOUT.CHANNEL_CLEANUP);
                     }
                   });
                   triggerToast("Challenge saved as pending. Play when ready!", TOAST_DURATION.DEFAULT);
@@ -1501,7 +1502,7 @@ function MainApp() {
                         event: 'wordup_async_invite_declined',
                         payload: { matchId: invite.matchId }
                       });
-                       setTimeout(() => supabase.removeChannel(declineChannel), TIMEOUT.CHANNEL_CLEANUP);
+                      setTimeout(() => supabase.removeChannel(declineChannel), TIMEOUT.CHANNEL_CLEANUP);
                     }
                   });
                   await supabase.from("wordup_async_matches").update({ status: "declined" }).eq("id", invite.matchId);
