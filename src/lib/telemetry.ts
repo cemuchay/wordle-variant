@@ -93,7 +93,7 @@ async function submitBucketWithRetry(bucket: TelemetryBucket, maxRetries = 3): P
    return false;
 }
 
-let activeTimer: NodeJS.Timeout | null = null;
+let activeTimer: ReturnType<typeof setTimeout> | null = null;
 let currentBucket: TelemetryBucket | null = null;
 
 function flushCurrentActiveSectionDuration(): void {

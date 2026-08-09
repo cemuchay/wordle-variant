@@ -45,7 +45,6 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
     cancelQueue,
     startBotMatch,
     startDirectChallenge,
-    loadMatchesList,
     matchesList,
     loadMatch,
     deleteMatch,

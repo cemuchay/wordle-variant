@@ -1,8 +1,8 @@
 // src/components/freeplay/FreePlayModal.tsx
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, Shuffle, Trophy, RotateCcw, Flame, CheckCircle, ArrowLeft, Gamepad2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { motion } from 'framer-motion';
+import { X, Calendar, Shuffle, CheckCircle, ArrowLeft, Gamepad2 } from 'lucide-react';
 import { GameArea } from '../layout/GameArea';
 import { ArchiveDatePicker } from './ArchiveDatePicker';
 import { getDailyConfigSub } from '../../lib/game-logic/helpers/getDailyConfig';
@@ -16,14 +16,12 @@ import {
   getArchiveDraft,
   saveArchiveDraft,
   clearArchiveDraft,
-  FIRST_ARCHIVE_DATE,
   type ArchiveGameRecord,
 } from '../../utils/archiveDb';
 import {
   getGuestFreePlayState,
   saveGuestFreePlayState,
   getTodayDateString,
-  type GuestFreePlayState,
 } from '../../utils/guestFreePlay';
 import type { GuessResult, LetterStatus } from '../../types/game';
 import { useApp } from '../../context/AppContext';
@@ -155,7 +153,7 @@ export const FreePlayModal = ({
   const reconstructStateFromGuesses = (
     word: string,
     rawGuesses: string[],
-    length: number,
+    _length: number,
     attemptsMax: number
   ) => {
     const evaluatedGuesses: GuessResult[][] = [];

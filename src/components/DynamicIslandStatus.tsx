@@ -345,8 +345,6 @@ export const DynamicIslandStatus = () => {
         return '150px';
     };
 
-    const isLongText = toast.show && (toast.message?.length > 25 || toast.isLarge);
-
     return (
         <div key={resumeKey} className="fixed left-1/2 -translate-x-1/2 pointer-events-none" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 8px)', zIndex: Z_INDEX.DYNAMIC_ISLAND }}>
             <motion.div

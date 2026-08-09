@@ -594,27 +594,6 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
          .eq("id", matchId);
    },
 
-   resetGame: () => {
-      set({
-         matchId: null,
-         gridSize: DEFAULT_GRID_SIZE,
-         maxPlayers: 2,
-         role: null,
-         status: "lobby",
-         view: "lobby",
-         board: [],
-         tileBag: [],
-         players: [],
-         currentTurnIndex: 0,
-         currentTurn: null,
-         moves: [],
-         placedTiles: [],
-         rack: [],
-         loading: false,
-         error: null,
-      });
-   },
-
    startQueue: async (
       userId,
       _isRated,

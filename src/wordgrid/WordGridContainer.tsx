@@ -47,7 +47,6 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     submitMove,
     exchangeTiles,
     resignMatch,
-    updateFromMatchRecord,
   } = useWordGridStore();
 
   const tileBag = useWordGridStore((s: any) => s.tileBag);

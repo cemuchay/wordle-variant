@@ -1,7 +1,7 @@
 // src/components/freeplay/ArchiveDatePicker.tsx
 
 import { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { X, Calendar as CalendarIcon, CheckCircle2, Sparkles, Shuffle, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { FIRST_ARCHIVE_DATE, getYesterdayArchiveDate, getAllValidArchiveDates } from '../../utils/archiveDb';
 
