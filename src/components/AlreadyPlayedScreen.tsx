@@ -82,14 +82,146 @@ export const AlreadyPlayedScreen = ({
           </div>
         </motion.div>
 
-        {/* 2-Column Responsive Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch">
+        {/* TOP SECTION: Daily Bot Event Marathon Banner */}
+        {isMarathonLoading ? (
+          <div className="w-full h-24 bg-slate-900/40 border border-white/5 rounded-2xl animate-pulse flex flex-col justify-center px-6 gap-2">
+            <div className="h-3 bg-white/10 rounded-full w-24" />
+            <div className="h-4 bg-white/10 rounded-full w-48" />
+            <div className="h-3 bg-white/10 rounded-full w-32" />
+          </div>
+        ) : isMarathonError || !activeDailyMarathons || activeDailyMarathons.length === 0 ? (
+          <div
+            onClick={() => onNavigate("challenges")}
+            className="w-full flex items-center justify-between bg-slate-900/40 backdrop-blur-md border border-white/5 border-dashed rounded-2xl p-4 hover:border-indigo-500/30 hover:bg-slate-900/60 transition-all duration-300 shadow-lg cursor-pointer"
+          >
+            <div className="text-left space-y-1">
+              <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400">Marathons Offline</span>
+              <h4 className="text-xs font-black uppercase tracking-wide text-white">Check out active challenges</h4>
+              <p className="text-[10px] text-gray-400 leading-tight">Find community games and player lobbies.</p>
+            </div>
+            <span className="text-indigo-400 font-bold text-xs shrink-0">&rarr;</span>
+          </div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05, duration: 0.3 }}
+            className="w-full border border-white/5 rounded-3xl overflow-hidden shadow-xl"
+          >
+            <MarathonBanner
+              challenges={activeDailyMarathons}
+              onClick={(challenge) => {
+                setSelectedChallengeId(challenge.challenge_id || challenge.challenge?.id);
+                setIsChallengeOpen(true);
+              }}
+            />
+          </motion.div>
+        )}
+
+        {/* MOBILE HORIZONTAL SCROLL STRIP (visible on mobile < md) */}
+        <div className="block md:hidden w-full">
+          <div className="flex items-center justify-between px-1 mb-2">
+            <span className="text-xs font-black uppercase tracking-widest text-indigo-400">
+              ⚡ Select Game Mode
+            </span>
+            <span className="text-[10px] text-gray-400 font-bold">Swipe &rarr;</span>
+          </div>
+          <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide space-x-3 pb-3 -mx-4 px-4">
+            {/* 1. Play Guest Game */}
+            <button
+              onClick={() => onOpenFreePlay?.('guest')}
+              className="snap-center shrink-0 w-[240px] p-4 bg-linear-to-br from-emerald-950/90 via-slate-900 to-slate-950 border border-emerald-500/40 rounded-2xl flex flex-col justify-between gap-3 shadow-xl text-left active:scale-98"
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="p-2.5 bg-emerald-500/20 rounded-xl text-emerald-400 border border-emerald-500/30">
+                  <Gamepad2 size={20} />
+                </div>
+                <span className="text-[9px] font-black uppercase text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">Local</span>
+              </div>
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-white">Play Guest Game</h4>
+                <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">Daily local puzzle without cloud stats.</p>
+              </div>
+            </button>
+
+            {/* 2. Play Archive */}
+            <button
+              onClick={() => onOpenFreePlay?.('archive')}
+              className="snap-center shrink-0 w-[240px] p-4 bg-linear-to-br from-indigo-950/90 via-slate-900 to-slate-950 border border-indigo-500/40 rounded-2xl flex flex-col justify-between gap-3 shadow-xl text-left active:scale-98"
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="p-2.5 bg-indigo-500/20 rounded-xl text-indigo-400 border border-indigo-500/30">
+                  <Calendar size={20} />
+                </div>
+                <span className="text-[9px] font-black uppercase text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full">Archive</span>
+              </div>
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-white">Play Archive</h4>
+                <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">Browse and play past daily puzzles.</p>
+              </div>
+            </button>
+
+            {/* 3. See Your Board */}
+            <button
+              onClick={onAdmirePuzzle}
+              className="snap-center shrink-0 w-[240px] p-4 bg-slate-900/90 border border-emerald-500/30 rounded-2xl flex flex-col justify-between gap-3 shadow-xl text-left active:scale-98"
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="p-2.5 bg-emerald-500/10 rounded-xl text-emerald-400 border border-emerald-500/20">
+                  <Eye size={20} />
+                </div>
+                <span className="text-[9px] font-black uppercase text-gray-400 bg-white/5 px-2 py-0.5 rounded-full">Today</span>
+              </div>
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-white">See Your Board</h4>
+                <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">Review completed grid & share results.</p>
+              </div>
+            </button>
+
+            {/* 4. See Leaderboard */}
+            <button
+              onClick={() => onNavigate("leaderboard")}
+              className="snap-center shrink-0 w-[240px] p-4 bg-slate-900/90 border border-amber-500/30 rounded-2xl flex flex-col justify-between gap-3 shadow-xl text-left active:scale-98"
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="p-2.5 bg-amber-500/10 rounded-xl text-amber-400 border border-amber-500/20">
+                  <Trophy size={20} />
+                </div>
+                <span className="text-[9px] font-black uppercase text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">Rank</span>
+              </div>
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-white">See Leaderboard</h4>
+                <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">Compare daily stats & player rank.</p>
+              </div>
+            </button>
+
+            {/* 5. Play WordUp */}
+            <button
+              onClick={() => onNavigate("wordup")}
+              className="snap-center shrink-0 w-[240px] p-4 bg-slate-900/90 border border-indigo-500/30 rounded-2xl flex flex-col justify-between gap-3 shadow-xl text-left active:scale-98"
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="p-2.5 bg-indigo-500/10 rounded-xl text-indigo-400 border border-indigo-500/20">
+                  <Swords size={20} />
+                </div>
+                <span className="text-[9px] font-black uppercase text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full">PVP</span>
+              </div>
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-white">Play WordUp</h4>
+                <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">Fast-paced multiplayer battle mode.</p>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* DESKTOP 2-COLUMN GRID (visible on desktop md:grid) */}
+        <div className="hidden md:grid md:grid-cols-2 gap-5 items-stretch">
           
           {/* LEFT COLUMN: Free Play & Archive Modes */}
           <motion.div
             initial={{ opacity: 0, x: -15 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.05, duration: 0.3 }}
+            transition={{ delay: 0.1, duration: 0.3 }}
             className="flex flex-col space-y-3 bg-slate-900/50 border border-white/5 rounded-3xl p-4 backdrop-blur-md shadow-xl"
           >
             <div className="flex items-center justify-between px-1 pb-1 border-b border-white/5">
@@ -140,7 +272,7 @@ export const AlreadyPlayedScreen = ({
           <motion.div
             initial={{ opacity: 0, x: 15 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1, duration: 0.3 }}
+            transition={{ delay: 0.15, duration: 0.3 }}
             className="flex flex-col space-y-3 bg-slate-900/50 border border-white/5 rounded-3xl p-4 backdrop-blur-md shadow-xl"
           >
             <div className="flex items-center justify-between px-1 pb-1 border-b border-white/5">
@@ -215,42 +347,6 @@ export const AlreadyPlayedScreen = ({
 
           </motion.div>
         </div>
-
-        {/* BOTTOM SECTION: Daily Bot Event Marathon Banner */}
-        {isMarathonLoading ? (
-          <div className="w-full h-24 bg-slate-900/40 border border-white/5 rounded-2xl animate-pulse flex flex-col justify-center px-6 gap-2">
-            <div className="h-3 bg-white/10 rounded-full w-24" />
-            <div className="h-4 bg-white/10 rounded-full w-48" />
-            <div className="h-3 bg-white/10 rounded-full w-32" />
-          </div>
-        ) : isMarathonError || !activeDailyMarathons || activeDailyMarathons.length === 0 ? (
-          <div
-            onClick={() => onNavigate("challenges")}
-            className="w-full flex items-center justify-between bg-slate-900/40 backdrop-blur-md border border-white/5 border-dashed rounded-2xl p-4 hover:border-indigo-500/30 hover:bg-slate-900/60 transition-all duration-300 shadow-lg cursor-pointer"
-          >
-            <div className="text-left space-y-1">
-              <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400">Marathons Offline</span>
-              <h4 className="text-xs font-black uppercase tracking-wide text-white">Check out active challenges</h4>
-              <p className="text-[10px] text-gray-400 leading-tight">Find community games and player lobbies.</p>
-            </div>
-            <span className="text-indigo-400 font-bold text-xs shrink-0">&rarr;</span>
-          </div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15, duration: 0.3 }}
-            className="w-full border border-white/5 rounded-3xl overflow-hidden shadow-xl"
-          >
-            <MarathonBanner
-              challenges={activeDailyMarathons}
-              onClick={(challenge) => {
-                setSelectedChallengeId(challenge.challenge_id || challenge.challenge?.id);
-                setIsChallengeOpen(true);
-              }}
-            />
-          </motion.div>
-        )}
       </div>
 
       {/* Details / Help Modal */}
