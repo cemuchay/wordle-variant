@@ -13,6 +13,9 @@ import {
   getCompletedArchiveDates,
   getYesterdayArchiveDate,
   getAllValidArchiveDates,
+  getArchiveDraft,
+  saveArchiveDraft,
+  clearArchiveDraft,
   FIRST_ARCHIVE_DATE,
   type ArchiveGameRecord,
 } from '../../utils/archiveDb';
@@ -43,6 +46,18 @@ export const FreePlayModal = ({
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [completedDates, setCompletedDates] = useState<Set<string>>(new Set());
+
+  // Keep mode & date in sync when modal opens or initialMode changes
+  useEffect(() => {
+    if (isOpen) {
+      setMode(initialMode);
+      if (initialMode === 'guest') {
+        setSelectedDate(getTodayDateString());
+      } else {
+        setSelectedDate(getYesterdayArchiveDate());
+      }
+    }
+  }, [isOpen, initialMode]);
 
   // Game puzzle configuration & state
   const [targetWord, setTargetWord] = useState<string>('');
@@ -104,16 +119,22 @@ export const FreePlayModal = ({
         setWordLength(config.length);
         setMaxAttempts(config.maxAttempts || 6);
 
-        // Load archive record from IndexedDB
+        // 1. Check completed archive record in IndexedDB
         const record = await getArchiveGame(selectedDate);
         if (record) {
           reconstructStateFromGuesses(config.word.toUpperCase(), record.guesses, config.length, config.maxAttempts || 6);
         } else {
-          setGuesses([]);
-          setLetterStatuses({});
-          setIsGameOver(false);
-          setIsWon(false);
-          setScore(0);
+          // 2. Check in-progress draft in LocalStorage so user can resume later
+          const draftGuesses = getArchiveDraft(selectedDate);
+          if (draftGuesses && draftGuesses.length > 0) {
+            reconstructStateFromGuesses(config.word.toUpperCase(), draftGuesses, config.length, config.maxAttempts || 6);
+          } else {
+            setGuesses([]);
+            setLetterStatuses({});
+            setIsGameOver(false);
+            setIsWon(false);
+            setScore(0);
+          }
         }
       }
     } catch (err) {
@@ -272,19 +293,26 @@ export const FreePlayModal = ({
         attempts: newGuesses.length,
       });
     } else {
-      const record: ArchiveGameRecord = {
-        date: selectedDate,
-        word: targetWord,
-        guesses: newRawGuesses,
-        isGameOver: over,
-        isWon: won,
-        score: calcScore,
-        attempts: newGuesses.length,
-        playedAt: new Date().toISOString(),
-        completedAt: over ? new Date().toISOString() : undefined,
-      };
-      await saveArchiveGame(record);
-      refreshCompletedDates();
+      if (over) {
+        // Complete archive game saved to IndexedDB & clear in-progress draft from LocalStorage
+        const record: ArchiveGameRecord = {
+          date: selectedDate,
+          word: targetWord,
+          guesses: newRawGuesses,
+          isGameOver: over,
+          isWon: won,
+          score: calcScore,
+          attempts: newGuesses.length,
+          playedAt: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+        };
+        await saveArchiveGame(record);
+        clearArchiveDraft(selectedDate);
+        refreshCompletedDates();
+      } else {
+        // Save in-progress archive draft to LocalStorage so user can resume later
+        saveArchiveDraft(selectedDate, targetWord, newRawGuesses);
+      }
     }
   };
 

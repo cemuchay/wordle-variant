@@ -100,3 +100,36 @@ export function getAllValidArchiveDates(): string[] {
   }
   return dates;
 }
+
+const ARCHIVE_DRAFT_PREFIX = 'wordle_archive_draft_';
+
+export function getArchiveDraft(date: string): string[] | null {
+  try {
+    const raw = localStorage.getItem(`${ARCHIVE_DRAFT_PREFIX}${date}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed.guesses) ? parsed.guesses : null;
+  } catch (err) {
+    console.warn('[archiveDb] getArchiveDraft error:', err);
+    return null;
+  }
+}
+
+export function saveArchiveDraft(date: string, word: string, guesses: string[]): void {
+  try {
+    localStorage.setItem(
+      `${ARCHIVE_DRAFT_PREFIX}${date}`,
+      JSON.stringify({ date, word, guesses, savedAt: new Date().toISOString() })
+    );
+  } catch (err) {
+    console.warn('[archiveDb] saveArchiveDraft error:', err);
+  }
+}
+
+export function clearArchiveDraft(date: string): void {
+  try {
+    localStorage.removeItem(`${ARCHIVE_DRAFT_PREFIX}${date}`);
+  } catch (err) {
+    console.warn('[archiveDb] clearArchiveDraft error:', err);
+  }
+}
