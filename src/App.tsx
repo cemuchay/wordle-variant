@@ -42,6 +42,7 @@ import { AlreadyPlayedScreen } from "./components/AlreadyPlayedScreen";
 import MoreGamesList from "./components/MoreGamesList";
 import AppLoadingSkeleton from "./components/app/AppLoadingSkeleton";
 import DisconnectedUI from "./components/app/DisconnectedUI";
+import { initTelemetry } from "./lib/telemetry";
 
 const ChatRoom = safeLazy(() => import("./components/chatRoom"));
 const StatsModal = safeLazy(() => import("./components/StatsModal").then(m => ({ default: m.StatsModal })));
@@ -68,6 +69,10 @@ const fadeVariants = {
 
 function MainApp() {
   const { user, loading: isAuthLoading } = useAuth();
+
+  useEffect(() => {
+    initTelemetry();
+  }, []);
 
   const [guestOptedIn, setGuestOptedIn] = useState(() =>
     safeLocalStorage.getItem('wordle_guest_opted_in') === 'true',
