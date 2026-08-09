@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWordGridStore } from '../store/useWordGridStore';
@@ -168,8 +169,8 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
   };
 
   const handleConfirmExchange = async () => {
-  // Current working rack after recalling all placed tiles
-  const fullRack = [...rack, ...placedTiles.map((t: any) => t.letter)];
+    // Current working rack after recalling all placed tiles
+    const fullRack = [...rack, ...placedTiles.map((t: any) => t.letter)];
     const selectedLetters = fullRack.filter((_: string, idx: number) => exchangeSelections[idx]);
     if (selectedLetters.length === 0) {
       triggerToast("Select at least one tile to swap.");
@@ -314,7 +315,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
         {/* Banner Header (Mobile: 1st, Desktop: top of left column) */}
         <div className="order-1 md:col-span-5 w-full max-w-[480px] mx-auto md:max-w-none">
           <div className="w-full bg-[#0c121e]/95 border border-slate-800 rounded-3xl p-3.5 sm:p-4 shadow-2xl backdrop-blur-md flex flex-col gap-3 animate-in fade-in duration-300">
-            
+
             {/* Top row: Back button, Title & Mode info */}
             <div className="flex items-center justify-between w-full gap-2">
               <div className="flex items-center gap-2 min-w-0">

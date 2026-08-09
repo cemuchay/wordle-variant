@@ -210,7 +210,7 @@ export const BattleView = ({
       <motion.div
          initial={{ opacity: 0 }}
          animate={{ opacity: 1 }}
-         className="flex flex-col flex-1 justify-between h-full pt-3 pb-0 relative overflow-hidden"
+         className="flex flex-col flex-1 justify-between h-full pt-0 pb-0 relative overflow-hidden"
       >
 
 

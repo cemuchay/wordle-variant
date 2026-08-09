@@ -62,7 +62,7 @@ export const GameOverView = ({
       <motion.div
          initial={{ opacity: 0, scale: 0.95 }}
          animate={{ opacity: 1, scale: 1 }}
-         className="flex flex-col flex-1 justify-center gap-6 py-4"
+         className="flex flex-col flex-1 justify-center gap-6 py-2"
       >
          <div className="text-center space-y-1">
             <Award size={48} className={`mx-auto animate-bounce ${statusTextClass}`} />
@@ -189,8 +189,8 @@ export const GameOverView = ({
                                     <div
                                        key={i}
                                        className={`rounded-lg overflow-hidden border ${q.choices[i] === q.answer
-                                             ? "border-green-500 ring-1 ring-green-500"
-                                             : "border-white/10"
+                                          ? "border-green-500 ring-1 ring-green-500"
+                                          : "border-white/10"
                                           } bg-slate-950/60 flex items-center justify-center aspect-2/1`}
                                     >
                                        <img
