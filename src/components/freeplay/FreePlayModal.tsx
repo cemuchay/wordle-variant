@@ -335,9 +335,10 @@ export const FreePlayModal = ({
       isOverlay={true}
       zIndex="z-150"
       maxWidth="full"
+      theme="dark"
       containerClassName="p-0!"
     >
-      <div className="flex flex-col h-full w-full bg-slate-950 text-white select-none overflow-hidden animate-in fade-in duration-200">
+      <div className="flex flex-col h-full w-full bg-background text-white select-none overflow-hidden animate-in fade-in duration-200">
         {/* Header Bar */}
         <div className="w-full bg-slate-900/90 border-b border-slate-800 px-4 py-3 flex items-center justify-between gap-3 shrink-0 backdrop-blur-md">
           <div className="flex items-center gap-2">
@@ -390,7 +391,7 @@ export const FreePlayModal = ({
         </div>
 
         {/* Main Game Screen */}
-        <div className="flex-1 flex flex-col items-center justify-between w-full max-w-lg mx-auto p-2 min-h-0 overflow-y-auto">
+        <div className="flex-1 flex flex-col items-center justify-between w-full max-w-lg mx-auto p-2 pb-4 sm:pb-6 min-h-0 h-full overflow-y-auto overflow-x-hidden">
           {isLoading ? (
             <div className="flex-1 flex flex-col items-center justify-center space-y-3">
               <div className="w-10 h-10 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
