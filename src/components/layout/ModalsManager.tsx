@@ -15,6 +15,7 @@ const AuthModal = safeLazy(() => import('../AuthModal').then(m => ({ default: m.
 const UserProfileModal = safeLazy(() => import('../UserProfileModal').then(m => ({ default: m.UserProfileModal })));
 
 import { useAnnouncements } from '../../hooks/useAnnouncements';
+import { setActiveSection } from '../../lib/telemetry';
 
 interface ModalsManagerProps {
     modals: {
@@ -64,6 +65,28 @@ export const ModalsManager = ({
     initialChallengeId
 }: ModalsManagerProps) => {
     const { currentAnnouncement, isOpen: isAnnouncementOpen, markAsRead } = useAnnouncements(!!gameContext.user);
+
+    // Telemetry: Auto-track open modals and section time spent
+    useEffect(() => {
+        if (modals.isSettingsOpen) setActiveSection('settings-modal');
+        else if (modals.isInfoOpen) setActiveSection('info-modal');
+        else if (modals.isStatsOpen) setActiveSection('stats-modal');
+        else if (modals.isChallengeOpen) setActiveSection('challenge-modal');
+        else if (modals.isNotificationsOpen) setActiveSection('notifications-modal');
+        else if (modals.isAuthOpen) setActiveSection('auth-modal');
+        else if (modals.isGameOverOpen) setActiveSection('gameover-modal');
+        else if (viewedProfileId) setActiveSection('user-profile-modal');
+        else setActiveSection('main-dashboard');
+    }, [
+        modals.isSettingsOpen,
+        modals.isInfoOpen,
+        modals.isStatsOpen,
+        modals.isChallengeOpen,
+        modals.isNotificationsOpen,
+        modals.isAuthOpen,
+        modals.isGameOverOpen,
+        viewedProfileId,
+    ]);
 
     useEffect(() => {
         const preloadComponents = () => {
