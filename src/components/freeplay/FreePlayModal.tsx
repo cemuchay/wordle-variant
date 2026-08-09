@@ -7,9 +7,9 @@ import { ModalLayout } from '../layout/ModalLayout';
 import { GameArea } from '../layout/GameArea';
 import { ArchiveDatePicker } from './ArchiveDatePicker';
 import { getDailyConfigSub } from '../../lib/game-logic/helpers/getDailyConfig';
-import { evaluateGuess } from '../../lib/game-logic/helpers/evaluateGuess';
+import { checkGuess as evaluateGuess } from '../../lib/game-logic';
 import {
-  saveCompletedArchive,
+  saveArchiveGame,
   getCompletedArchiveDates,
   saveArchiveDraft,
   getArchiveDraft,
@@ -20,7 +20,7 @@ import {
 import { saveGuestFreePlayState, getGuestFreePlayState, getTodayDateString } from '../../utils/guestFreePlay';
 import { useApp } from '../../context/AppContext';
 import { applyTheme } from '../../utils/theme';
-import type { GuessResult, LetterStatusMap } from '../../types/game';
+import type { GuessResult, LetterStatus } from '../../types/game';
 
 interface FreePlayModalProps {
   isOpen: boolean;
@@ -44,15 +44,6 @@ export const FreePlayModal = ({
 }: FreePlayModalProps) => {
   const { triggerToast } = useApp();
 
-  let isDynamicIslandVisible = false;
-  try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    const app = useApp();
-    isDynamicIslandVisible = app.isDynamicIslandVisible;
-  } catch {
-    // Fallback if rendered outside context
-  }
-
   const [mode, setMode] = useState<'guest' | 'archive'>(initialMode);
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     return initialMode === 'guest' ? getTodayDateString() : getYesterdayArchiveDate();
@@ -69,7 +60,7 @@ export const FreePlayModal = ({
   // Game State
   const [guesses, setGuesses] = useState<GuessResult[][]>([]);
   const [currentGuess, setCurrentGuess] = useState('');
-  const [letterStatuses, setLetterStatuses] = useState<LetterStatusMap>({});
+  const [letterStatuses, setLetterStatuses] = useState<Record<string, LetterStatus>>({});
   const [isGameOver, setIsGameOver] = useState(false);
   const [isWon, setIsWon] = useState(false);
   const [score, setScore] = useState(0);
@@ -112,14 +103,14 @@ export const FreePlayModal = ({
 
   // Reconstruct game board & keyboard statuses from raw string array
   const reconstructStateFromGuesses = useCallback(
-    (word: string, rawGuesses: string[], length: number, attemptsMax: number) => {
+    (word: string, rawGuesses: string[], attemptsMax: number) => {
       const reconstructedGrid: GuessResult[][] = [];
-      const newLetterStatuses: LetterStatusMap = {};
+      const newLetterStatuses: Record<string, LetterStatus> = {};
 
       rawGuesses.forEach((guessStr) => {
         const evalResults = evaluateGuess(guessStr, word);
-        const row: GuessResult[] = evalResults.map((res, i) => {
-          const char = guessStr[i]?.toUpperCase() || res.letter || res.char || '';
+        const row: GuessResult[] = evalResults.map((res) => {
+          const char = res.letter.toUpperCase();
           const status = res.status;
 
           // Update letter status map for keyboard display
@@ -133,7 +124,6 @@ export const FreePlayModal = ({
           }
 
           return {
-            char,
             letter: char,
             status,
           };
@@ -180,7 +170,7 @@ export const FreePlayModal = ({
         // Load guest state from LocalStorage
         const saved = getGuestFreePlayState();
         if (saved && saved.date === todayStr) {
-          reconstructStateFromGuesses(config.word.toUpperCase(), saved.guesses, config.length, config.maxAttempts || 6);
+          reconstructStateFromGuesses(config.word.toUpperCase(), saved.guesses, config.maxAttempts || 6);
         } else {
           setGuesses([]);
           setLetterStatuses({});
@@ -198,7 +188,7 @@ export const FreePlayModal = ({
         // Check if draft exists in LocalStorage
         const draft = getArchiveDraft(selectedDate);
         if (draft && draft.length > 0) {
-          reconstructStateFromGuesses(config.word.toUpperCase(), draft, config.length, config.maxAttempts || 6);
+          reconstructStateFromGuesses(config.word.toUpperCase(), draft, config.maxAttempts || 6);
         } else {
           setGuesses([]);
           setLetterStatuses({});
@@ -283,14 +273,10 @@ export const FreePlayModal = ({
     }
 
     const evalResults = evaluateGuess(currentGuess, targetWord);
-    const newRow: GuessResult[] = evalResults.map((res, i) => {
-      const char = currentGuess[i].toUpperCase();
-      return {
-        char,
-        letter: char,
-        status: res.status,
-      };
-    });
+    const newRow: GuessResult[] = evalResults.map((res) => ({
+      letter: res.letter.toUpperCase(),
+      status: res.status,
+    }));
 
     const newGuesses = [...guesses, newRow];
     setGuesses(newGuesses);
@@ -299,7 +285,7 @@ export const FreePlayModal = ({
     // Update letter statuses map
     const newLetterStatuses = { ...letterStatuses };
     newRow.forEach((res) => {
-      const char = res.char || res.letter || '';
+      const char = res.letter.toUpperCase();
       const existing = newLetterStatuses[char];
       if (res.status === 'correct') {
         newLetterStatuses[char] = 'correct';
@@ -315,7 +301,7 @@ export const FreePlayModal = ({
     const won = currentGuess.toUpperCase() === targetWord;
     const over = won || newGuesses.length >= maxAttempts;
 
-    const newRawGuesses = newGuesses.map((row) => row.map((cell) => cell.char || cell.letter).join(''));
+    const newRawGuesses = newGuesses.map((row) => row.map((cell) => cell.letter).join(''));
 
     if (over) {
       setIsGameOver(true);
@@ -329,13 +315,15 @@ export const FreePlayModal = ({
 
       if (mode === 'archive') {
         // Save completed archive to IndexedDB and clear draft
-        await saveCompletedArchive({
+        await saveArchiveGame({
           date: selectedDate,
           word: targetWord,
           guesses: newRawGuesses,
+          isGameOver: true,
           isWon: won,
           score: calcScore,
           attempts: newGuesses.length,
+          playedAt: new Date().toISOString(),
         });
         clearArchiveDraft(selectedDate);
         setCompletedDates((prev) => new Set(prev).add(selectedDate));
