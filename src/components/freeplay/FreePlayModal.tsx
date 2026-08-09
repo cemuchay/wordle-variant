@@ -390,7 +390,7 @@ export const FreePlayModal = ({
       theme="dark"
       containerClassName="p-0!"
     >
-      <div className="flex flex-col h-full w-full bg-slate-950 text-white select-none overflow-hidden animate-in fade-in duration-200">
+      <div className="flex flex-col h-full w-full bg-background text-white select-none overflow-hidden animate-in fade-in duration-200">
         {/* Header Bar */}
         <div className="w-full bg-slate-900/90 border-b border-slate-800 px-4 py-3 flex items-center justify-between gap-3 shrink-0 backdrop-blur-md">
           <div className="flex items-center gap-2">
