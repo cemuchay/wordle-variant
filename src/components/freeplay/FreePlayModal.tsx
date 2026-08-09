@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { X, Calendar, Shuffle, CheckCircle, ArrowLeft, Gamepad2 } from 'lucide-react';
+import { ModalLayout } from '../layout/ModalLayout';
 import { GameArea } from '../layout/GameArea';
 import { ArchiveDatePicker } from './ArchiveDatePicker';
 import { getDailyConfigSub } from '../../lib/game-logic/helpers/getDailyConfig';
@@ -327,131 +328,141 @@ export const FreePlayModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-white select-none overflow-hidden animate-in fade-in duration-200">
-      {/* Header Bar */}
-      <div className="w-full bg-slate-900/90 border-b border-slate-800 px-4 py-3 flex items-center justify-between gap-3 shrink-0 backdrop-blur-md">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onClose}
-            className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer"
-          >
-            <ArrowLeft size={16} /> Exit
-          </button>
-
-          {/* Mode Badge & Picker Launcher */}
-          {mode === 'archive' ? (
+    <ModalLayout
+      isOpen={isOpen}
+      onClose={onClose}
+      showCloseButton={false}
+      isOverlay={true}
+      zIndex="z-150"
+      maxWidth="full"
+      containerClassName="p-0!"
+    >
+      <div className="flex flex-col h-full w-full bg-slate-950 text-white select-none overflow-hidden animate-in fade-in duration-200">
+        {/* Header Bar */}
+        <div className="w-full bg-slate-900/90 border-b border-slate-800 px-4 py-3 flex items-center justify-between gap-3 shrink-0 backdrop-blur-md">
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowDatePicker(true)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-indigo-950/80 hover:bg-indigo-900/80 border border-indigo-500/40 rounded-xl text-indigo-200 text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
+              onClick={onClose}
+              className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer"
             >
-              <Calendar size={15} className="text-indigo-400" />
-              <span>{selectedDate}</span>
-              <span className="text-[10px] bg-indigo-500/30 text-indigo-300 px-1.5 py-0.5 rounded-md">
-                {completedDates.has(selectedDate) ? '✅ Solved' : '🎯 Play'}
-              </span>
+              <ArrowLeft size={16} /> Exit
             </button>
-          ) : (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-950/80 border border-emerald-500/40 rounded-xl text-emerald-200 text-xs font-black uppercase tracking-wider">
-              <Gamepad2 size={15} className="text-emerald-400" />
-              <span>Daily Guest Game</span>
-            </div>
-          )}
-        </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-2">
-          {mode === 'archive' && (
-            <button
-              onClick={handleShuffleUnplayed}
-              className="p-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 rounded-xl text-xs font-bold transition-all cursor-pointer"
-              title="Shuffle Random Unplayed Archive"
-            >
-              <Shuffle size={16} />
-            </button>
-          )}
-
-          <button
-            onClick={onClose}
-            className="p-2 text-gray-400 hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
-          >
-            <X size={18} />
-          </button>
-        </div>
-      </div>
-
-      {/* Main Game Screen */}
-      <div className="flex-1 flex flex-col items-center justify-between w-full max-w-lg mx-auto p-2 min-h-0 overflow-y-auto">
-        {isLoading ? (
-          <div className="flex-1 flex flex-col items-center justify-center space-y-3">
-            <div className="w-10 h-10 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
-            <p className="text-xs font-black uppercase tracking-widest text-indigo-300">Loading Puzzle...</p>
-          </div>
-        ) : (
-          <>
-            {/* Completion Banner if game is over */}
-            {isGameOver && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`w-full p-3.5 rounded-2xl border mb-2 shadow-lg flex items-center justify-between gap-3 ${
-                  isWon
-                    ? 'bg-emerald-950/90 border-emerald-500/60 text-emerald-100'
-                    : 'bg-rose-950/90 border-rose-500/60 text-rose-100'
-                }`}
+            {/* Mode Badge & Picker Launcher */}
+            {mode === 'archive' ? (
+              <button
+                onClick={() => setShowDatePicker(true)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-950/80 hover:bg-indigo-900/80 border border-indigo-500/40 rounded-xl text-indigo-200 text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
               >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-white/10 shrink-0">
-                    {isWon ? <CheckCircle size={22} className="text-emerald-400" /> : <X size={22} className="text-rose-400" />}
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-black uppercase tracking-wider">
-                      {isWon ? 'Puzzle Solved!' : 'Better Luck Next Time!'}
-                    </h3>
-                    <p className="text-xs font-bold text-gray-300">
-                      The word was <span className="text-white font-black tracking-widest">{targetWord}</span>
-                    </p>
-                  </div>
-                </div>
+                <Calendar size={15} className="text-indigo-400" />
+                <span>{selectedDate}</span>
+                <span className="text-[10px] bg-indigo-500/30 text-indigo-300 px-1.5 py-0.5 rounded-md">
+                  {completedDates.has(selectedDate) ? '✅ Solved' : '🎯 Play'}
+                </span>
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-950/80 border border-emerald-500/40 rounded-xl text-emerald-200 text-xs font-black uppercase tracking-wider">
+                <Gamepad2 size={15} className="text-emerald-400" />
+                <span>Daily Guest Game</span>
+              </div>
+            )}
+          </div>
 
-                {isWon && (
-                  <div className="px-3 py-1.5 bg-emerald-500 text-slate-950 rounded-xl text-xs font-black uppercase shrink-0 shadow-md">
-                    +{score} pts
-                  </div>
-                )}
-              </motion.div>
+          {/* Action Controls */}
+          <div className="flex items-center gap-2">
+            {mode === 'archive' && (
+              <button
+                onClick={handleShuffleUnplayed}
+                className="p-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                title="Shuffle Random Unplayed Archive"
+              >
+                <Shuffle size={16} />
+              </button>
             )}
 
-            {/* Core Game Area & Keyboard */}
-            <GameArea
-              wordLength={wordLength}
-              maxAttempts={maxAttempts}
-              guesses={guesses}
-              currentGuess={currentGuess}
-              letterStatuses={letterStatuses}
-              hintRecord={null}
-              isGameOver={isGameOver}
-              isShake={isShake}
-              onChar={handleChar}
-              onDelete={handleDelete}
-              onEnter={handleEnter}
-            />
-          </>
+            <button
+              onClick={onClose}
+              className="p-2 text-gray-400 hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* Main Game Screen */}
+        <div className="flex-1 flex flex-col items-center justify-between w-full max-w-lg mx-auto p-2 min-h-0 overflow-y-auto">
+          {isLoading ? (
+            <div className="flex-1 flex flex-col items-center justify-center space-y-3">
+              <div className="w-10 h-10 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+              <p className="text-xs font-black uppercase tracking-widest text-indigo-300">Loading Puzzle...</p>
+            </div>
+          ) : (
+            <>
+              {/* Completion Banner if game is over */}
+              {isGameOver && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`w-full p-3.5 rounded-2xl border mb-2 shadow-lg flex items-center justify-between gap-3 ${
+                    isWon
+                      ? 'bg-emerald-950/90 border-emerald-500/60 text-emerald-100'
+                      : 'bg-rose-950/90 border-rose-500/60 text-rose-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-white/10 shrink-0">
+                      {isWon ? <CheckCircle size={22} className="text-emerald-400" /> : <X size={22} className="text-rose-400" />}
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black uppercase tracking-wider">
+                        {isWon ? 'Puzzle Solved!' : 'Better Luck Next Time!'}
+                      </h3>
+                      <p className="text-xs font-bold text-gray-300">
+                        The word was <span className="text-white font-black tracking-widest">{targetWord}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {isWon && (
+                    <div className="px-3 py-1.5 bg-emerald-500 text-slate-950 rounded-xl text-xs font-black uppercase shrink-0 shadow-md">
+                      +{score} pts
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {/* Core Game Area & Keyboard */}
+              <GameArea
+                wordLength={wordLength}
+                maxAttempts={maxAttempts}
+                guesses={guesses}
+                currentGuess={currentGuess}
+                letterStatuses={letterStatuses}
+                hintRecord={null}
+                isGameOver={isGameOver}
+                isShake={isShake}
+                onChar={handleChar}
+                onDelete={handleDelete}
+                onEnter={handleEnter}
+              />
+            </>
+          )}
+        </div>
+
+        {/* Archive Date Picker Overlay */}
+        {showDatePicker && (
+          <ArchiveDatePicker
+            selectedDate={selectedDate}
+            onSelectDate={(date) => {
+              setSelectedDate(date);
+              setShowDatePicker(false);
+            }}
+            completedDates={completedDates}
+            onClose={() => setShowDatePicker(false)}
+            onShuffleUnplayed={handleShuffleUnplayed}
+          />
         )}
       </div>
-
-      {/* Archive Date Picker Overlay */}
-      {showDatePicker && (
-        <ArchiveDatePicker
-          selectedDate={selectedDate}
-          onSelectDate={(date) => {
-            setSelectedDate(date);
-            setShowDatePicker(false);
-          }}
-          completedDates={completedDates}
-          onClose={() => setShowDatePicker(false)}
-          onShuffleUnplayed={handleShuffleUnplayed}
-        />
-      )}
-    </div>
+    </ModalLayout>
   );
 };
