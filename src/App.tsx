@@ -549,6 +549,21 @@ function MainApp() {
       window.removeEventListener("open-stats-modal", handleOpenStats);
   }, [setStatsActiveTab, setIsStatsOpen]);
 
+  // Listen to custom event to open WordGrid match directly
+  useEffect(() => {
+    const handleOpenWordGrid = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      setIsMoreOpen(true);
+      setMoreGameMode("wordgrid");
+      if (detail?.matchId && user?.id) {
+        useWordGridStore.getState().loadMatch(detail.matchId, user.id);
+      }
+    };
+    window.addEventListener("open-wordgrid-match", handleOpenWordGrid);
+    return () =>
+      window.removeEventListener("open-wordgrid-match", handleOpenWordGrid);
+  }, [user]);
+
   // Listen to custom event to open auth modal
   useEffect(() => {
     const handleOpenAuth = () => setIsAuthOpen(true);

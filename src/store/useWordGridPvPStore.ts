@@ -214,6 +214,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
       view: (record.status === "completed" ? "completed" : "active") as WordGridPvPViewType,
       placedTiles: [],
       rack: activeRack,
+      loading: false,
     };
 
     set(snapshot);
@@ -469,14 +470,39 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
         moves: [],
       };
 
-      const { data, error } = await supabase.from("wordgrid_matches").insert(payload).select().single();
+      const { data, error } = await supabase
+        .from("wordgrid_matches")
+        .insert(payload)
+        .select(`*, player1:player1_id(id, username, avatar_url)`)
+        .single();
       if (error) throw error;
 
       get().updateFromMatchRecord(data, userId);
+
+      // Send challenge notification to opponent
+      const challengerName = (data as any)?.player1?.username || "A player";
+      supabase.from("notifications").insert({
+        user_id: opponentId,
+        type: "CHALLENGE_INVITE",
+        title: "WordGrid Arena Challenge 🔠",
+        message: `${challengerName} has challenged you to a WordGrid game (${gridSize}×${gridSize})!`,
+        data: {
+          mode: "wordgrid",
+          matchId,
+          challengerId: userId,
+          gridSize,
+        },
+        is_read: false,
+      }).then(({ error: notifErr }) => {
+        if (notifErr) console.warn("[WordGridPvP] Challenge notification warning:", notifErr);
+      });
+
       triggerToast("Direct challenge started!");
     } catch (e: any) {
       console.error("[WordGridPvP] Direct challenge error:", e);
-      set({ error: e.message, loading: false });
+      set({ error: e.message });
+    } finally {
+      set({ loading: false });
     }
   },
 }));
