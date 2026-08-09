@@ -351,6 +351,34 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
       }
     });
 
+    // Notify opponent that it is their turn
+    const nextTurnUserId = updatedState.currentTurn;
+    const isCompleted = updatedState.status === "completed";
+    const currentPlayer = state.players.find((p) => p.id === userId);
+    const playerName = currentPlayer?.username || "Your opponent";
+
+    if (nextTurnUserId && isUuid(nextTurnUserId) && nextTurnUserId !== userId) {
+      supabase
+        .from("notifications")
+        .insert({
+          user_id: nextTurnUserId,
+          type: "CHALLENGE_INVITE",
+          title: isCompleted ? "WordGrid Match Completed! 🏆" : "Your Turn in WordGrid! 🔠",
+          message: isCompleted
+            ? `${playerName} played the final move! Check out the final scores.`
+            : `${playerName} played a word! It is now your turn.`,
+          data: {
+            mode: "wordgrid",
+            matchId: state.matchId,
+            turnUserId: nextTurnUserId,
+          },
+          is_read: false,
+        })
+        .then(({ error: notifErr }) => {
+          if (notifErr) console.warn("[WordGridPvP] Move turn notification error:", notifErr);
+        });
+    }
+
     return true;
   },
 
@@ -399,6 +427,31 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
         triggerToast?.(`Cloud sync warning: ${error.message || "Failed to exchange tiles"}`, 4000);
       }
     });
+
+    // Notify opponent that it is their turn after exchange
+    const nextTurnUserId = updatedState.currentTurn;
+    const currentPlayer = state.players.find((p) => p.id === userId);
+    const playerName = currentPlayer?.username || "Your opponent";
+
+    if (nextTurnUserId && isUuid(nextTurnUserId) && nextTurnUserId !== userId) {
+      supabase
+        .from("notifications")
+        .insert({
+          user_id: nextTurnUserId,
+          type: "CHALLENGE_INVITE",
+          title: "Your Turn in WordGrid! 🔠",
+          message: `${playerName} swapped tiles! It is now your turn.`,
+          data: {
+            mode: "wordgrid",
+            matchId: state.matchId,
+            turnUserId: nextTurnUserId,
+          },
+          is_read: false,
+        })
+        .then(({ error: notifErr }) => {
+          if (notifErr) console.warn("[WordGridPvP] Swap turn notification error:", notifErr);
+        });
+    }
   },
 
   resignMatch: async (_userId) => {
