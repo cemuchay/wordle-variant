@@ -625,6 +625,19 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
          set(updatedState);
          saveBotSnapshot(state.matchId, updatedState);
 
+         if (botMove) {
+            window.dispatchEvent(
+               new CustomEvent("opponent-played-move", {
+                  detail: {
+                     playerName: "WordGrid Bot 🤖",
+                     word: botMove.word,
+                     score: botMove.score,
+                     isSwap: typeof botMove.word === "string" && botMove.word.includes("Swapped"),
+                  },
+               })
+            );
+         }
+
          if (botHighlightTimer) clearTimeout(botHighlightTimer);
          botHighlightTimer = setTimeout(() => {
             set({ lastBotPlacedCoords: [], lastBotMove: null });

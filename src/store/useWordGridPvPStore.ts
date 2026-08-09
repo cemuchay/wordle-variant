@@ -200,6 +200,30 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
     const turnIndex = record.current_turn_index ?? 0;
     const currentTurn = record.current_turn || playersList[turnIndex]?.id || currentUserId;
 
+    const newMoves = record.moves || [];
+    const prevMovesCount = get().moves?.length || 0;
+    if (newMoves.length > prevMovesCount) {
+      const lastMove = newMoves[newMoves.length - 1];
+      if (lastMove && lastMove.player_id !== currentUserId) {
+        const opponent = playersList.find((p) => p.id === lastMove.player_id);
+        const oppName = opponent?.username || record.player1?.username || record.player2?.username || "Opponent";
+        const word = lastMove.primary_word || lastMove.word || "a word";
+        const score = lastMove.score || 0;
+        const isSwap = typeof word === "string" && word.includes("Swapped");
+
+        window.dispatchEvent(
+          new CustomEvent("opponent-played-move", {
+            detail: {
+              playerName: oppName,
+              word,
+              score,
+              isSwap,
+            },
+          })
+        );
+      }
+    }
+
     const snapshot = {
       matchId: record.id,
       gridSize: record.grid_size || DEFAULT_GRID_SIZE,
@@ -211,7 +235,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
       players: playersList,
       currentTurnIndex: turnIndex,
       currentTurn,
-      moves: record.moves || [],
+      moves: newMoves,
       view: (record.status === "completed" ? "completed" : "active") as WordGridPvPViewType,
       placedTiles: [],
       rack: activeRack,

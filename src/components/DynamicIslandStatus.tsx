@@ -116,12 +116,25 @@ export const DynamicIslandStatus = () => {
             if (detail && detail.message) {
                 // Briefly flash in Dynamic Island using triggerToast
                 triggerToast(detail.message, TOAST_DURATION.VERY_LONG);
-
-
             }
         };
+
+        const handleOpponentMove = (e: Event) => {
+            const detail = (e as CustomEvent)?.detail;
+            if (detail && detail.word) {
+                const text = detail.isSwap
+                    ? `${detail.playerName} swapped tiles`
+                    : `${detail.playerName} played "${detail.word}" (+${detail.score} pts)!`;
+                triggerToast(text, TOAST_DURATION.VERY_LONG, true);
+            }
+        };
+
         window.addEventListener('new-notification', handleNewNotification);
-        return () => window.removeEventListener('new-notification', handleNewNotification);
+        window.addEventListener('opponent-played-move', handleOpponentMove);
+        return () => {
+            window.removeEventListener('new-notification', handleNewNotification);
+            window.removeEventListener('opponent-played-move', handleOpponentMove);
+        };
     }, [triggerToast]);
 
     // Toast logic: auto-hide after duration

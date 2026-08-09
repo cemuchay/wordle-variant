@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useWordGridStore } from '../store/useWordGridStore';
 import { MatchmakingLobby } from './components/MatchmakingLobby';
 import { BoardGrid } from './components/BoardGrid';
@@ -206,6 +207,32 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
       { id: player2?.id || 'p2', username: player2?.username || 'Player 2', score: p2Score, rack: [] },
     ];
 
+  const [splashMove, setSplashMove] = useState<{
+    playerName: string;
+    word: string;
+    score: number;
+    isSwap?: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    let timer: any = null;
+    const handleOpponentMove = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (detail && detail.word) {
+        setSplashMove(detail);
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+          setSplashMove(null);
+        }, 4500);
+      }
+    };
+    window.addEventListener('opponent-played-move', handleOpponentMove);
+    return () => {
+      window.removeEventListener('opponent-played-move', handleOpponentMove);
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
+
   return (
     <div
       onCopy={(e) => e.preventDefault()}
@@ -221,8 +248,46 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
         />
       )}
 
+      {/* Opponent / Bot Play Splash Notification */}
+      <AnimatePresence>
+        {splashMove && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.85, y: -20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: -10 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+            className="fixed top-14 sm:top-16 left-1/2 -translate-x-1/2 z-50 px-4 w-full max-w-sm pointer-events-auto cursor-pointer"
+            onClick={() => setSplashMove(null)}
+          >
+            <div className="bg-linear-to-r from-slate-900/95 via-indigo-950/95 to-slate-900/95 border-2 border-indigo-400/80 rounded-3xl p-4 shadow-[0_10px_35px_rgba(99,102,241,0.4)] backdrop-blur-md flex items-center justify-between gap-3 text-white">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-xl shadow-inner shrink-0 animate-bounce">
+                  {splashMove.playerName.includes("Bot") ? "🤖" : "⚔️"}
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-indigo-300 truncate">
+                    {splashMove.playerName} {splashMove.isSwap ? 'swapped tiles' : 'just played'}
+                  </span>
+                  {!splashMove.isSwap && (
+                    <span className="text-base font-black tracking-wide text-white truncate drop-shadow-md">
+                      "{splashMove.word}"
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {!splashMove.isSwap && (
+                <div className="px-3.5 py-1.5 bg-emerald-500 text-slate-950 rounded-2xl text-xs font-black uppercase shadow-lg shrink-0">
+                  +{splashMove.score} pts
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Bot Move Splash Notification */}
-      {lastBotMove && (
+      {lastBotMove && !splashMove && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none animate-in fade-in slide-in-from-top-4 zoom-in-95 duration-300 px-4 w-full max-w-sm">
           <div className="bg-linear-to-r from-emerald-900/95 via-teal-900/95 to-slate-900/95 border-2 border-emerald-400 rounded-3xl p-4 shadow-2xl shadow-emerald-950/80 backdrop-blur-md flex items-center justify-between gap-3 text-white">
             <div className="flex items-center gap-3">
