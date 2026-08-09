@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { X, Calendar as CalendarIcon, CheckCircle2, Sparkles, Shuffle, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { FIRST_ARCHIVE_DATE, getYesterdayArchiveDate, getAllValidArchiveDates } from '../../utils/archiveDb';
+import { ModalLayout } from '../layout/ModalLayout';
 
 interface ArchiveDatePickerProps {
   selectedDate: string;
@@ -81,14 +82,16 @@ export const ArchiveDatePicker = ({
   }, [filteredDates, currentYearMonth]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.92, y: 15 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.92, y: 15 }}
-        transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-        className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4 max-h-[90vh] flex flex-col text-white"
-      >
+    <ModalLayout
+      isOpen={true}
+      onClose={onClose}
+      showCloseButton={false}
+      isOverlay={true}
+      zIndex="z-160"
+      maxWidth="md"
+      containerClassName="p-0!"
+    >
+      <div className="flex flex-col h-full w-full bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4 text-white overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-3">
           <div className="flex items-center gap-2.5">
@@ -245,7 +248,7 @@ export const ArchiveDatePicker = ({
             Allowed range: {FIRST_ARCHIVE_DATE} to {yesterday}
           </p>
         </div>
-      </motion.div>
-    </div>
+      </div>
+    </ModalLayout>
   );
 };

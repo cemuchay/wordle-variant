@@ -59,7 +59,7 @@ export const AlreadyPlayedScreen = ({
   return (
     <div className="h-full w-full overflow-y-auto scrollbar-hide px-4 sm:px-8 py-6 flex flex-col items-center justify-start select-none text-white bg-dark">
       <div className="w-full max-w-3xl mx-auto flex flex-col space-y-6">
-        
+
         {/* Top Header Block */}
         <motion.div
           initial={{ opacity: 0, y: -15 }}
@@ -71,14 +71,11 @@ export const AlreadyPlayedScreen = ({
           <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl pointer-events-none" />
 
           <CountDown isOpen={true} />
-          
+
           <div className="space-y-1">
             <h2 className="text-lg sm:text-xl font-black uppercase tracking-wider text-white">
               Daily Puzzle Completed! 🎉
             </h2>
-            <p className="text-xs sm:text-sm text-gray-300 font-semibold max-w-md mx-auto">
-              You're all done with today's challenge. Jump into free play, browse the archive, or check your stats!
-            </p>
           </div>
         </motion.div>
 
@@ -127,44 +124,11 @@ export const AlreadyPlayedScreen = ({
             <span className="text-[10px] text-gray-400 font-bold">Swipe &rarr;</span>
           </div>
           <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide space-x-3 pb-3 -mx-4 px-4">
-            {/* 1. Play Guest Game */}
-            <button
-              onClick={() => onOpenFreePlay?.('guest')}
-              className="snap-center shrink-0 w-[240px] p-4 bg-linear-to-br from-emerald-950/90 via-slate-900 to-slate-950 border border-emerald-500/40 rounded-2xl flex flex-col justify-between gap-3 shadow-xl text-left active:scale-98"
-            >
-              <div className="flex items-center justify-between w-full">
-                <div className="p-2.5 bg-emerald-500/20 rounded-xl text-emerald-400 border border-emerald-500/30">
-                  <Gamepad2 size={20} />
-                </div>
-                <span className="text-[9px] font-black uppercase text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">Local</span>
-              </div>
-              <div>
-                <h4 className="text-xs font-black uppercase tracking-wider text-white">Play Guest Game</h4>
-                <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">Daily local puzzle without cloud stats.</p>
-              </div>
-            </button>
 
-            {/* 2. Play Archive */}
-            <button
-              onClick={() => onOpenFreePlay?.('archive')}
-              className="snap-center shrink-0 w-[240px] p-4 bg-linear-to-br from-indigo-950/90 via-slate-900 to-slate-950 border border-indigo-500/40 rounded-2xl flex flex-col justify-between gap-3 shadow-xl text-left active:scale-98"
-            >
-              <div className="flex items-center justify-between w-full">
-                <div className="p-2.5 bg-indigo-500/20 rounded-xl text-indigo-400 border border-indigo-500/30">
-                  <Calendar size={20} />
-                </div>
-                <span className="text-[9px] font-black uppercase text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full">Archive</span>
-              </div>
-              <div>
-                <h4 className="text-xs font-black uppercase tracking-wider text-white">Play Archive</h4>
-                <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">Browse and play past daily puzzles.</p>
-              </div>
-            </button>
-
-            {/* 3. See Your Board */}
+            {/* 1. See Your Board */}
             <button
               onClick={onAdmirePuzzle}
-              className="snap-center shrink-0 w-[240px] p-4 bg-slate-900/90 border border-emerald-500/30 rounded-2xl flex flex-col justify-between gap-3 shadow-xl text-left active:scale-98"
+              className="snap-center shrink-0 w-60 p-4 bg-slate-900/90 border border-emerald-500/30 rounded-2xl flex flex-col justify-between gap-3 shadow-xl text-left active:scale-98"
             >
               <div className="flex items-center justify-between w-full">
                 <div className="p-2.5 bg-emerald-500/10 rounded-xl text-emerald-400 border border-emerald-500/20">
@@ -173,15 +137,49 @@ export const AlreadyPlayedScreen = ({
                 <span className="text-[9px] font-black uppercase text-gray-400 bg-white/5 px-2 py-0.5 rounded-full">Today</span>
               </div>
               <div>
-                <h4 className="text-xs font-black uppercase tracking-wider text-white">See Your Board</h4>
-                <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">Review completed grid & share results.</p>
+                <h4 className="text-base font-black uppercase tracking-wider text-white">See Your Board</h4>
+                <p className="text-[12px] text-gray-400 mt-0.5 leading-tight">Review completed grid & share results.</p>
+              </div>
+            </button>
+
+            {/* 2. Play Archive */}
+            <button
+              onClick={() => onOpenFreePlay?.('archive')}
+              className="snap-center shrink-0 w-60 p-4 bg-linear-to-br from-indigo-950/90 via-slate-900 to-slate-950 border border-indigo-500/40 rounded-2xl flex flex-col justify-between gap-3 shadow-xl text-left active:scale-98"
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="p-2.5 bg-indigo-500/20 rounded-xl text-indigo-400 border border-indigo-500/30">
+                  <Calendar size={20} />
+                </div>
+                <span className="text-[9px] font-black uppercase text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full">Archive</span>
+              </div>
+              <div>
+                <h4 className="text-base font-black uppercase tracking-wider text-white">Play Archive</h4>
+                <p className="text-[12px] text-gray-400 mt-0.5 leading-tight">Browse and play past daily puzzles.</p>
+              </div>
+            </button>
+
+            {/* 3. Play Guest Game */}
+            <button
+              onClick={() => onOpenFreePlay?.('guest')}
+              className="snap-center shrink-0 w-60 p-4 bg-linear-to-br from-emerald-950/90 via-slate-900 to-slate-950 border border-emerald-500/40 rounded-2xl flex flex-col justify-between gap-3 shadow-xl text-left active:scale-98"
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="p-2.5 bg-emerald-500/20 rounded-xl text-emerald-400 border border-emerald-500/30">
+                  <Gamepad2 size={20} />
+                </div>
+                <span className="text-[9px] font-black uppercase text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">Local</span>
+              </div>
+              <div>
+                <h4 className="text-base font-black uppercase tracking-wider text-white">Play Guest Game</h4>
+                <p className="text-[12px] text-gray-400 mt-0.5 leading-tight">Daily local puzzle without cloud stats.</p>
               </div>
             </button>
 
             {/* 4. See Leaderboard */}
             <button
               onClick={() => onNavigate("leaderboard")}
-              className="snap-center shrink-0 w-[240px] p-4 bg-slate-900/90 border border-amber-500/30 rounded-2xl flex flex-col justify-between gap-3 shadow-xl text-left active:scale-98"
+              className="snap-center shrink-0 w-60 p-4 bg-slate-900/90 border border-amber-500/30 rounded-2xl flex flex-col justify-between gap-3 shadow-xl text-left active:scale-98"
             >
               <div className="flex items-center justify-between w-full">
                 <div className="p-2.5 bg-amber-500/10 rounded-xl text-amber-400 border border-amber-500/20">
@@ -190,15 +188,15 @@ export const AlreadyPlayedScreen = ({
                 <span className="text-[9px] font-black uppercase text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">Rank</span>
               </div>
               <div>
-                <h4 className="text-xs font-black uppercase tracking-wider text-white">See Leaderboard</h4>
-                <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">Compare daily stats & player rank.</p>
+                <h4 className="text-base font-black uppercase tracking-wider text-white">See Leaderboard</h4>
+                <p className="text-[12px] text-gray-400 mt-0.5 leading-tight">Compare daily stats & player rank.</p>
               </div>
             </button>
 
             {/* 5. Play WordUp */}
             <button
               onClick={() => onNavigate("wordup")}
-              className="snap-center shrink-0 w-[240px] p-4 bg-slate-900/90 border border-indigo-500/30 rounded-2xl flex flex-col justify-between gap-3 shadow-xl text-left active:scale-98"
+              className="snap-center shrink-0 w-60 p-4 bg-slate-900/90 border border-indigo-500/30 rounded-2xl flex flex-col justify-between gap-3 shadow-xl text-left active:scale-98"
             >
               <div className="flex items-center justify-between w-full">
                 <div className="p-2.5 bg-indigo-500/10 rounded-xl text-indigo-400 border border-indigo-500/20">
@@ -207,8 +205,8 @@ export const AlreadyPlayedScreen = ({
                 <span className="text-[9px] font-black uppercase text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full">PVP</span>
               </div>
               <div>
-                <h4 className="text-xs font-black uppercase tracking-wider text-white">Play WordUp</h4>
-                <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">Fast-paced multiplayer battle mode.</p>
+                <h4 className="text-base font-black uppercase tracking-wider text-white">Play WordUp</h4>
+                <p className="text-[12px] text-gray-400 mt-0.5 leading-tight">Fast-paced multiplayer battle mode.</p>
               </div>
             </button>
           </div>
@@ -216,7 +214,7 @@ export const AlreadyPlayedScreen = ({
 
         {/* DESKTOP 2-COLUMN GRID (visible on desktop md:grid) */}
         <div className="hidden md:grid md:grid-cols-2 gap-5 items-stretch">
-          
+
           {/* LEFT COLUMN: Free Play & Archive Modes */}
           <motion.div
             initial={{ opacity: 0, x: -15 }}
