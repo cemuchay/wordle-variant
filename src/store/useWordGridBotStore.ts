@@ -32,6 +32,17 @@ const toDbUuid = (id: string | null | undefined): string | null => {
    return uuidRegex.test(id) ? id : null;
 };
 
+function generateUUID(): string {
+   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+   }
+   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+   });
+}
+
 // Local Storage Helper for Bot Snapshots
 export function saveBotSnapshot(
    matchId: string | null,
@@ -202,9 +213,7 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
    startBotMatch: async (userId, difficulty, gridSize = DEFAULT_GRID_SIZE, triggerToast) => {
       set({ loading: true, error: null });
       try {
-         const matchId = typeof crypto !== "undefined" && crypto?.randomUUID
-            ? crypto.randomUUID()
-            : `bot_${Date.now()}`;
+         const matchId = generateUUID();
          const initialBag = generateInitialTileBag();
          const { rack: p1Rack, newBag: bag1 } = await drawBalancedRack(
             initialBag,

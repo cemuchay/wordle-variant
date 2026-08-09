@@ -19,6 +19,17 @@ function isUuid(val: any): boolean {
   );
 }
 
+function generateUUID(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export function savePvPSnapshot(matchId: string | null, snapshot: Record<string, any>) {
   if (!matchId) return;
   try {
@@ -400,7 +411,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
   startQueue: async (userId, _isRated, gridSize, targetPlayers, _triggerToast) => {
     set({ loading: true, view: "matchmaking" });
     try {
-      const matchId = `match_${Date.now()}`;
+      const matchId = generateUUID();
       const initialBag = generateInitialTileBag();
       const { rack: p1Rack, newBag } = await drawBalancedRack(initialBag, [], 7, true);
 
@@ -436,7 +447,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
   startDirectChallenge: async (userId, opponentId, gridSize, triggerToast) => {
     set({ loading: true });
     try {
-      const matchId = `challenge_${Date.now()}`;
+      const matchId = generateUUID();
       const initialBag = generateInitialTileBag();
       const { rack: p1Rack, newBag: bag1 } = await drawBalancedRack(initialBag, [], 7, true);
       const { rack: p2Rack, newBag: finalBag } = await drawBalancedRack(bag1, [], 7, true);
