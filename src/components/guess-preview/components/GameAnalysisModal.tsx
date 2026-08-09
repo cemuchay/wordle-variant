@@ -430,15 +430,15 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
               </div>
             </>
           )}
-          {/* Footer */}
-          <div className="border-t border-gray-800 shrink-0">
-            <button
-              onClick={onClose}
-              className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-colors cursor-pointer"
-            >
-              Close Analysis
-            </button>
-          </div>
+        </div>
+        {/* Footer */}
+        <div className="border-t border-gray-800 shrink-0">
+          <button
+            onClick={onClose}
+            className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-colors cursor-pointer"
+          >
+            Close Analysis
+          </button>
         </div>
       </div>
     </div>
