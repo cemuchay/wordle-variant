@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
+import { applyTheme, type AppThemeValue } from '../../utils/theme';
 
 export interface ModalLayoutProps {
   isOpen?: boolean;
@@ -12,6 +14,7 @@ export interface ModalLayoutProps {
   containerClassName?: string;
   zIndex?: string;
   isOverlay?: boolean;
+  theme?: AppThemeValue;
 }
 
 const maxWidthMap = {
@@ -34,10 +37,40 @@ export const ModalLayout: React.FC<ModalLayoutProps> = ({
   containerClassName = '',
   zIndex = 'z-150',
   isOverlay = true,
+  theme = 'dark',
 }) => {
+  let isDynamicIslandVisible = false;
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const app = useApp();
+    isDynamicIslandVisible = app.isDynamicIslandVisible;
+  } catch {
+    // Context fallback if mounted outside AppContext
+  }
+
+  const prevThemeRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen && theme) {
+      prevThemeRef.current = document.documentElement.getAttribute('data-theme');
+      applyTheme(theme);
+    }
+    return () => {
+      if (isOpen && prevThemeRef.current) {
+        applyTheme(prevThemeRef.current);
+      }
+    };
+  }, [isOpen, theme]);
+
   if (!isOpen) return null;
 
   const isFullScreen = maxWidth === 'full';
+
+  const topPadding = isOverlay
+    ? isDynamicIslandVisible
+      ? 'calc(env(safe-area-inset-top, 0px) + 52px)'
+      : 'env(safe-area-inset-top, 0px)'
+    : undefined;
 
   if (isFullScreen) {
     return (
@@ -46,9 +79,9 @@ export const ModalLayout: React.FC<ModalLayoutProps> = ({
           isOverlay
             ? `fixed inset-0 ${zIndex} bg-background`
             : 'relative flex-1 bg-background'
-        } w-full h-dvh min-h-dvh max-h-dvh flex flex-col flex-1 overflow-hidden select-none text-white ${className}`}
+        } w-full h-dvh min-h-dvh max-h-dvh flex flex-col flex-1 overflow-hidden select-none text-white transition-[padding-top] duration-200 ${className}`}
         style={{
-          paddingTop: isOverlay ? 'env(safe-area-inset-top, 0px)' : undefined,
+          paddingTop: topPadding,
           paddingBottom: isOverlay ? 'env(safe-area-inset-bottom, 0px)' : undefined,
           paddingLeft: isOverlay ? 'env(safe-area-inset-left, 0px)' : undefined,
           paddingRight: isOverlay ? 'env(safe-area-inset-right, 0px)' : undefined,
@@ -76,7 +109,7 @@ export const ModalLayout: React.FC<ModalLayoutProps> = ({
             </div>
           )}
 
-          <div className="flex-1 flex flex-col min-h-0 overflow-y-auto scrollbar-hide">
+          <div className="flex-1 flex flex-col min-h-0 h-full w-full overflow-hidden">
             {children}
           </div>
         </div>
@@ -90,7 +123,10 @@ export const ModalLayout: React.FC<ModalLayoutProps> = ({
         isOverlay
           ? `fixed inset-0 ${zIndex} bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200`
           : 'relative flex-1'
-      } w-full h-full min-h-0 overflow-hidden select-none text-white ${className}`}
+      } w-full h-full min-h-0 overflow-hidden select-none text-white transition-[padding-top] duration-200 ${className}`}
+      style={{
+        paddingTop: topPadding,
+      }}
     >
       <div
         className={`w-full ${maxWidthMap[maxWidth]} flex flex-col max-h-[90dvh] min-h-0 relative overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl p-4 sm:p-5 ${containerClassName}`}
