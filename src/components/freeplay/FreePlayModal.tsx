@@ -145,7 +145,7 @@ export const FreePlayModal = ({
       evaluatedGuesses.push(evalRow);
 
       evalRow.forEach((res) => {
-        const char = res.char.toUpperCase();
+        const char = (res.letter || (res as any).char || '').toUpperCase();
         const current = newLetterStatuses[char];
         if (res.status === 'correct') {
           newLetterStatuses[char] = 'correct';
@@ -178,7 +178,7 @@ export const FreePlayModal = ({
     // 1st pass: Correct matches
     guessArr.forEach((char, i) => {
       if (char === targetArr[i]) {
-        result[i] = { char, status: 'correct' };
+        result[i] = { letter: char, status: 'correct' };
         targetUsed[i] = true;
       }
     });
@@ -188,10 +188,10 @@ export const FreePlayModal = ({
       if (result[i]) return;
       const foundIdx = targetArr.findIndex((tc, idx) => tc === char && !targetUsed[idx]);
       if (foundIdx !== -1) {
-        result[i] = { char, status: 'present' };
+        result[i] = { letter: char, status: 'present' };
         targetUsed[foundIdx] = true;
       } else {
-        result[i] = { char, status: 'absent' };
+        result[i] = { letter: char, status: 'absent' };
       }
     });
 
@@ -234,12 +234,12 @@ export const FreePlayModal = ({
     // Process valid guess
     const evalRow = evaluateGuess(targetWord, currentGuess);
     const newGuesses = [...guesses, evalRow];
-    const newRawGuesses = newGuesses.map((row) => row.map((r) => r.char).join(''));
+    const newRawGuesses = newGuesses.map((row) => row.map((r) => r.letter || (r as any).char || '').join(''));
 
     // Update letter statuses
     const newStatuses = { ...letterStatuses };
     evalRow.forEach((res) => {
-      const char = res.char.toUpperCase();
+      const char = (res.letter || (res as any).char || '').toUpperCase();
       const curr = newStatuses[char];
       if (res.status === 'correct') {
         newStatuses[char] = 'correct';
