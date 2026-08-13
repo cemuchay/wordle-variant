@@ -68,6 +68,7 @@ interface AppState {
    showNotifications: boolean;
    statsActiveTab: "stats" | "leaderboard";
    isLoadingDate: boolean;
+   isHeaderMenuOpen: boolean;
 
    // Auth-related Local State
    preferences: UserPreferences;
@@ -141,6 +142,7 @@ interface AppState {
    setIsPWAInstalled: (val: boolean) => void;
     setWordupMode: (mode: "live" | "async" | null) => void;
     setPendingAsyncMatchId: (id: string | null) => void;
+    setHeaderMenuOpen: (val: boolean) => void;
     }
 
    export const useAppStore = create<AppState>()(
@@ -190,8 +192,10 @@ interface AppState {
          wordupMode: (safeLocalStorage.getItem("wordup_mode") as "live" | "async" | null) || null,
          pendingAsyncMatchId: null,
          hasHydrated: false,
+         isHeaderMenuOpen: false,
 
          // Actions
+         setHeaderMenuOpen: (isHeaderMenuOpen) => set({ isHeaderMenuOpen }),
          setHasHydrated: (hasHydrated) => set({ hasHydrated }),
          triggerToast: (message, duration = TOAST_DURATION.DEFAULT, isLarge = false) =>
             set({ toast: { show: true, message, duration, isLarge } }),

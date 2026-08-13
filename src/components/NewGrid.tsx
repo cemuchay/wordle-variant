@@ -5,6 +5,7 @@ import { ANIMATION_DURATION } from '../constants/ui';
 import { LAYOUT } from '../constants/game';
 import returnAnimationTime from '../utils/returnAnimationTime';
 import { useIsResponsive } from '../hooks/useResponsive';
+import { useAppStore } from '../store/useAppStore';
 
 interface CellProps {
   letter: string;
@@ -134,13 +135,19 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
   onOpenArchive,
   onOpenDailyEvent,
 }) => {
-  const { isDesktop, } = useIsResponsive();
+  const { isDesktop } = useIsResponsive();
+
+  const isHeaderMenuOpen = useAppStore((s) => s.isHeaderMenuOpen);
+  const isChallenge = gameplayType === 'challenge' || isChallengeMode;
+  const isArchiveOrGuest = gameplayType === 'archive' || gameplayType === 'guest';
+  const shouldHideNavButtons = isChallenge || isArchiveOrGuest || isHeaderMenuOpen;
 
   let cellSizePx: number | null = null;
   if (maxGridWidth && maxGridHeight) {
     const gapSize = compact ? 4 : 6;
     const padding = compact ? LAYOUT.GRID_PADDING_COMPACT : LAYOUT.GRID_PADDING;
     const extraWidth = maxAttempts > LAYOUT.COMPACT_GRID_THRESHOLD ? LAYOUT.GRID_EXTRA_WIDTH : 0;
+    const topButtonsHeight = shouldHideNavButtons ? 0 : 36;
 
     const usableWidth = maxGridWidth - padding - extraWidth;
 
@@ -149,13 +156,12 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
     if (maxAttempts > LAYOUT.COMPACT_GRID_THRESHOLD) {
       cellSizePx = Math.floor(cellWidthLimit);
     } else {
-      const usableHeight = maxGridHeight - padding;
+      const usableHeight = maxGridHeight - padding - topButtonsHeight;
       const cellHeightLimit = (usableHeight - (maxAttempts - 1) * gapSize) / maxAttempts;
       cellSizePx = Math.floor(Math.max(10, Math.min(cellWidthLimit, cellHeightLimit)));
     }
 
     // On desktop in challenge mode, apply the resize scale
-    const isChallenge = gameplayType === 'challenge' || compact;
     if (isDesktop && isChallenge) {
       const resizeScale = maxAttempts > LAYOUT.COMPACT_GRID_THRESHOLD ? 0.35 : LAYOUT.GRID_RESIZE_SCALE;
       cellSizePx = Math.floor(cellSizePx * resizeScale);
@@ -314,12 +320,8 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
   const rowGapClass = compact ? 'gap-1 sm:gap-1.5' : 'gap-1.5 sm:gap-2';
   const [showEditHelp, setShowEditHelp] = useState(false);
 
-  const isChallenge = gameplayType === 'challenge' || isChallengeMode;
-  const isArchiveOrGuest = gameplayType === 'archive' || gameplayType === 'guest';
-  const shouldHideNavButtons = isChallenge || isArchiveOrGuest;
-
   return (
-    <div className="relative mx-auto w-fit select-none shrink-0">
+    <div className={`relative mx-auto w-fit select-none shrink-0 `}>
       {/* Top Lightweight Quick Nav Buttons (Hidden in challenge/archive/guest modes) */}
       {!shouldHideNavButtons && (
         <div className="flex items-center justify-center gap-2 mb-2 w-full">
