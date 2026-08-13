@@ -100,11 +100,11 @@ export const GameArea = ({
             }
         }
 
-        let availableHeight = (containerRect.height - containerPadding - siblingHeights - containerGap - headerOverlap - 8) * 1.15;
+        let availableHeight = containerRect.height - containerPadding - siblingHeights - containerGap - headerOverlap - 12;
         let availableWidth = containerRect.width - (parseFloat(computedStyle.paddingLeft) || 0) - (parseFloat(computedStyle.paddingRight) || 0) - 16;
 
         // Safeguard to prevent collapsing grids on iOS/iPhone WebKit sizing bugs
-        const minHeightFallback = window.innerHeight * 0.35;
+        const minHeightFallback = window.innerHeight * 0.30;
         availableHeight = Math.max(minHeightFallback, availableHeight);
 
         // Apply a 15% size reduction factor on desktop to prevent clipping/crowding

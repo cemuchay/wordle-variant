@@ -19,6 +19,8 @@ import {
 } from '../../utils/archiveDb';
 import { saveGuestFreePlayState, getGuestFreePlayState, getTodayDateString } from '../../utils/guestFreePlay';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../hooks/useAuth';
+import { loadWordLists } from '../../data/words';
 import { applyTheme } from '../../utils/theme';
 import type { GuessResult, LetterStatus } from '../../types/game';
 
@@ -27,6 +29,19 @@ interface FreePlayModalProps {
   onClose: () => void;
   initialMode?: 'guest' | 'archive';
 }
+
+/**
+ * Formats YYYY-MM-DD date string to DD-MM-YYYY format for UI presentation.
+ */
+const formatDateDDMMYYYY = (isoDateStr: string): string => {
+  if (!isoDateStr || typeof isoDateStr !== 'string') return isoDateStr;
+  const parts = isoDateStr.split('-');
+  if (parts.length === 3) {
+    const [yyyy, mm, dd] = parts;
+    return `${dd}-${mm}-${yyyy}`;
+  }
+  return isoDateStr;
+};
 
 /**
  * Returns the earliest valid archive date that has NOT yet been completed.
@@ -43,6 +58,8 @@ export const FreePlayModal = ({
   initialMode = 'archive',
 }: FreePlayModalProps) => {
   const { triggerToast } = useApp();
+  const { user } = useAuth();
+  const isAuthenticated = !!user;
 
   const [mode, setMode] = useState<'guest' | 'archive'>(initialMode);
   const [selectedDate, setSelectedDate] = useState<string>(() => {
@@ -72,29 +89,31 @@ export const FreePlayModal = ({
 
   // Load completed archive dates & default to earliest unplayed date
   const refreshCompletedDates = useCallback(async () => {
-    const dates = await getCompletedArchiveDates();
-    setCompletedDates(dates);
-    if (initialMode === 'archive') {
-      const earliest = getEarliestUnplayedArchiveDate(dates);
-      setSelectedDate(earliest);
+    try {
+      const dates = await getCompletedArchiveDates();
+      const setCompleted = new Set(dates);
+      setCompletedDates(setCompleted);
+      if (initialMode === 'archive') {
+        const earliest = getEarliestUnplayedArchiveDate(setCompleted);
+        setSelectedDate(earliest);
+      }
+    } catch (err) {
+      console.error('[FreePlayModal] Error loading completed dates:', err);
     }
   }, [initialMode]);
 
   useEffect(() => {
     if (isOpen) {
-      refreshCompletedDates();
+      setMode(initialMode);
+      if (initialMode === 'guest') {
+        setSelectedDate(getTodayDateString());
+      } else {
+        refreshCompletedDates();
+      }
     }
-  }, [isOpen, refreshCompletedDates]);
+  }, [isOpen, initialMode, refreshCompletedDates]);
 
-  // Sync mode when initialMode prop changes
-  useEffect(() => {
-    setMode(initialMode);
-    if (initialMode === 'guest') {
-      setSelectedDate(getTodayDateString());
-    }
-  }, [initialMode]);
-
-  // Apply dark theme when modal opens
+  // Sync body theme
   useEffect(() => {
     if (isOpen) {
       applyTheme('dark');
@@ -180,7 +199,7 @@ export const FreePlayModal = ({
         }
       } else {
         // Mode === 'archive'
-        const config = await getDailyConfigSub(false, selectedDate);
+        const config = await getDailyConfigSub(isAuthenticated, selectedDate);
         setTargetWord(config.word.toUpperCase());
         setWordLength(config.length);
         setMaxAttempts(config.maxAttempts || 6);
@@ -203,7 +222,7 @@ export const FreePlayModal = ({
     } finally {
       setIsLoading(false);
     }
-  }, [mode, selectedDate, reconstructStateFromGuesses, triggerToast]);
+  }, [mode, selectedDate, isAuthenticated, reconstructStateFromGuesses, triggerToast]);
 
   useEffect(() => {
     if (isOpen) {
@@ -222,7 +241,7 @@ export const FreePlayModal = ({
     if (unplayed.length > 0) {
       const nextDate = unplayed[0]; // Earliest remaining unplayed date
       setSelectedDate(nextDate);
-      triggerToast(`Loading next archive puzzle: ${nextDate}`);
+      triggerToast(`Loading next archive puzzle: ${formatDateDDMMYYYY(nextDate)}`);
     } else {
       triggerToast('All available archive puzzles completed! 🏆');
     }
@@ -270,6 +289,19 @@ export const FreePlayModal = ({
       setTimeout(() => setIsShake(false), 500);
       triggerToast(`Word must be ${wordLength} letters`);
       return;
+    }
+
+    // Validate guess against dictionary word list
+    try {
+      const { valid } = await loadWordLists(wordLength);
+      if (!valid.has(currentGuess.toUpperCase())) {
+        setIsShake(true);
+        setTimeout(() => setIsShake(false), 500);
+        triggerToast('Not in word list');
+        return;
+      }
+    } catch (err) {
+      console.warn('Word validation fallback check failed:', err);
     }
 
     const evalResults = evaluateGuess(currentGuess, targetWord);
@@ -374,7 +406,7 @@ export const FreePlayModal = ({
     const pool = unplayed.length > 0 ? unplayed : allValid;
     const randomDate = pool[Math.floor(Math.random() * pool.length)];
     setSelectedDate(randomDate);
-    triggerToast(`Jumped to archive: ${randomDate}`);
+    triggerToast(`Jumped to archive: ${formatDateDDMMYYYY(randomDate)}`);
   };
 
   if (!isOpen) return null;
@@ -408,7 +440,7 @@ export const FreePlayModal = ({
                 className="flex items-center gap-2 px-3 py-1.5 bg-indigo-950/80 hover:bg-indigo-900/80 border border-indigo-500/40 rounded-xl text-indigo-200 text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
               >
                 <Calendar size={15} className="text-indigo-400" />
-                <span>{selectedDate}</span>
+                <span>{formatDateDDMMYYYY(selectedDate)}</span>
                 <span className="text-[10px] bg-indigo-500/30 text-indigo-300 px-1.5 py-0.5 rounded-md">
                   {completedDates.has(selectedDate) ? '✅ Solved' : '🎯 Play'}
                 </span>

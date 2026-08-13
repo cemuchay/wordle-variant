@@ -15,6 +15,16 @@ interface ArchiveDatePickerProps {
 
 type FilterMode = 'all' | 'unplayed' | 'completed';
 
+const formatDateDDMMYYYY = (isoDateStr: string): string => {
+  if (!isoDateStr || typeof isoDateStr !== 'string') return isoDateStr;
+  const parts = isoDateStr.split('-');
+  if (parts.length === 3) {
+    const [yyyy, mm, dd] = parts;
+    return `${dd}-${mm}-${yyyy}`;
+  }
+  return isoDateStr;
+};
+
 export const ArchiveDatePicker = ({
   selectedDate,
   onSelectDate,
@@ -220,7 +230,7 @@ export const ArchiveDatePicker = ({
 
                     <div className="flex items-baseline gap-1.5">
                       <span className="text-lg font-black tracking-tight leading-none">{dayNum}</span>
-                      <span className="text-[10px] font-bold text-gray-400">{dateStr.slice(5)}</span>
+                      <span className="text-[10px] font-bold text-gray-400">{formatDateDDMMYYYY(dateStr)}</span>
                     </div>
 
                     <div className="w-full text-[9px] font-extrabold uppercase tracking-wider">
@@ -240,7 +250,7 @@ export const ArchiveDatePicker = ({
         {/* Footer info */}
         <div className="border-t border-white/10 pt-2.5 text-center">
           <p className="text-[10px] text-gray-500 font-semibold">
-            Allowed range: {FIRST_ARCHIVE_DATE} to {yesterday}
+            Allowed range: {formatDateDDMMYYYY(FIRST_ARCHIVE_DATE)} to {formatDateDDMMYYYY(yesterday)}
           </p>
         </div>
       </div>
