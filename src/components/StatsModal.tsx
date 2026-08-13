@@ -12,6 +12,7 @@ import { ProtectedAvatar } from './chat/ProtectedAvatar';
 import { ReigningBadge } from './common/ReigningBadge';
 import { LeaderboardSkeleton } from './common/Skeletons';
 import GuessPreviewModal from './guess-preview';
+import { StreakCounter } from './StreakCounter';
 
 // type Timeframe = 'today' | 'weekly' | 'monthly' | 'all';
 type Timeframe = 'today' | 'yesterday' | 'weekly' | 'monthly'
@@ -311,15 +312,20 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
               <span className="text-[10px] text-gray-600 uppercase font-bold">Fetching your history...</span>
             </div>
           ) : (
-            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="flex justify-around mb-4 text-center">
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-4">
+              <div className="flex justify-around text-center">
                 <StatItem value={stats.gamesPlayed} label="Played" />
                 <StatItem
                   value={`${stats.gamesPlayed ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0}%`}
                   label="Win %"
                 />
-                <StatItem value={stats.currentStreak} label="Streak" />
               </div>
+
+              <StreakCounter
+                size="big"
+                currentStreak={stats.currentStreak}
+                maxStreak={stats.maxStreak}
+              />
 
               <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] mb-3 text-gray-500">Guess Distribution</h3>
               <div className="space-y-2">

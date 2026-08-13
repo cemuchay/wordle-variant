@@ -3,7 +3,9 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Gamepad2, Calendar, Trophy, Eye, Swords, HelpCircle, X } from "lucide-react";
 import { MarathonBanner } from "./common/MarathonBanner";
-import CountDown from "./common/CountDown"
+import CountDown from "./common/CountDown";
+import { useApp } from "../context/AppContext";
+import { StreakCounter } from "./StreakCounter";
 
 interface AlreadyPlayedScreenProps {
   onNavigate: (item: "play" | "chat" | "leaderboard" | "challenges" | "wordup") => void;
@@ -33,6 +35,7 @@ export const AlreadyPlayedScreen = ({
   setSelectedChallengeId,
   setIsChallengeOpen,
 }: AlreadyPlayedScreenProps) => {
+  const { stats } = useApp();
   const [selectedDetail, setSelectedDetail] = useState<OptionDetail | null>(null);
 
   const options: OptionDetail[] = [
@@ -76,6 +79,14 @@ export const AlreadyPlayedScreen = ({
             <h2 className="text-lg sm:text-xl font-black uppercase tracking-wider text-white">
               Daily Puzzle Completed! 🎉
             </h2>
+          </div>
+
+          <div className="pt-2">
+            <StreakCounter
+              size="big"
+              currentStreak={stats?.currentStreak ?? 0}
+              maxStreak={stats?.maxStreak ?? 0}
+            />
           </div>
         </motion.div>
 

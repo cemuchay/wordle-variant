@@ -6,6 +6,8 @@ import { LAYOUT } from '../constants/game';
 import returnAnimationTime from '../utils/returnAnimationTime';
 import { useIsResponsive } from '../hooks/useResponsive';
 import { useAppStore } from '../store/useAppStore';
+import { useApp } from '../context/AppContext';
+import { StreakCounter } from './StreakCounter';
 
 interface CellProps {
   letter: string;
@@ -136,6 +138,7 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
   onOpenDailyEvent,
 }) => {
   const { isDesktop } = useIsResponsive();
+  const { stats } = useApp();
 
   const isHeaderMenuOpen = useAppStore((s) => s.isHeaderMenuOpen);
   const isChallenge = gameplayType === 'challenge' || isChallengeMode;
@@ -324,7 +327,13 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
     <div className={`relative mx-auto w-fit select-none shrink-0 `}>
       {/* Top Lightweight Quick Nav Buttons (Hidden in challenge/archive/guest modes) */}
       {!shouldHideNavButtons && (
-        <div className="flex items-center justify-center gap-2 mb-2 w-full">
+        <div className="flex items-center justify-start sm:justify-center gap-1.5 sm:gap-2 mb-2 w-full max-w-full overflow-x-auto scrollbar-hide shrink-0 px-0.5 py-0.5">
+          <StreakCounter
+            size="small"
+            currentStreak={stats?.currentStreak ?? 0}
+            maxStreak={stats?.maxStreak ?? 0}
+          />
+
           <button
             onClick={() => {
               if (onOpenArchive) {
@@ -333,7 +342,7 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
                 window.dispatchEvent(new CustomEvent('open-free-play', { detail: { mode: 'archive' } }));
               }
             }}
-            className="px-2.5 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-indigo-200 border border-indigo-500/25 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs"
+            className="shrink-0 px-2.5 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-indigo-200 border border-indigo-500/25 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs"
             title="Variant Archive"
           >
             <Calendar size={12} className="text-indigo-400 shrink-0" />
@@ -349,7 +358,7 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
                 window.dispatchEvent(new CustomEvent('open-challenges'));
               }
             }}
-            className="px-2.5 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 hover:text-emerald-200 border border-emerald-500/25 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs"
+            className="shrink-0 px-2.5 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 hover:text-emerald-200 border border-emerald-500/25 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs"
             title="Daily Event / Bot Event"
           >
             <Sparkles size={12} className="text-emerald-400 shrink-0" />

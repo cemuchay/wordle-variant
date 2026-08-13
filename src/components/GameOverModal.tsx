@@ -5,6 +5,7 @@ import type { GameConfig, GameStats, GuessResult } from "../types/game";
 import CountDown from "./common/CountDown";
 import { ModalLayout } from "./layout/ModalLayout";
 import { ShareButton } from "./ShareButton";
+import { StreakCounter } from "./StreakCounter";
 
 interface Props {
   isOpen: boolean;
@@ -89,11 +90,11 @@ export const GameOverModal: React.FC<Props> = ({
           </p>
 
           {/* Statistics Section */}
-          <div className="mb-8">
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">
+          <div className="mb-8 space-y-4">
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
               Statistics
             </h3>
-            <div className="flex justify-between px-4 mb-4">
+            <div className="flex justify-around px-4">
               <StatBox value={stats?.gamesPlayed ?? 0} label="Played" />
               <StatBox
                 value={
@@ -103,9 +104,14 @@ export const GameOverModal: React.FC<Props> = ({
                 }
                 label="Win %"
               />
-              <StatBox value={stats?.currentStreak ?? 0} label="Streak" />
-              <StatBox value={stats?.maxStreak ?? 0} label="Max" />
             </div>
+
+            <StreakCounter
+              size="big"
+              currentStreak={stats?.currentStreak ?? 0}
+              maxStreak={stats?.maxStreak ?? 0}
+            />
+
             {isAuthenticated && (
               <button
                 onClick={handleOpenLeaderboard}
