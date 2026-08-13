@@ -71,6 +71,9 @@ export function isCurrentPeriod(awardType: string, periodKey: string): boolean {
 }
 
 export function formatAwardPeriod(awardType: string, periodKey: string): string {
+  if (awardType.startsWith('streak_')) {
+    return 'Streak Milestone';
+  }
   if (awardType === 'monthly_champion') {
     const [yearStr, monthStr] = periodKey.split('-');
     const month = Number(monthStr);

@@ -5,6 +5,7 @@ import { useApp } from "../context/AppContext";
 import { safeLocalStorage } from "../utils/storage";
 import { calculateStreak } from "@/utils/streak";
 import { QUERY } from "../constants/queries";
+import { checkAndGrantStreakMilestoneOnWin } from "../utils/streakAwards";
 
 const INITIAL_STATS: GameStats = {
    gamesPlayed: 0,
@@ -40,7 +41,7 @@ export const useWordleStats = (
       if (userId && date) {
          const prefix = "wordle-";
          const todayKey = `${prefix}${date}`;
-          const sevenDaysAgo = Date.now() - QUERY.STALE_24H;
+         const sevenDaysAgo = Date.now() - QUERY.STALE_24H;
 
          safeLocalStorage.getAllKeys().forEach((key) => {
             // Remove only daily wordle keys that aren't for today
@@ -112,6 +113,10 @@ export const useWordleStats = (
          constructed.gamesWon = data.filter((s) => s.status === "won").length;
          constructed.currentStreak = currentStreak;
          constructed.maxStreak = maxStreak;
+
+         if (maxStreak >= 50 && userId) {
+            checkAndGrantStreakMilestoneOnWin(userId, maxStreak);
+         }
 
          setStats(constructed);
       }

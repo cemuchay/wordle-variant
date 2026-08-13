@@ -1,4 +1,4 @@
-import { Trophy, Award, Crown, Zap, Sparkles } from 'lucide-react'
+import { Trophy, Award, Crown, Zap, Sparkles, Flame } from 'lucide-react'
 import type { UserAward } from '../../types/awards'
 import { isCurrentPeriod, formatAwardPeriod } from '../../utils/isoWeek'
 
@@ -6,6 +6,8 @@ interface TrophyCabinetStats {
    dailyWins: number
    weeklyWins: number
    monthlyWins: number
+   currentStreak?: number
+   maxStreak?: number
 }
 
 interface TrophyCabinetProps {
@@ -148,6 +150,32 @@ export const TrophyCabinet = ({ stats, awards, onExplore }: TrophyCabinetProps) 
                               <span className="text-[10px] text-emerald-300/60 font-bold ml-auto">{a.score} pts</span>
                            </div>
                         ))}
+                     </div>
+                  </div>
+               )}
+
+               {/* Shelf 4: Streak Milestone Trophies */}
+               {displayAwards.filter(a => a.award_type.startsWith('streak_')).length > 0 && (
+                  <div className="bg-white/[0.02] rounded-2xl border border-white/5 p-3 space-y-2" style={{ transform: 'translateZ(15px)' }}>
+                     <h4 className="text-[9px] font-black uppercase tracking-widest text-amber-400/80 flex items-center gap-1.5">
+                        <Flame size={12} className="text-amber-400 fill-amber-400/20" />
+                        Streak Milestone Trophies
+                     </h4>
+                     <div className="flex flex-wrap gap-2">
+                        {displayAwards.filter(a => a.award_type.startsWith('streak_')).map(a => {
+                           const milestoneLabel = a.score === 365 ? '365 Days (1 Year)' : `${a.score} Days`;
+                           const dateStr = a.awarded_at ? new Date(a.awarded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+                           return (
+                              <div
+                                 key={a.id}
+                                 className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2 text-[11px]"
+                              >
+                                 <Flame size={14} className="text-amber-400 fill-amber-400/20 shrink-0 animate-pulse" />
+                                 <span className="text-amber-200 font-bold">{milestoneLabel}</span>
+                                 {dateStr && <span className="text-[9px] text-amber-400/60 font-semibold ml-auto">{dateStr}</span>}
+                              </div>
+                           );
+                        })}
                      </div>
                   </div>
                )}

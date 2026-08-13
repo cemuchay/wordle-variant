@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Trophy, Award, Crown, Zap, ChevronLeft, ChevronRight } from 'lucide-react'
+import { X, Trophy, Award, Crown, Zap, ChevronLeft, ChevronRight, Flame } from 'lucide-react'
 import type { UserAward } from '../../types/awards'
 import { isCurrentPeriod, formatAwardPeriod } from '../../utils/isoWeek'
 
@@ -8,6 +8,8 @@ interface TrophyCabinetStats {
    dailyWins: number
    weeklyWins: number
    monthlyWins: number
+   currentStreak?: number
+   maxStreak?: number
 }
 
 interface TrophyCabinetExplorerProps {
@@ -81,24 +83,47 @@ export const TrophyCabinetExplorer = ({ stats, awards, username, onClose }: Trop
       })
 
       completed.forEach(a => {
-         const isWeekly = a.award_type === 'weekly_champion'
-         const isBot = a.award_type === 'bot_marathon_weekly'
+         const isWeekly = a.award_type === 'weekly_champion';
+         const isBot = a.award_type === 'bot_marathon_weekly';
+         const isStreak = a.award_type.startsWith('streak_');
+
+         let icon = Trophy;
+         let label = 'Monthly Dominator';
+         let color = 'text-purple-400';
+         let gradient = 'from-purple-500/20 via-violet-500/10 to-transparent';
+         let subtitle = formatAwardPeriod(a.award_type, a.period_key);
+
+         if (isWeekly) {
+            icon = Crown;
+            label = 'Weekly Champion';
+            color = 'text-amber-400';
+            gradient = 'from-amber-500/20 via-yellow-500/10 to-transparent';
+         } else if (isBot) {
+            icon = Zap;
+            label = 'Bot Marathon Champion';
+            color = 'text-emerald-400';
+            gradient = 'from-emerald-500/20 via-green-500/10 to-transparent';
+         } else if (isStreak) {
+            icon = Flame;
+            label = a.score === 365 ? '365-Day Streak (1 Year)' : `${a.score}-Day Streak Milestone`;
+            color = 'text-amber-400';
+            gradient = 'from-amber-500/25 via-orange-500/15 to-transparent';
+            const dateStr = a.awarded_at ? new Date(a.awarded_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
+            subtitle = dateStr ? `Achieved ${dateStr}` : 'Streak Milestone Unlocked';
+         }
+
          items.push({
             id: a.id,
             type: 'award',
             awardType: a.award_type,
-            icon: isWeekly ? Crown : isBot ? Zap : Trophy,
-            label: isWeekly ? 'Weekly Champion' : isBot ? 'Bot Marathon Champion' : 'Monthly Dominator',
-            subtitle: formatAwardPeriod(a.award_type, a.period_key),
+            icon,
+            label,
+            subtitle,
             score: a.score,
-            color: isWeekly ? 'text-amber-400' : isBot ? 'text-emerald-400' : 'text-purple-400',
-            gradient: isWeekly
-               ? 'from-amber-500/20 via-yellow-500/10 to-transparent'
-               : isBot
-                  ? 'from-emerald-500/20 via-green-500/10 to-transparent'
-                  : 'from-purple-500/20 via-violet-500/10 to-transparent',
-         })
-      })
+            color,
+            gradient,
+         });
+      });
 
       return items
    }, [stats, completed])
