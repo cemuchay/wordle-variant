@@ -12,7 +12,7 @@ import PWAInstallBanner from "./components/PWAInstallBanner";
 import NotificationPermissionPrompt from "./components/NotificationPermissionPrompt";
 import FloatingChatBubble from "./components/chat/FloatingChatBubble";
 import { NotificationsManager } from "./components/notifications/NotificationsManager";
-import { Bell, Swords, Trophy } from "lucide-react";
+import { Bell, Swords, } from "lucide-react";
 import { useLiveStore } from "./wordup/live/store/useLiveStore";
 import { useAsyncStore } from "./wordup/async/store/useAsyncStore";
 import { subscribeToPush } from "./lib/pushService";
@@ -953,6 +953,30 @@ function MainApp() {
     }
   };
 
+  // Listen to custom events for opening archive / free play and daily events (challenges)
+  useEffect(() => {
+    const handleOpenFreePlay = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      setFreePlayMode(detail?.mode || "archive");
+      setIsFreePlayOpen(true);
+    };
+    const handleOpenChallenges = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      const marathonItem = activeDailyMarathons && activeDailyMarathons.length > 0 ? activeDailyMarathons[0] : null;
+      const marathonId = detail?.challengeId || (marathonItem ? (marathonItem.challenge_id || marathonItem.challenge?.id || marathonItem.id) : null);
+      if (marathonId) {
+        setSelectedChallengeId(marathonId);
+      }
+      handleNavigation("challenges");
+    };
+    window.addEventListener("open-free-play", handleOpenFreePlay);
+    window.addEventListener("open-challenges", handleOpenChallenges);
+    return () => {
+      window.removeEventListener("open-free-play", handleOpenFreePlay);
+      window.removeEventListener("open-challenges", handleOpenChallenges);
+    };
+  }, [activeDailyMarathons]);
+
 
   if (!isHydrated || isLoadingDate || isAuthLoading) {
     return (
@@ -1088,20 +1112,6 @@ function MainApp() {
                   />
                 ) : (
                   <div className="h-full flex flex-col relative min-h-0 w-full">
-                    {user && state.isGameOver && isAlreadyPlayedTodayOnLoad && (
-                      <div className="flex items-center justify-center pt-1 pb-1 z-30 shrink-0">
-                        <button
-                          onClick={() => {
-                            safeSessionStorage.removeItem("wordle_already_played_dismissed");
-                            setDismissedAlreadyPlayed(false);
-                          }}
-                          className="px-3.5 py-1.5 bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border border-indigo-400/60 rounded-xl text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
-                        >
-                          <Trophy size={14} className="text-amber-300" />
-                          <span>Variant Archive & More</span>
-                        </button>
-                      </div>
-                    )}
                     <GameArea
                       wordLength={config?.length ?? DEFAULT_WORD_LENGTH}
                       maxAttempts={config?.maxAttempts ?? MAX_ATTEMPTS}

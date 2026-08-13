@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
    BarChart3,
    Clock,
@@ -42,6 +42,35 @@ interface RawTelemetryLog {
    is_bounce: boolean;
    created_at: string;
 }
+
+const to2dp = (val: number | undefined | null): string => {
+   if (val === undefined || val === null || isNaN(val)) return "0.00";
+   return Number(val).toFixed(2);
+};
+
+const calculateMean = (numbers: number[]): number => {
+   if (numbers.length === 0) return 0;
+   const sum = numbers.reduce((acc, curr) => acc + curr, 0);
+   return sum / numbers.length;
+};
+
+const calculateMedian = (numbers: number[]): number => {
+   if (numbers.length === 0) return 0;
+   const sorted = [...numbers].sort((a, b) => a - b);
+   const middle = Math.floor(sorted.length / 2);
+   if (sorted.length % 2 === 0) {
+      return (sorted[middle - 1] + sorted[middle]) / 2;
+   }
+   return sorted[middle];
+};
+
+const formatDuration = (totalSeconds: number): string => {
+   if (!totalSeconds || isNaN(totalSeconds)) return "0.00s";
+   const m = Math.floor(totalSeconds / 60);
+   const s = (totalSeconds % 60).toFixed(2);
+   if (m === 0) return `${s}s`;
+   return `${m}m ${s}s`;
+};
 
 export const AnonymizedTelemetrySection: React.FC<AnonymizedTelemetrySectionProps> = ({
    triggerToast,
@@ -92,27 +121,101 @@ export const AnonymizedTelemetrySection: React.FC<AnonymizedTelemetrySectionProp
       fetchTelemetry(selectedDate);
    }, [selectedDate, fetchTelemetry]);
 
-   const formatDuration = (totalSeconds: number): string => {
-      if (!totalSeconds || isNaN(totalSeconds)) return "0s";
-      const m = Math.floor(totalSeconds / 60);
-      const s = totalSeconds % 60;
-      if (m === 0) return `${s}s`;
-      return `${m}m ${s}s`;
-   };
+   // Overall App Opens Metrics (Mean & Median)
+   const appOpensMetrics = useMemo(() => {
+      const arr = rawLogs.map((l) => Number(l.app_opens) || 0);
+      const mean = arr.length > 0 ? calculateMean(arr) : Number(summary?.avg_app_opens_per_user) || 0;
+      const median = arr.length > 0 ? calculateMedian(arr) : 0;
+      return { mean, median };
+   }, [rawLogs, summary]);
 
-   // Sort Top Clicks
-   const sortedClicks = summary?.top_clicks
-      ? Object.entries(summary.top_clicks).sort((a, b) => b[1] - a[1])
-      : [];
+   // Overall Time Spent Metrics (Mean & Median)
+   const timeSpentMetrics = useMemo(() => {
+      const arr = rawLogs.map((l) => Number(l.time_spent_seconds) || 0);
+      const mean = arr.length > 0 ? calculateMean(arr) : Number(summary?.avg_time_spent_seconds) || 0;
+      const median = arr.length > 0 ? calculateMedian(arr) : 0;
+      return { mean, median };
+   }, [rawLogs, summary]);
 
-   const maxClicks = sortedClicks.length > 0 ? sortedClicks[0][1] : 1;
+   // Section Clicks Stats (Total, Mean, Median per Section)
+   const sectionClicksStats = useMemo(() => {
+      const sectionMap: Record<string, number[]> = {};
 
-   // Sort Top Time Spent
-   const sortedTime = summary?.top_time_spent
-      ? Object.entries(summary.top_time_spent).sort((a, b) => b[1] - a[1])
-      : [];
+      if (summary?.top_clicks) {
+         Object.keys(summary.top_clicks).forEach((sec) => {
+            sectionMap[sec] = [];
+         });
+      }
 
-   const maxTime = sortedTime.length > 0 ? sortedTime[0][1] : 1;
+      rawLogs.forEach((log) => {
+         const clicks = log.clicks_per_section || {};
+         Object.keys(clicks).forEach((sec) => {
+            if (!sectionMap[sec]) sectionMap[sec] = [];
+         });
+      });
+
+      rawLogs.forEach((log) => {
+         const clicks = log.clicks_per_section || {};
+         Object.keys(sectionMap).forEach((sec) => {
+            sectionMap[sec].push(Number(clicks[sec]) || 0);
+         });
+      });
+
+      const result = Object.entries(sectionMap).map(([section, counts]) => {
+         const total = counts.length > 0
+            ? counts.reduce((a, b) => a + b, 0)
+            : Number(summary?.top_clicks?.[section]) || 0;
+         const mean = counts.length > 0
+            ? calculateMean(counts)
+            : (Number(summary?.top_clicks?.[section]) || 0) / Math.max(1, summary?.total_active_devices || 1);
+         const median = counts.length > 0 ? calculateMedian(counts) : 0;
+         return { section, total, mean, median };
+      });
+
+      return result.sort((a, b) => b.total - a.total);
+   }, [rawLogs, summary]);
+
+   const maxClicks = sectionClicksStats.length > 0 ? sectionClicksStats[0].total : 1;
+
+   // Section Time Spent Stats (Total, Mean, Median per Section)
+   const sectionTimeStats = useMemo(() => {
+      const sectionMap: Record<string, number[]> = {};
+
+      if (summary?.top_time_spent) {
+         Object.keys(summary.top_time_spent).forEach((sec) => {
+            sectionMap[sec] = [];
+         });
+      }
+
+      rawLogs.forEach((log) => {
+         const times = log.time_spent_per_section || {};
+         Object.keys(times).forEach((sec) => {
+            if (!sectionMap[sec]) sectionMap[sec] = [];
+         });
+      });
+
+      rawLogs.forEach((log) => {
+         const times = log.time_spent_per_section || {};
+         Object.keys(sectionMap).forEach((sec) => {
+            sectionMap[sec].push(Number(times[sec]) || 0);
+         });
+      });
+
+      const result = Object.entries(sectionMap).map(([section, times]) => {
+         const total = times.length > 0
+            ? times.reduce((a, b) => a + b, 0)
+            : Number(summary?.top_time_spent?.[section]) || 0;
+         const mean = times.length > 0
+            ? calculateMean(times)
+            : (Number(summary?.top_time_spent?.[section]) || 0) / Math.max(1, summary?.total_active_devices || 1);
+         const median = times.length > 0 ? calculateMedian(times) : 0;
+         return { section, total, mean, median };
+      });
+
+      return result.sort((a, b) => b.total - a.total);
+   }, [rawLogs, summary]);
+
+   const maxTime = sectionTimeStats.length > 0 ? sectionTimeStats[0].total : 1;
 
    // Filter Raw Logs
    const filteredLogs = rawLogs.filter((log) => {
@@ -191,7 +294,7 @@ export const AnonymizedTelemetrySection: React.FC<AnonymizedTelemetrySectionProp
          {/* Summary KPI Cards Grid */}
          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Active Devices */}
-            <div className="bg-gray-900 border border-white/10 rounded-2xl p-5 relative overflow-hidden">
+            <div className="bg-gray-900 border border-white/10 rounded-2xl p-5 relative overflow-hidden flex flex-col justify-between">
                <div className="flex items-center justify-between">
                   <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">
                      Active Devices
@@ -199,53 +302,69 @@ export const AnonymizedTelemetrySection: React.FC<AnonymizedTelemetrySectionProp
                   <Smartphone className="text-indigo-400" size={18} />
                </div>
                <div className="mt-3">
-                  <span className="text-2xl font-black tracking-tight text-white">
-                     {summary?.total_active_devices || 0}
+                  <span className="text-2xl font-black tracking-tight text-white font-mono">
+                     {to2dp(summary?.total_active_devices ?? rawLogs.length)}
                   </span>
                   <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider ml-2">
-                     Anonymous Clients
+                     Clients
                   </span>
                </div>
             </div>
 
             {/* Total App Opens */}
-            <div className="bg-gray-900 border border-white/10 rounded-2xl p-5 relative overflow-hidden">
+            <div className="bg-gray-900 border border-white/10 rounded-2xl p-5 relative overflow-hidden flex flex-col justify-between space-y-2">
                <div className="flex items-center justify-between">
                   <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">
                      Daily App Opens
                   </span>
                   <BarChart3 className="text-correct" size={18} />
                </div>
-               <div className="mt-3 flex items-baseline justify-between">
-                  <span className="text-2xl font-black tracking-tight text-white">
-                     {summary?.total_app_opens || 0}
-                  </span>
-                  <span className="text-xs font-bold text-correct bg-correct/10 px-2 py-0.5 rounded-lg border border-correct/20">
-                     {summary?.avg_app_opens_per_user || 0} / user
-                  </span>
+               <div className="mt-1 space-y-1">
+                  <div className="flex items-baseline justify-between">
+                     <span className="text-2xl font-black tracking-tight text-white font-mono">
+                        {to2dp(summary?.total_app_opens ?? rawLogs.reduce((a, b) => a + (b.app_opens || 0), 0))}
+                     </span>
+                     <span className="text-[10px] font-bold text-gray-500">Total Opens</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] pt-1.5 border-t border-white/5 font-mono">
+                     <span className="text-correct font-bold">
+                        Mean: {to2dp(appOpensMetrics.mean)}
+                     </span>
+                     <span className="text-indigo-400 font-bold">
+                        Median: {to2dp(appOpensMetrics.median)}
+                     </span>
+                  </div>
                </div>
             </div>
 
-            {/* Avg Time Spent */}
-            <div className="bg-gray-900 border border-white/10 rounded-2xl p-5 relative overflow-hidden">
+            {/* Avg & Median Time Spent */}
+            <div className="bg-gray-900 border border-white/10 rounded-2xl p-5 relative overflow-hidden flex flex-col justify-between space-y-2">
                <div className="flex items-center justify-between">
                   <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">
-                     Avg Time Spent
+                     Time Spent
                   </span>
                   <Clock className="text-yellow-400" size={18} />
                </div>
-               <div className="mt-3">
-                  <span className="text-2xl font-black tracking-tight text-white">
-                     {formatDuration(summary?.avg_time_spent_seconds || 0)}
-                  </span>
-                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider ml-2">
-                     Active session duration
-                  </span>
+               <div className="mt-1 space-y-1">
+                  <div className="flex items-baseline justify-between">
+                     <span className="text-2xl font-black tracking-tight text-white font-mono">
+                        {formatDuration(summary?.total_time_spent_seconds ?? rawLogs.reduce((a, b) => a + (b.time_spent_seconds || 0), 0))}
+                     </span>
+                     <span className="text-[10px] font-bold text-gray-500">Total</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] pt-1.5 border-t border-white/5 font-mono">
+                     <span className="text-yellow-400 font-bold">
+                        Mean: {formatDuration(timeSpentMetrics.mean)}
+                     </span>
+                     <span className="text-indigo-400 font-bold">
+                        Med: {formatDuration(timeSpentMetrics.median)}
+                     </span>
+                  </div>
                </div>
             </div>
 
             {/* Bounce Rate */}
-            <div className="bg-gray-900 border border-white/10 rounded-2xl p-5 relative overflow-hidden">
+            <div className="bg-gray-900 border border-white/10 rounded-2xl p-5 relative overflow-hidden flex flex-col justify-between">
                <div className="flex items-center justify-between">
                   <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">
                      Bounce Rate
@@ -253,11 +372,11 @@ export const AnonymizedTelemetrySection: React.FC<AnonymizedTelemetrySectionProp
                   <ArrowLeftRight className="text-red-400" size={18} />
                </div>
                <div className="mt-3 flex items-baseline justify-between">
-                  <span className="text-2xl font-black tracking-tight text-white">
-                     {summary?.bounce_rate_pct || 0}%
+                  <span className="text-2xl font-black tracking-tight text-white font-mono">
+                     {to2dp(summary?.bounce_rate_pct ?? (rawLogs.length ? (rawLogs.filter(l => l.is_bounce).length / rawLogs.length) * 100 : 0))}%
                   </span>
                   <span
-                     className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border ${
+                     className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border font-mono ${
                         (summary?.bounce_rate_pct || 0) <= 25
                            ? "bg-correct/10 border-correct/20 text-correct"
                            : (summary?.bounce_rate_pct || 0) <= 50
@@ -265,7 +384,7 @@ export const AnonymizedTelemetrySection: React.FC<AnonymizedTelemetrySectionProp
                            : "bg-red-500/10 border-red-500/20 text-red-400"
                      }`}
                   >
-                     {summary?.total_bounces || 0} bounces
+                     {to2dp(summary?.total_bounces ?? rawLogs.filter(l => l.is_bounce).length)} bounces
                   </span>
                </div>
             </div>
@@ -280,28 +399,35 @@ export const AnonymizedTelemetrySection: React.FC<AnonymizedTelemetrySectionProp
                      <MousePointerClick className="text-correct" size={16} /> Most Clicked Sections & Modals
                   </h4>
                   <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-                     Top Interactions
+                     Mean & Median Clicks
                   </span>
                </div>
 
-               {sortedClicks.length === 0 ? (
+               {sectionClicksStats.length === 0 ? (
                   <div className="py-10 text-center text-xs font-bold text-gray-600 uppercase tracking-wider border border-dashed border-white/5 rounded-xl">
                      No section clicks logged for {selectedDate}
                   </div>
                ) : (
-                  <div className="space-y-3">
-                     {sortedClicks.map(([section, count]) => {
-                        const pct = Math.round((count / maxClicks) * 100);
+                  <div className="space-y-4">
+                     {sectionClicksStats.map((item) => {
+                        const pct = maxClicks > 0 ? Math.round((item.total / maxClicks) * 100) : 0;
                         return (
-                           <div key={section} className="space-y-1">
+                           <div key={item.section} className="space-y-1.5 bg-black/20 p-3.5 rounded-xl border border-white/5">
                               <div className="flex items-center justify-between text-xs font-bold">
-                                 <span className="text-gray-200 capitalize">
-                                    {section.replace(/[-_]/g, " ")}
+                                 <span className="text-gray-200 capitalize flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-correct shrink-0" />
+                                    {item.section.replace(/[-_]/g, " ")}
                                  </span>
                                  <span className="text-correct font-mono">
-                                    {count} clicks
+                                    {to2dp(item.total)} total clicks
                                  </span>
                               </div>
+
+                              <div className="flex items-center justify-between text-[10px] font-mono text-gray-400 px-0.5">
+                                 <span>Mean: <strong className="text-white">{to2dp(item.mean)}</strong> / user</span>
+                                 <span>Median: <strong className="text-indigo-400">{to2dp(item.median)}</strong> / user</span>
+                              </div>
+
                               <div className="w-full bg-black/40 h-2 rounded-full overflow-hidden border border-white/5">
                                  <div
                                     className="bg-correct h-full rounded-full transition-all duration-500"
@@ -322,28 +448,35 @@ export const AnonymizedTelemetrySection: React.FC<AnonymizedTelemetrySectionProp
                      <Clock className="text-indigo-400" size={16} /> Most Time Spent per Section
                   </h4>
                   <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-                     Duration Breakdown
+                     Mean & Median Duration
                   </span>
                </div>
 
-               {sortedTime.length === 0 ? (
+               {sectionTimeStats.length === 0 ? (
                   <div className="py-10 text-center text-xs font-bold text-gray-600 uppercase tracking-wider border border-dashed border-white/5 rounded-xl">
                      No section duration logged for {selectedDate}
                   </div>
                ) : (
-                  <div className="space-y-3">
-                     {sortedTime.map(([section, seconds]) => {
-                        const pct = Math.round((seconds / maxTime) * 100);
+                  <div className="space-y-4">
+                     {sectionTimeStats.map((item) => {
+                        const pct = maxTime > 0 ? Math.round((item.total / maxTime) * 100) : 0;
                         return (
-                           <div key={section} className="space-y-1">
+                           <div key={item.section} className="space-y-1.5 bg-black/20 p-3.5 rounded-xl border border-white/5">
                               <div className="flex items-center justify-between text-xs font-bold">
-                                 <span className="text-gray-200 capitalize">
-                                    {section.replace(/[-_]/g, " ")}
+                                 <span className="text-gray-200 capitalize flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
+                                    {item.section.replace(/[-_]/g, " ")}
                                  </span>
                                  <span className="text-indigo-400 font-mono">
-                                    {formatDuration(seconds)}
+                                    {formatDuration(item.total)} ({to2dp(item.total)}s)
                                  </span>
                               </div>
+
+                              <div className="flex items-center justify-between text-[10px] font-mono text-gray-400 px-0.5">
+                                 <span>Mean: <strong className="text-white">{formatDuration(item.mean)}</strong> ({to2dp(item.mean)}s)</span>
+                                 <span>Median: <strong className="text-indigo-400">{formatDuration(item.median)}</strong> ({to2dp(item.median)}s)</span>
+                              </div>
+
                               <div className="w-full bg-black/40 h-2 rounded-full overflow-hidden border border-white/5">
                                  <div
                                     className="bg-indigo-500 h-full rounded-full transition-all duration-500"
@@ -377,7 +510,7 @@ export const AnonymizedTelemetrySection: React.FC<AnonymizedTelemetrySectionProp
                      placeholder="Search client hash..."
                      value={searchQuery}
                      onChange={(e) => setSearchQuery(e.target.value)}
-                     className="bg-black/40 border border-white/10 rounded-xl py-2 pl-9 pr-3 text-xs text-white focus:outline-none focus:border-correct/50 placeholder-gray-600"
+                     className="bg-black/40 border border-white/10 rounded-xl py-2 pl-9 pr-3 text-xs text-white focus:outline-none focus:border-correct/50 placeholder-gray-600 font-mono"
                   />
                </div>
             </div>
@@ -404,28 +537,28 @@ export const AnonymizedTelemetrySection: React.FC<AnonymizedTelemetrySectionProp
                            <th className="py-3 px-4 text-right">Submitted At</th>
                         </tr>
                      </thead>
-                     <tbody className="divide-y divide-white/5">
+                     <tbody className="divide-y divide-white/5 font-mono">
                         {filteredLogs.map((log) => {
                            const clickSummary = Object.entries(log.clicks_per_section || {})
-                              .map(([sec, cnt]) => `${sec}: ${cnt}`)
+                              .map(([sec, cnt]) => `${sec}: ${to2dp(Number(cnt))}`)
                               .slice(0, 2)
                               .join(", ");
 
                            return (
                               <tr key={log.id} className="hover:bg-white/2 transition-colors">
-                                 <td className="py-3 px-4 font-mono text-[11px] text-gray-400">
+                                 <td className="py-3 px-4 text-[11px] text-gray-400 font-mono">
                                     {log.client_hash.substring(0, 12)}...
                                  </td>
                                  <td className="py-3 px-4 font-bold text-white">
-                                    {log.app_opens}
+                                    {to2dp(log.app_opens)}
                                  </td>
-                                 <td className="py-3 px-4 font-mono font-bold text-indigo-400">
+                                 <td className="py-3 px-4 font-bold text-indigo-400">
                                     {formatDuration(log.time_spent_seconds)}
                                  </td>
-                                 <td className="py-3 px-4 text-gray-400 truncate max-w-[200px]">
+                                 <td className="py-3 px-4 text-gray-400 truncate max-w-[200px] text-[11px]">
                                     {clickSummary || "None"}
                                  </td>
-                                 <td className="py-3 px-4">
+                                 <td className="py-3 px-4 font-sans">
                                     {log.is_bounce ? (
                                        <span className="text-[9px] font-black uppercase tracking-wider text-red-400 bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20">
                                           Yes (Bounce)
@@ -436,7 +569,7 @@ export const AnonymizedTelemetrySection: React.FC<AnonymizedTelemetrySectionProp
                                        </span>
                                     )}
                                  </td>
-                                 <td className="py-3 px-4 text-right font-mono text-[10px] text-gray-500">
+                                 <td className="py-3 px-4 text-right text-[10px] text-gray-500">
                                     {new Date(log.created_at).toLocaleTimeString([], {
                                        hour: "2-digit",
                                        minute: "2-digit",
