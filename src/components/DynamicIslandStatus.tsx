@@ -299,10 +299,32 @@ export const DynamicIslandStatus = () => {
         });
     }, [resumeKey]);
 
+    // Refresh profiles whenever island is expanded so new online users are updated
+    useEffect(() => {
+        if (isExpanded) {
+            refreshProfiles();
+        }
+    }, [isExpanded, refreshProfiles]);
+
     const sortedProfiles = useMemo(() => {
-        return [...allProfiles]
+        // Merge any online user missing from allProfiles so online users are never lost
+        const combinedProfiles = [...allProfiles];
+        onlineUsers.forEach(u => {
+            if (u.id && !combinedProfiles.some(p => p.id === u.id)) {
+                combinedProfiles.push({
+                    id: u.id,
+                    username: u.username || 'Player',
+                    avatar_url: u.avatar_url || '',
+                    last_seen_at: new Date().toISOString(),
+                });
+            }
+        });
+
+        return combinedProfiles
             .filter(p => {
-                if (p.id === user?.id) return true;
+                const isOnline = onlineUsers.some(u => u.id === p.id);
+                if (isOnline) return true; // Always show currently online users
+                if (p.id === user?.id) return true; // Always show current user
                 if (!p.last_seen_at) return false;
                 return new Date(p.last_seen_at).getTime() >= oneMonthAgoCutoff;
             })

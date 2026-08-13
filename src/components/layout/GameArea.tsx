@@ -24,6 +24,7 @@ interface GameAreaProps {
     onSetCursor?: (index: number) => void;
     onSetEditIndex?: (index: number | null) => void;
     isAlreadyPlayed?: boolean;
+    gameplayType?: 'regular' | 'challenge' | 'archive' | 'guest';
 }
 
 export const GameArea = ({
@@ -43,6 +44,7 @@ export const GameArea = ({
     onSetCursor,
     onSetEditIndex,
     isAlreadyPlayed = false,
+    gameplayType = 'regular',
 }: GameAreaProps) => {
     const { preferences } = useApp();
     // const [debugInfo, setDebugInfo] = useState({
@@ -221,7 +223,7 @@ export const GameArea = ({
                         hintRecord={hintRecord}
                         isShake={isShake}
                         compact={preferences.compactMode}
-                        gameplayType="regular"
+                        gameplayType={gameplayType}
                         onSetCursor={onSetCursor}
                         onSetEditIndex={onSetEditIndex}
                         maxGridWidth={gridDimensions.maxWidth}
