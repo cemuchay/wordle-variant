@@ -16,6 +16,7 @@ const UserProfileModal = safeLazy(() => import('../UserProfileModal').then(m => 
 
 import { useAnnouncements } from '../../hooks/useAnnouncements';
 import { setActiveSection } from '../../lib/telemetry';
+import { StreakMilestoneModal } from '../StreakMilestoneModal';
 
 interface ModalsManagerProps {
     modals: {
@@ -171,12 +172,14 @@ export const ModalsManager = ({
                     isAuthenticated={gameContext.user ? true : false}
                 />
             )}
+
             {viewedProfileId && (
                 <UserProfileModal
                     userId={viewedProfileId}
                     onClose={() => setViewedProfileId(null)}
                 />
             )}
+            <StreakMilestoneModal />
         </Suspense>
     );
 };

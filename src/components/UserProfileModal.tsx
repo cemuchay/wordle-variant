@@ -635,7 +635,13 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                                     </div>
 
                                     <TrophyCabinet
-                                       stats={{ dailyWins: stats.dailyWins, weeklyWins: stats.weeklyWins, monthlyWins: stats.monthlyWins }}
+                                       stats={{ 
+                                          dailyWins: stats.dailyWins, 
+                                          weeklyWins: stats.weeklyWins, 
+                                          monthlyWins: stats.monthlyWins,
+                                          currentStreak: stats.currentStreak,
+                                          maxStreak: stats.maxStreak,
+                                       }}
                                        awards={awards}
                                        onExplore={() => setIsCabinetOpen(true)}
                                     />
