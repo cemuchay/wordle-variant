@@ -532,6 +532,7 @@ export const FreePlayModal = ({
                 onChar={handleChar}
                 onDelete={handleDelete}
                 onEnter={handleEnter}
+                gameplayType={mode}
               />
             </>
           )}
