@@ -21,7 +21,32 @@ ALTER TABLE user_awards ADD CONSTRAINT user_awards_award_type_check
     'streak_1000'
   ));
 
--- Step 3: Calculate TRUE consecutive calendar-day winning streaks for all users
+-- Step 3: Setup Row Level Security (RLS) Policies on user_awards
+ALTER TABLE user_awards ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can insert their own awards" ON user_awards;
+CREATE POLICY "Users can insert their own awards" 
+ON user_awards 
+FOR INSERT 
+TO authenticated 
+WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can update their own awards" ON user_awards;
+CREATE POLICY "Users can update their own awards" 
+ON user_awards 
+FOR UPDATE 
+TO authenticated 
+USING (auth.uid() = user_id) 
+WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Anyone can view user awards" ON user_awards;
+CREATE POLICY "Anyone can view user awards" 
+ON user_awards 
+FOR SELECT 
+TO public 
+USING (true);
+
+-- Step 4: Calculate TRUE consecutive calendar-day winning streaks for all users
 WITH won_dates AS (
   SELECT DISTINCT
     user_id,

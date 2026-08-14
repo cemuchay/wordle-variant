@@ -53,6 +53,8 @@ interface ModalsManagerProps {
     viewedProfileId: string | null;
     setViewedProfileId: (id: string | null) => void;
     initialChallengeId?: string | null;
+    activeNavigationItem?: string;
+    moreGameMode?: string | null;
 }
 
 export const ModalsManager = ({
@@ -63,11 +65,13 @@ export const ModalsManager = ({
     onChallengeCreated,
     viewedProfileId,
     setViewedProfileId,
-    initialChallengeId
+    initialChallengeId,
+    activeNavigationItem,
+    moreGameMode,
 }: ModalsManagerProps) => {
     const { currentAnnouncement, isOpen: isAnnouncementOpen, markAsRead } = useAnnouncements(!!gameContext.user);
 
-    // Telemetry: Auto-track open modals and section time spent
+    // Telemetry: Auto-track open modals and section time spent (including wordup and wordgrid)
     useEffect(() => {
         if (modals.isSettingsOpen) setActiveSection('settings-modal');
         else if (modals.isInfoOpen) setActiveSection('info-modal');
@@ -77,6 +81,12 @@ export const ModalsManager = ({
         else if (modals.isAuthOpen) setActiveSection('auth-modal');
         else if (modals.isGameOverOpen) setActiveSection('gameover-modal');
         else if (viewedProfileId) setActiveSection('user-profile-modal');
+        else if (activeNavigationItem === 'more' && moreGameMode === 'wordgrid') setActiveSection('wordgrid');
+        else if (activeNavigationItem === 'wordup' || (activeNavigationItem === 'more' && moreGameMode === 'wordup')) setActiveSection('wordup');
+        else if (activeNavigationItem === 'challenges') setActiveSection('challenges');
+        else if (activeNavigationItem === 'leaderboard') setActiveSection('leaderboard');
+        else if (activeNavigationItem === 'chat') setActiveSection('chat');
+        else if (activeNavigationItem === 'more' && moreGameMode === 'select') setActiveSection('more-games-menu');
         else setActiveSection('main-dashboard');
     }, [
         modals.isSettingsOpen,
@@ -87,6 +97,8 @@ export const ModalsManager = ({
         modals.isAuthOpen,
         modals.isGameOverOpen,
         viewedProfileId,
+        activeNavigationItem,
+        moreGameMode,
     ]);
 
     useEffect(() => {

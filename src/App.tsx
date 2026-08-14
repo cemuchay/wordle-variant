@@ -1270,6 +1270,8 @@ function MainApp() {
         viewedProfileId={viewedProfileId}
         setViewedProfileId={setViewedProfileId}
         initialChallengeId={selectedChallengeId}
+        activeNavigationItem={activeNavigationItem}
+        moreGameMode={moreGameMode}
       />
 
 

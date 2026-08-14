@@ -1,6 +1,6 @@
 import React, { memo, useState, useEffect, useCallback, useRef } from 'react';
 import type { GuessResult } from '../types/game';
-import { HelpCircle, X, Calendar, Sparkles, ChevronRight } from 'lucide-react';
+import { HelpCircle, X, Calendar, Sparkles, ChevronRight, Share2, Check, Loader2 } from 'lucide-react';
 import { ANIMATION_DURATION } from '../constants/ui';
 import { LAYOUT } from '../constants/game';
 import returnAnimationTime from '../utils/returnAnimationTime';
@@ -8,6 +8,7 @@ import { useIsResponsive } from '../hooks/useResponsive';
 import { useAppStore } from '../store/useAppStore';
 import { useApp } from '../context/AppContext';
 import { StreakCounter } from './StreakCounter';
+import { generateShareText } from '../lib/share';
 
 interface CellProps {
   letter: string;
@@ -138,7 +139,7 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
   onOpenDailyEvent,
 }) => {
   const { isDesktop } = useIsResponsive();
-  const { stats } = useApp();
+  const { stats, triggerToast, date, profile } = useApp();
 
   const isHeaderMenuOpen = useAppStore((s) => s.isHeaderMenuOpen);
   const isChallenge = gameplayType === 'challenge' || isChallengeMode;
@@ -226,6 +227,7 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
   const isOneAttemptLeft = attemptsCount === maxAttempts - 1 && revealingRowIndex === null;
   const isWon = guesses.some(g => g.length === wordLength && g.every(res => res.status === 'correct'));
   const isLost = !isWon && attemptsCount === maxAttempts && revealingRowIndex === null;
+  const isGameOver = isWon || isLost;
 
   const lastGuess = guesses[guesses.length - 1];
   let hasRepeatedLetters = false;
@@ -322,6 +324,45 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
 
   const rowGapClass = compact ? 'gap-1 sm:gap-1.5' : 'gap-1.5 sm:gap-2';
   const [showEditHelp, setShowEditHelp] = useState(false);
+  const [isShareCopied, setIsShareCopied] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+
+  const handleShareResults = useCallback(async () => {
+    if (isSharing) return;
+    setIsSharing(true);
+    try {
+      const text = generateShareText({
+        date: date || new Date().toISOString().split('T')[0],
+        guesses,
+        maxAttempts,
+        won: isWon,
+        usedHint: false,
+        gameMessage: '',
+        wordLength,
+        isAuthenticated: !!profile,
+      });
+
+      if (navigator.share) {
+        try {
+          await navigator.share({ text });
+          triggerToast?.('Shared results!');
+          return;
+        } catch {
+          /* Fallback to clipboard if native share cancelled */
+        }
+      }
+
+      await navigator.clipboard.writeText(text);
+      setIsShareCopied(true);
+      triggerToast?.('Results copied to clipboard!');
+      setTimeout(() => setIsShareCopied(false), 2500);
+    } catch (err) {
+      console.error('Failed to share results:', err);
+      triggerToast?.('Failed to copy results');
+    } finally {
+      setIsSharing(false);
+    }
+  }, [date, guesses, maxAttempts, isWon, wordLength, profile, isSharing, triggerToast]);
 
   return (
     <div className={`relative mx-auto w-fit select-none shrink-0 `}>
@@ -333,6 +374,32 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
             currentStreak={stats?.currentStreak ?? 0}
             maxStreak={stats?.maxStreak ?? 0}
           />
+
+          {isGameOver && (
+            <button
+              onClick={handleShareResults}
+              disabled={isSharing}
+              className="shrink-0 px-2.5 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs disabled:opacity-50"
+              title="Share game results"
+            >
+              {isSharing ? (
+                <>
+                  <Loader2 size={12} className="animate-spin text-emerald-400 shrink-0" />
+                  <span>sharing...</span>
+                </>
+              ) : isShareCopied ? (
+                <>
+                  <Check size={12} className="text-emerald-400 shrink-0" />
+                  <span>copied!</span>
+                </>
+              ) : (
+                <>
+                  <Share2 size={12} className="text-emerald-400 shrink-0" />
+                  <span>share</span>
+                </>
+              )}
+            </button>
+          )}
 
           <button
             onClick={() => {
