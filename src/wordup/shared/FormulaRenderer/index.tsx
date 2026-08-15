@@ -23,6 +23,14 @@ export function isScientificCategory(category?: string): boolean {
     );
 }
 
+function isInlineMath(str: string): boolean {
+    const trimmed = str.trim();
+    // Exclude simple prices or currency like $10, $50, $1,000
+    if (/^\d+([.,]\d+)?\b/.test(trimmed)) return false;
+    // Require math operators, LaTeX syntax, or symbols
+    return /[\^_\=+\-\/\*\\<>≤≥±≠≈%]|\\[a-zA-Z]+/.test(trimmed);
+}
+
 interface FormulaRendererProps {
     text: string;
     category?: string;
@@ -44,18 +52,31 @@ const FormulaRenderer: React.FC<FormulaRendererProps> = ({
     const parts = text.split(/(\$\$.*?\$\$|\$.*?\$)/g);
 
     return (
-        <span className={`inline-block w-full ${className}`}>
+        <span className={`inline ${className}`}>
             {parts.map((part, index) => {
                 const isBlock = part.startsWith("$$") && part.endsWith("$$");
-                const isInline = part.startsWith("$") && part.endsWith("$");
+                const rawInline = part.startsWith("$") && part.endsWith("$") && part.length > 2;
+                const isInline = rawInline && isInlineMath(part.slice(1, -1));
 
                 if (isBlock || isInline) {
                     const formula = isBlock ? part.slice(2, -2).trim() : part.slice(1, -1).trim();
                     const htmlContent = formatFormulaHTML(formula);
+
+                    if (isBlock) {
+                        return (
+                            <span
+                                key={index}
+                                className="block my-2 p-2 text-center font-serif text-lg text-sky-200 select-none tracking-wide"
+                                style={{ fontFamily: "Georgia, Cambria, 'Times New Roman', Times, serif" }}
+                                dangerouslySetInnerHTML={{ __html: htmlContent }}
+                            />
+                        );
+                    }
+
                     return (
                         <span
                             key={index}
-                            className="block my-3 p-3.5 text-center bg-slate-950/50 backdrop-blur-md border border-white/10 rounded-xl shadow-md font-serif text-xl text-sky-200 select-none tracking-wide"
+                            className="inline-flex items-center px-1 font-serif text-sky-200 select-none"
                             style={{ fontFamily: "Georgia, Cambria, 'Times New Roman', Times, serif" }}
                             dangerouslySetInnerHTML={{ __html: htmlContent }}
                         />
