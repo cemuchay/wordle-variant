@@ -1,13 +1,44 @@
 import React from "react";
 import formatFormulaHTML from "./formatFormulaHTML";
 
+const SCIENTIFIC_CATEGORIES = new Set([
+    "chemistry",
+    "maths",
+    "physics",
+    "computers",
+    "element_arena",
+    "mental_math_blitz",
+    "sequence_solver",
+    "math",
+]);
+
+export function isScientificCategory(category?: string): boolean {
+    if (!category) return false;
+    const cat = category.toLowerCase().trim();
+    return (
+        SCIENTIFIC_CATEGORIES.has(cat) ||
+        cat.includes("chem") ||
+        cat.includes("math") ||
+        cat.includes("physic")
+    );
+}
+
 interface FormulaRendererProps {
     text: string;
+    category?: string;
+    isScientific?: boolean;
     className?: string;
 }
 
-const FormulaRenderer: React.FC<FormulaRendererProps> = ({ text, className = "" }) => {
+const FormulaRenderer: React.FC<FormulaRendererProps> = ({
+    text,
+    category,
+    isScientific,
+    className = "",
+}) => {
     if (!text) return null;
+
+    const shouldFormatScientific = isScientific ?? isScientificCategory(category);
 
     // Split text by $$ (block math) and $ (inline math)
     const parts = text.split(/(\$\$.*?\$\$|\$.*?\$)/g);
@@ -30,17 +61,19 @@ const FormulaRenderer: React.FC<FormulaRendererProps> = ({ text, className = "" 
                         />
                     );
                 } else {
-                    // Check if plain text contains chemical formulas or subscripts (e.g. H2O, O2, CO2, Na+)
-                    const hasChemFormula = /([A-Z][a-z]?[0-9]+)|([A-Z][a-z]?[\+\-\u2212\u2013])|(_[0-9a-zA-Z]+)/.test(part);
-                    if (hasChemFormula) {
-                        const htmlContent = formatFormulaHTML(part);
-                        return (
-                            <span
-                                key={index}
-                                className="whitespace-pre-line"
-                                dangerouslySetInnerHTML={{ __html: htmlContent }}
-                            />
-                        );
+                    // Only apply un-delimited chemical/scientific formula formatting for scientific topics
+                    if (shouldFormatScientific) {
+                        const hasChemFormula = /([A-Z][a-z]?[0-9]+)|([A-Z][a-z]?[\+\-\u2212\u2013])|(_\{[0-9a-zA-Z]+\})/.test(part);
+                        if (hasChemFormula) {
+                            const htmlContent = formatFormulaHTML(part);
+                            return (
+                                <span
+                                    key={index}
+                                    className="whitespace-pre-line"
+                                    dangerouslySetInnerHTML={{ __html: htmlContent }}
+                                />
+                            );
+                        }
                     }
                     // Normal text (preserve line breaks)
                     return (
@@ -54,4 +87,4 @@ const FormulaRenderer: React.FC<FormulaRendererProps> = ({ text, className = "" 
     );
 };
 
-export default FormulaRenderer
+export default FormulaRenderer;
