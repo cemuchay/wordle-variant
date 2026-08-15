@@ -25,6 +25,11 @@ interface GameAreaProps {
     onSetEditIndex?: (index: number | null) => void;
     isAlreadyPlayed?: boolean;
     gameplayType?: 'regular' | 'challenge' | 'archive' | 'guest';
+    onHint?: () => void;
+    usedHint?: boolean;
+    canShowHint?: boolean;
+    isHintLocked?: boolean;
+    gameMessage?: string;
 }
 
 export const GameArea = ({
@@ -45,6 +50,11 @@ export const GameArea = ({
     onSetEditIndex,
     isAlreadyPlayed = false,
     gameplayType = 'regular',
+    onHint,
+    usedHint,
+    canShowHint,
+    isHintLocked,
+    gameMessage,
 }: GameAreaProps) => {
     const { preferences } = useApp();
     // const [debugInfo, setDebugInfo] = useState({
@@ -211,7 +221,7 @@ export const GameArea = ({
     return (
         <div className="gameplay-container flex-1 flex flex-col justify-between min-h-0 w-full px-2 pb-0.5 sm:pt-2 sm:pb-1 gap-2 sm:gap-4">
 
-            <div ref={containerRef} className="flex-1 flex items-center justify-center min-h-0 w-full relative">
+            <div ref={containerRef} className={`flex-1 flex justify-center min-h-0 w-full relative overflow-y-auto scrollbar-hide ${hideKeyboard || isGameOver ? 'items-start pt-1 sm:pt-2' : 'items-center'}`}>
                 <div className="relative grid-wrapper-parent">
                     <NewGrid
                         wordLength={wordLength}
@@ -230,6 +240,11 @@ export const GameArea = ({
                         maxGridHeight={gridDimensions.maxHeight}
                         onToggleRules={() => setShowHelp(!showHelp)}
                         showRules={showHelp}
+                        onHint={onHint}
+                        usedHint={usedHint}
+                        canShowHint={canShowHint}
+                        isHintLocked={isHintLocked}
+                        gameMessage={gameMessage}
                     />
                 </div>
             </div>

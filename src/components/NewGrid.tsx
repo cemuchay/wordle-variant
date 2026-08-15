@@ -1,6 +1,6 @@
 import React, { memo, useState, useEffect, useCallback, useRef } from 'react';
 import type { GuessResult } from '../types/game';
-import { HelpCircle, X, Calendar, Sparkles, ChevronRight, Share2, Check, Loader2 } from 'lucide-react';
+import { HelpCircle, X, Calendar, Sparkles, ChevronRight, Share2, Check, Loader2, Lightbulb } from 'lucide-react';
 import { ANIMATION_DURATION } from '../constants/ui';
 import { LAYOUT } from '../constants/game';
 import returnAnimationTime from '../utils/returnAnimationTime';
@@ -113,6 +113,11 @@ interface NewGridProps {
   showRules?: boolean;
   onOpenArchive?: () => void;
   onOpenDailyEvent?: () => void;
+  onHint?: () => void;
+  usedHint?: boolean;
+  canShowHint?: boolean;
+  isHintLocked?: boolean;
+  gameMessage?: string;
 }
 
 const LONG_PRESS_MS = 500;
@@ -137,6 +142,11 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
   showRules,
   onOpenArchive,
   onOpenDailyEvent,
+  onHint,
+  usedHint,
+  canShowHint,
+  isHintLocked,
+  gameMessage,
 }) => {
   const { isDesktop } = useIsResponsive();
   const { stats, triggerToast, date, profile } = useApp();
@@ -336,8 +346,8 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
         guesses,
         maxAttempts,
         won: isWon,
-        usedHint: false,
-        gameMessage: '',
+        usedHint: usedHint ?? false,
+        gameMessage: gameMessage ?? '',
         wordLength,
         isAuthenticated: !!profile,
       });
@@ -362,13 +372,38 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
     } finally {
       setIsSharing(false);
     }
-  }, [date, guesses, maxAttempts, isWon, wordLength, profile, isSharing, triggerToast]);
+  }, [date, guesses, maxAttempts, isWon, usedHint, gameMessage, wordLength, profile, isSharing, triggerToast]);
 
   return (
     <div className={`relative mx-auto w-fit select-none shrink-0 `}>
       {/* Top Lightweight Quick Nav Buttons (Hidden in challenge/archive/guest modes) */}
       {!shouldHideNavButtons && (
         <div className="flex items-center justify-start sm:justify-center gap-1.5 sm:gap-2 mb-2 w-full max-w-full overflow-x-auto scrollbar-hide shrink-0 px-0.5 py-0.5">
+          {!isGameOver && canShowHint && onHint && (() => {
+            const isLocked = isHintLocked ?? (guesses.length < 2);
+            const isUnavailable = isLocked || !!usedHint;
+            return (
+              <button
+                onClick={onHint}
+                disabled={isUnavailable}
+                className={`shrink-0 px-2.5 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg transition-all flex items-center gap-1.5 shadow-xs relative ${
+                  isUnavailable
+                    ? 'bg-black/80 text-gray-500 border border-gray-800 opacity-50 cursor-not-allowed pointer-events-none'
+                    : 'bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30 border border-yellow-500/40 cursor-pointer active:scale-95 animate-pulse'
+                }`}
+                title={usedHint ? "Hint Used" : isLocked ? "Unlock hint by guessing 2+ words" : "Get Hint"}
+              >
+                <Lightbulb size={12} className={isUnavailable ? "text-gray-600" : "text-yellow-400 fill-yellow-400/20"} />
+                <span>{usedHint ? "hint used" : isLocked ? "hint 🔒" : "get hint"}</span>
+                {isLocked && !usedHint && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-[80%] h-[1.5px] bg-red-600/60 rotate-45" />
+                  </div>
+                )}
+              </button>
+            );
+          })()}
+
           <StreakCounter
             size="small"
             currentStreak={stats?.currentStreak ?? 0}

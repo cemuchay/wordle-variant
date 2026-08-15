@@ -1,7 +1,4 @@
-import { HelpCircle, Lightbulb, RotateCcw, SettingsIcon, Share } from 'lucide-react';
-import { useState } from 'react';
-import { useApp } from '../../context/AppContext';
-import { TOAST_DURATION } from '../../constants/ui';
+import { HelpCircle, RotateCcw, SettingsIcon, Share } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirmation } from '../../hooks/useConfirmation';
 import type { SyncStatus } from '../../types/game';
@@ -16,14 +13,14 @@ interface AppHeaderProps {
     onOpenSearch?: () => void;
     onOpenInfo?: () => void;
     onOpenWeeklyWrapped?: () => void;
-    onHint: () => void;
+    onHint?: () => void;
     onReset: () => void;
     onShare: () => void;
     onRetrySync: () => void;
     isGameOver: boolean;
     isRevealing?: boolean;
-    usedHint: boolean;
-    canShowHint: boolean;
+    usedHint?: boolean;
+    canShowHint?: boolean;
     isHintLocked?: boolean;
     syncStatus: SyncStatus;
     isMonday?: boolean;
@@ -36,36 +33,16 @@ export const AppHeader = ({
     onOpenSettings,
     onOpenInfo,
     onOpenWeeklyWrapped,
-    onHint,
     onReset,
     onShare,
     onRetrySync,
     isGameOver,
-    isRevealing,
-    usedHint,
-    canShowHint,
-    isHintLocked,
     syncStatus,
     isMonday = false,
     hideGameplayActions = false
 }: AppHeaderProps) => {
     const { user, signOut } = useAuth();
     const { ask } = useConfirmation();
-    const { triggerToast, } = useApp();
-    const [isShaking, setIsShaking] = useState(false);
-
-    const handleLockedHintClick = () => {
-        setIsShaking(true);
-        const goofyMessages = [
-            "Not so fast! 🤫 Guess more words first!",
-            "No freebies yet! Keep trying! 🔒",
-            "Work for it! Guess at least 2 words! 💪",
-            "Nice try, lockpicker! 🗝️"
-        ];
-        const randomMsg = goofyMessages[Math.floor(Math.random() * goofyMessages.length)];
-        triggerToast(randomMsg, TOAST_DURATION.DEFAULT);
-        setTimeout(() => setIsShaking(false), 500);
-    };
 
     const handleSignOut = async () => {
         const confirmed = await ask({
@@ -99,26 +76,6 @@ export const AppHeader = ({
                     {!hideGameplayActions && (
                         <>
                             <div className="flex items-center gap-0.5">
-                                {canShowHint && (!isGameOver || isRevealing) && (
-                                    <button
-                                        onClick={isHintLocked && !usedHint ? handleLockedHintClick : onHint}
-                                        disabled={usedHint}
-                                        className={`p-1.5 transition-all rounded-lg relative cursor-pointer ${usedHint
-                                            ? 'text-yellow-500/30 cursor-not-allowed'
-                                            : isHintLocked
-                                                ? `text-gray-500 opacity-70 hover:opacity-100 hover:bg-white/5 active:scale-95 ${isShaking ? 'animate-shake' : ''}`
-                                                : 'text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 active:scale-95 animate-pulse'
-                                            }`}
-                                        title={usedHint ? "Hint Used" : isHintLocked ? "Unlock hint by guessing 2+ words" : "Get Hint"}
-                                    >
-                                        <Lightbulb size={ICON_SIZE} />
-                                        {isHintLocked && !usedHint && (
-                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                <div className="w-[80%] h-[1.5px] bg-red-600/60 rotate-45" />
-                                            </div>
-                                        )}
-                                    </button>
-                                )}
                                 <button
                                     onClick={onReset}
                                     className="p-1.5 text-white hover:text-white rounded-lg hover:bg-white/5 transition-all active:rotate-180 duration-500 cursor-pointer"
