@@ -101,6 +101,7 @@ function MainApp() {
   const isBattlePlayingAsync = useAsyncStore((s) => s.isBattlePlaying);
   const isBattlePlaying = isBattlePlayingLive || isBattlePlayingAsync;
   const {
+    preferences,
     triggerToast,
     date,
     isLoadingDate,
@@ -1130,6 +1131,11 @@ function MainApp() {
                       onSetCursor={actions.onSetCursor}
                       onSetEditIndex={actions.onSetEditIndex}
                       isAlreadyPlayed={isAlreadyPlayedTodayOnLoad}
+                      onHint={actions.handleHint}
+                      usedHint={state.usedHint}
+                      canShowHint={!preferences.disableHints}
+                      isHintLocked={state.guesses.length < 2}
+                      gameMessage={state.gameMessage}
                     />
                   </div>
                 )}
