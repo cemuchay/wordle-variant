@@ -33,9 +33,9 @@ const formatFormulaHTML = (formula: string): string => {
    formatted = formatted.replace(/\*/g, " &times; ");
    formatted = formatted.replace(/\//g, " &divide; ");
 
-   // Handle chemical formula subscript notation with underscores: e.g. H_2O -> H<sub>2</sub>O
+   // Handle chemical formula subscript notation with underscores: e.g. H_2O -> H<sub>2</sub>O, x_{12} -> x<sub>12</sub>
    formatted = formatted.replace(/_\{([^}]+)\}/g, "<sub>$1</sub>");
-   formatted = formatted.replace(/_([0-9a-zA-Z+-]+)/g, "<sub>$1</sub>");
+   formatted = formatted.replace(/_([0-9]+[\+\-]?|[\+\-])/g, "<sub>$1</sub>");
 
    // Handle inline chemical formula digits (e.g. H2O -> H<sub>2</sub>O, CO2 -> CO<sub>2</sub>, Ca2+ -> Ca<sup>2+</sup>)
    formatted = formatted.replace(/([A-Z][a-z]?)([0-9]+)/g, "$1<sub>$2</sub>");

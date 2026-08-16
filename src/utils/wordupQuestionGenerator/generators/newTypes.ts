@@ -668,9 +668,14 @@ export const generateWordChain = async (
    const word = official[rand(0, official.length - 1)];
    const suffix = word.substring(word.length - 2);
 
-   let candidates: string[] = [];
+   // Pre-fetch all word lists for allowed lengths once
+   const listsMap = new Map<number, string[]>();
    for (const len of allowedLengths) {
-      const list = (await loadWordLists(len)).official;
+      listsMap.set(len, (await loadWordLists(len)).official);
+   }
+
+   let candidates: string[] = [];
+   for (const list of listsMap.values()) {
       candidates.push(...list.filter((w) => w.startsWith(suffix) && w !== word));
    }
 
@@ -681,8 +686,7 @@ export const generateWordChain = async (
       attempts++;
       fallbackWord = official[rand(0, official.length - 1)];
       fallbackSuffix = fallbackWord.substring(fallbackWord.length - 2);
-      for (const len of allowedLengths) {
-         const list = (await loadWordLists(len)).official;
+      for (const list of listsMap.values()) {
          candidates.push(
             ...list.filter((w) => w.startsWith(fallbackSuffix) && w !== fallbackWord),
          );
@@ -700,7 +704,7 @@ export const generateWordChain = async (
    while (choices.size < 4 && decoyAttempts < 100) {
       decoyAttempts++;
       const len = allowedLengths[rand(0, allowedLengths.length - 1)];
-      const list = (await loadWordLists(len)).official;
+      const list = listsMap.get(len) || official;
       const dummy = list[rand(0, list.length - 1)];
       if (!dummy.startsWith(fallbackSuffix)) choices.add(dummy);
    }
@@ -802,9 +806,13 @@ export const generateWordWithin = async (
    const longWord = official[rand(0, official.length - 1)];
 
    const shortLengths = allowedLengths.filter((l) => l >= 3 && l <= 5);
-   const subCandidates: string[] = [];
+   const shortListsMap = new Map<number, string[]>();
    for (const slen of shortLengths) {
-      const list = (await loadWordLists(slen)).official;
+      shortListsMap.set(slen, (await loadWordLists(slen)).official);
+   }
+
+   const subCandidates: string[] = [];
+   for (const list of shortListsMap.values()) {
       for (const w of list) {
          if (w.length < longWord.length && longWord.includes(w)) {
             subCandidates.push(w);
@@ -817,8 +825,7 @@ export const generateWordWithin = async (
    while (subCandidates.length === 0 && fallbackAttempts < 20) {
       fallbackAttempts++;
       fallbackWord = official[rand(0, official.length - 1)];
-      for (const slen of shortLengths) {
-         const list = (await loadWordLists(slen)).official;
+      for (const list of shortListsMap.values()) {
          for (const w of list) {
             if (w.length < fallbackWord.length && fallbackWord.includes(w)) {
                subCandidates.push(w);
@@ -838,7 +845,7 @@ export const generateWordWithin = async (
    while (choices.size < 4 && attempts < 100) {
       attempts++;
       const slen = shortLengths[rand(0, shortLengths.length - 1)];
-      const list = (await loadWordLists(slen)).official;
+      const list = shortListsMap.get(slen) || official;
       const dummy = list[rand(0, list.length - 1)];
       if (dummy !== correct && !fallbackWord.includes(dummy)) choices.add(dummy);
    }
@@ -1041,13 +1048,18 @@ export const generateLetterAddRemove = async (
       : `Add one letter to "${pair.base}" to make a valid word.`;
    const correctAnswer = pair.result;
 
+   const listsMap = new Map<number, string[]>();
+   for (const len of allowedLengths) {
+      listsMap.set(len, (await loadWordLists(len)).official);
+   }
+
    const choices = new Set<string>();
    choices.add(correctAnswer);
    let attempts = 0;
    while (choices.size < 4 && attempts < 100) {
       attempts++;
       const len = allowedLengths[rand(0, allowedLengths.length - 1)];
-      const list = (await loadWordLists(len)).official;
+      const list = listsMap.get(len) || official;
       const dummy = list[rand(0, list.length - 1)];
       const diffLen = Math.abs(dummy.length - correctAnswer.length);
       if (diffLen <= 1 && !pair.base.includes(dummy)) choices.add(dummy);

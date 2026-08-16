@@ -11,6 +11,7 @@ import { ProtectedAvatar } from "../../../components/chat/ProtectedAvatar";
 import { ScoreBar } from "../../shared/ScoreBar";
 import { CATEGORIES } from "../../shared/constants";
 import { WORDUP_GAME, CONFETTI, PROMPT_FONT_SIZE, CHOICE_FONT_SIZE } from "../../../constants/wordup";
+import { useAsyncStore } from "../store/useAsyncStore";
 
 interface MatchData {
    p1_score?: number;
@@ -318,7 +319,7 @@ export const BattleView = ({
                   {(activeQuestion.type || "definition").replace("_", " ")}
                </p>
                <h2 className={`${promptSizeClass} text-white whitespace-pre-line leading-relaxed`}>
-                  <FormulaRenderer text={activeQuestion.prompt} />
+                  <FormulaRenderer text={activeQuestion.prompt} category={matchData?.category || useAsyncStore.getState().category} />
                </h2>
                {activeQuestion.subPrompt && (
                   <p className="text-[10px] sm:text-xs text-white/60 bg-white/5 px-2.5 py-0.5 sm:py-1 rounded-lg inline-block">
@@ -505,7 +506,7 @@ export const BattleView = ({
                            className={btnClass}
                         >
                            <span className="text-center">
-                              <FormulaRenderer text={choice} />
+                              <FormulaRenderer text={choice} category={matchData?.category || useAsyncStore.getState().category} />
                            </span>
 
                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center z-10">

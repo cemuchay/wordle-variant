@@ -116,6 +116,8 @@ const shuffleChoices = (q: WordUpQuestion): WordUpQuestion => ({
    choices: [...q.choices].sort(() => Math.random() - 0.5),
 });
 
+import { loadWordLists } from "../../data/words";
+
 export const generateWordUpQuestions = async (
    category: string,
    count: number = 7,
@@ -148,9 +150,17 @@ export const generateWordUpQuestions = async (
    const isSpecificType = specificTypes.includes(category as any);
    const allowedLengths = resolveAllowedLengths(category);
 
+   // Pre-warm in-memory word list caches for all allowed lengths
+   await Promise.all(allowedLengths.map((len) => loadWordLists(len)));
+
    const questions: WordUpQuestion[] = [];
 
    for (let i = 0; i < count; i++) {
+      // Yield control to browser event loop every 5 items to keep UI fluid during large batches
+      if (i > 0 && i % 5 === 0) {
+         await new Promise((r) => setTimeout(r, 0));
+      }
+
       let type: WordUpQuestion["type"];
       let attempts = 0;
       do {
