@@ -71,6 +71,19 @@ export const ScoreBreakdown = memo(({
                 </div>
             </div>
 
+            {/* Nearly Got It Bonus */}
+            {breakdown?.nearlyGotIt !== undefined && breakdown.nearlyGotIt > 0 && (
+                <div className="flex justify-between text-[9px] uppercase font-bold text-indigo-400 items-center">
+                    <span className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block"></span>
+                        Nearly Got It Bonus:
+                    </span>
+                    <span className="text-indigo-300 font-mono font-black">
+                        +{breakdown.nearlyGotIt}
+                    </span>
+                </div>
+            )}
+
             {gameData?.time_taken !== null &&
                 gameData?.time_taken !== undefined && (
                     <div className="flex justify-between text-[9px] uppercase font-bold text-gray-400">

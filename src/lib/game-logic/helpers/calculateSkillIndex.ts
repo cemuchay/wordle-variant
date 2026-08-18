@@ -21,6 +21,7 @@ export const calculateSkillIndexSub = ({
    base: number;
    bonus: number;
    hint: number;
+   nearlyGotIt: number;
    decisions: {
       rowNumber: string;
       totalRowPoints: number;
@@ -64,6 +65,7 @@ export const calculateSkillIndexSub = ({
          base: 0,
          bonus: 0,
          hint: 0,
+         nearlyGotIt: 0,
          decisions: [],
          finalScore,
       };
@@ -76,6 +78,7 @@ export const calculateSkillIndexSub = ({
          base: 0,
          bonus: 0,
          hint: 0,
+         nearlyGotIt: 0,
          decisions: [],
          finalScore: 0,
       };
@@ -392,13 +395,30 @@ export const calculateSkillIndexSub = ({
               SCORING.BASE_SCORE_MAX,
         )
       : 0;
-   const finalScore: number = baseScore + totalBonus + localHint;
+
+   // Nearly Got It Bonus: If user got all greens except 1 letter in an earlier attempt, award 84 points
+   let nearlyGotItBonus = 0;
+   if (won && currentAttempts > 1) {
+      const wordLength = guesses[0]?.length || 0;
+      if (wordLength > 1) {
+         const hadNearlyGotIt = guesses.slice(0, currentAttempts - 1).some((row) => {
+            const greenCount = row.filter((cell: { status: string }) => cell.status === "correct").length;
+            return greenCount === wordLength - 1;
+         });
+         if (hadNearlyGotIt) {
+            nearlyGotItBonus = 84;
+         }
+      }
+   }
+
+   const finalScore: number = baseScore + totalBonus + localHint + nearlyGotItBonus;
 
    return {
       rows,
       base: baseScore,
       bonus: totalBonus,
       hint: localHint,
+      nearlyGotIt: nearlyGotItBonus,
       decisions: rowPointDecisions,
       finalScore,
    };
