@@ -4,7 +4,7 @@ import { getRandomWord, obfuscateWord } from "@/lib/game-logic";
 import { supabase } from "@/lib/supabaseClient";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { DEFAULT_WORD_LENGTH } from "@/constants/game";
-import getMatchCount from "../helpers/getMatchCount";
+import { generateHandicapStarters } from "../helpers/handicapStarters";
 
 const useUpdateChallenge = () => {
    const queryClient = useQueryClient();
@@ -61,62 +61,82 @@ const useUpdateChallenge = () => {
             );
          }
 
-         // Fetch the existing challenge to compare length/custom/target word
-         const { data: existing, error: existError } = await supabase
+         // Fetch existing challenge to check if target words must be regenerated
+         const { data: existing, error: fetchError } = await supabase
             .from("challenges")
             .select("*")
             .eq("id", challengeId)
             .single();
 
-         if (existError) throw existError;
+         if (fetchError) throw fetchError;
 
-         let actualLength = length;
+         // Determine if target words need regeneration
+         const lengthChanged = existing.word_length !== length;
+         const customFlagChanged = existing.is_custom_word !== isCustomWord;
+         const difficultyChanged = existing.difficulty !== difficulty;
+         const sentenceFlagChanged = existing.is_sentence !== isSentences;
+         const sentenceCountChanged =
+            isSentences && existing.word_length !== sentenceWordCount;
+
+         let shouldRegenerateTarget =
+            lengthChanged ||
+            customFlagChanged ||
+            difficultyChanged ||
+            sentenceFlagChanged ||
+            sentenceCountChanged;
+
+         // Check custom marathon words array changes
+         if (isCustomWord && length === 1 && customWords) {
+            shouldRegenerateTarget = true;
+         }
+
+         // Check custom word change for standard mode
+         if (
+            isCustomWord &&
+            length !== 1 &&
+            customWord &&
+            customWord !== existing.target_word
+         ) {
+            shouldRegenerateTarget = true;
+         }
+
          let targetWord = existing.target_word;
          let salt = existing.salt;
+         let actualLength = length;
          const plainMarathonTargets: Record<number, string> = {};
          let plainRegularTarget = "";
-
-         const lengthChanged = existing.word_length !== length;
-         const customChanged = existing.is_custom_word !== isCustomWord;
-         let effectiveForceOrder = marathonForceOrder;
-
          let resolvedMarathonGames =
             marathonGames || (length === 1 ? [3, 4, 5, 6, 7] : null);
-         let sentenceWords: string[] | null = null;
+         let effectiveForceOrder = marathonForceOrder;
 
          if (isSentences) {
             actualLength = 1;
             effectiveForceOrder = true;
+            let sentenceWords: string[] | null = null;
             if (isCustomWord) {
                sentenceWords = customSentence
                   .split(/\s+/)
                   .map((w: string) => w.trim().toUpperCase())
                   .filter(Boolean);
             } else {
-                const curated = getRandomCuratedSentence(sentenceWordCount || DEFAULT_WORD_LENGTH);
+               const curated = getRandomCuratedSentence(
+                  sentenceWordCount || DEFAULT_WORD_LENGTH,
+               );
                sentenceWords = curated ? curated : ["THE", "CAT", "SLEEPS"];
             }
             resolvedMarathonGames = sentenceWords!.map((w: string) => w.length);
          }
 
-         // If length changed, custom status changed, or new custom word is provided:
-         const shouldRegenerateTarget =
-            lengthChanged ||
-            customChanged ||
-            isSentences ||
-            (isCustomWord && (length === 1 ? !!customWords : !!customWord));
-
          if (shouldRegenerateTarget) {
             salt = Math.random().toString(36).substring(2, 15);
+
             if (resolvedMarathonGames) {
                const targetArray: { length: number; word: string }[] = [];
                const chosenWords = new Set<string>();
                for (let idx = 0; idx < resolvedMarathonGames.length; idx++) {
                   const l = resolvedMarathonGames[idx];
                   let rawWord = "";
-                  if (sentenceWords && idx < sentenceWords.length) {
-                     rawWord = sentenceWords[idx];
-                  } else if (isCustomWord) {
+                  if (isCustomWord) {
                      if (Array.isArray(customWords)) {
                         rawWord = customWords[idx];
                      } else if (
@@ -177,88 +197,27 @@ const useUpdateChallenge = () => {
 
             if (isRandomRequest) {
                finalHandicapIsRandom = true;
-               // Only generate new random starter if target word changed, or it wasn't random before
                const needsNewRandom =
                   shouldRegenerateTarget ||
                   !existing.handicap_starter_is_random ||
                   (!existing.handicap_starter && !existing.handicap_starters);
 
                if (needsNewRandom) {
-                  if (resolvedMarathonGames) {
-                     const startersList: string[] = [];
-                     for (
-                        let idx = 0;
-                        idx < resolvedMarathonGames.length;
-                        idx++
-                     ) {
-                        const l = resolvedMarathonGames[idx];
-                        const target =
-                           plainMarathonTargets[idx] ||
-                           (
-                              await getRandomWord(l, resolveDiff(idx), true)
-                           ).toUpperCase();
-                        const maxAllowed = l <= 4 ? 1 : 3;
-                        let starter = (
-                           await getRandomWord(l, resolveDiff(idx), true)
-                        ).toUpperCase();
-                        let limit = 0;
-                        while (limit < 200) {
-                           if (
-                              starter !== target &&
-                              getMatchCount(starter, target) <= maxAllowed
-                           ) {
-                              break;
-                           }
-                           starter = (
-                              await getRandomWord(l, resolveDiff(idx), true)
-                           ).toUpperCase();
-                           limit++;
-                        }
-                        startersList.push(starter);
-                     }
-                     finalHandicapStarters = startersList;
-                     finalHandicapStarter = null;
-                  } else {
-                     const target =
-                        plainRegularTarget ||
-                        (
-                           await getRandomWord(
-                              actualLength,
-                              resolveDiff(),
-                              true,
-                           )
-                        ).toUpperCase();
-                     const maxAllowed = actualLength <= 4 ? 1 : 3;
-                     let starter = (
-                        await getRandomWord(actualLength, resolveDiff(), true)
-                     ).toUpperCase();
-                     let limit = 0;
-                     while (limit < 200) {
-                        if (
-                           starter !== target &&
-                           getMatchCount(starter, target) <= maxAllowed
-                        ) {
-                           break;
-                        }
-                        starter = (
-                           await getRandomWord(
-                              actualLength,
-                              resolveDiff(),
-                              true,
-                           )
-                        ).toUpperCase();
-                        limit++;
-                     }
-                     finalHandicapStarter = starter;
-                     finalHandicapStarters = null;
-                  }
+                  const generated = await generateHandicapStarters({
+                     targetWord: plainRegularTarget,
+                     length: actualLength,
+                     marathonGames: resolvedMarathonGames,
+                     plainMarathonTargets,
+                     handicapLevel: params.handicapLevel || "normal",
+                     handicapRows: params.handicapRows || 1,
+                  });
+                  finalHandicapStarter = generated.finalHandicapStarter;
+                  finalHandicapStarters = generated.finalHandicapStarters;
                } else {
-                  // Keep existing random ones
                   finalHandicapStarter = existing.handicap_starter;
                   finalHandicapStarters = existing.handicap_starters;
                }
             } else {
-               // Custom word starter
                finalHandicapIsRandom = false;
                if (isSingleMasked) {
                   finalHandicapStarter = existing.handicap_starter;

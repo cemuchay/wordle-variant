@@ -19,6 +19,8 @@ export interface ChallengeFormSettings {
     customWordCount: number;
     isHandicap: boolean;
     handicapMode: 'random' | 'custom';
+    handicapLevel?: 'easy' | 'normal' | 'difficult';
+    handicapRows?: 1 | 2;
     handicapEnforced: boolean;
     isShapeshifter: boolean;
     disableHints: boolean;
@@ -131,7 +133,11 @@ export const CreateSummaryStep = memo(({ settings, onBack, onConfirm, loading }:
                     <SummaryRow
                         icon={<Swords size={14} />}
                         label="Handicap"
-                        value={s.handicapMode === 'random' ? 'Random starter' : 'Custom starter'}
+                        value={
+                            s.handicapMode === 'random'
+                                ? `Random (${(s.handicapLevel || 'normal').toUpperCase()} • Row ${s.handicapRows === 2 ? '1 & 2' : '1'})`
+                                : `Custom (Row ${s.handicapRows === 2 ? '1 & 2' : '1'})`
+                        }
                     />
                 )}
                 {s.isShapeshifter && (
