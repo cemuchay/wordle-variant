@@ -2079,6 +2079,13 @@ const WordUpTopicsManager = ({ triggerToast }: { triggerToast: (text: string, ty
                             <span className="text-[8px] font-bold text-correct uppercase tracking-widest">Master Admin</span>
                         </div>
                         <button
+                            onClick={() => window.location.href = '/word-finder-xyz'}
+                            className="bg-white/5 hover:bg-white/10 border border-white/10 text-amber-400 hover:text-amber-300 p-2 rounded-full transition-all cursor-pointer"
+                            title="Word Finder Tool"
+                        >
+                            <Search size={16} />
+                        </button>
+                        <button
                             onClick={() => setShowSqlHelper(!showSqlHelper)}
                             className={`p-2 rounded-full border transition-all text-xs font-black flex items-center gap-1.5 cursor-pointer ${showSqlHelper
                                 ? 'bg-correct border-correct text-black'

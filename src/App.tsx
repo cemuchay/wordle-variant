@@ -291,6 +291,14 @@ function MainApp() {
   useEffect(() => {
     if (!isHydrated || !date || tabRestoredRef.current) return;
 
+    const initialPath = typeof window !== "undefined" ? window.location.pathname.toLowerCase().replace(/\/$/, "") : "";
+    if (initialPath === "/word-grid" || initialPath === "/wordgrid") {
+      tabRestoredRef.current = true;
+      setIsMoreOpen(true);
+      setMoreGameMode("wordgrid");
+      return;
+    }
+
     let stored = safeSessionStorage.getItem("wordle_last_viewed_tab");
     let isFromSession = true;
 
@@ -1586,7 +1594,7 @@ function MainApp() {
 
 export default function App() {
   const path = typeof window !== "undefined" ? window.location.pathname.toLowerCase().replace(/\/$/, "") : "";
-  const isPageWordFinder = path === "/word-finder" || path === "/finder";
+  const isPageWordFinder = path === "/word-finder-xyz";
   const isPageAdmin = path === "/admin";
   const isPageUnsubscribe = path === "/unsubscribe";
 
