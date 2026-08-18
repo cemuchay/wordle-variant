@@ -49,6 +49,23 @@ const ShowScoringInfo = ({ showScoringInfo, setShowScoringInfo }: { showScoringI
                                     </div>
                                 </div>
 
+                                {/* Nearly Got It Bonus */}
+                                <div>
+                                    <h3 className="font-bold text-gray-200 uppercase tracking-tight text-[10px] mb-2 flex items-center gap-1.5">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block"></span>
+                                        Nearly Got It Bonus
+                                    </h3>
+                                    <div className="bg-indigo-950/30 border border-indigo-500/20 p-2.5 rounded-xl">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="font-black text-[9px] uppercase tracking-wide text-indigo-300">1 Letter Away Recovery</span>
+                                            <span className="font-mono text-indigo-400 font-bold">+84 pts</span>
+                                        </div>
+                                        <p className="text-gray-400 text-[10px]">
+                                            If you achieved all greens except one letter in an earlier attempt (e.g. <span className="text-white font-mono font-bold">HILLY</span> before solving <span className="text-correct font-mono font-bold">BILLY</span>, or <span className="text-white font-mono font-bold">CROW</span> before <span className="text-correct font-mono font-bold">BROW</span>), you earn a <span className="text-indigo-300 font-bold">+84 point</span> bonus to compensate for the attempt level base drop.
+                                        </p>
+                                    </div>
+                                </div>
+
                                 {/* Regression rules */}
                                 <div>
                                     <h3 className="font-bold text-gray-200 uppercase tracking-tight text-[10px] mb-2 flex items-center gap-1.5">

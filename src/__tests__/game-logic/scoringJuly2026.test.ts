@@ -167,4 +167,74 @@ describe('calculateSkillIndexJuly2026', () => {
       const wAwards = allDecisions.filter(d => d.letter === 'W' && d.pointDeduction > 0)
       expect(wAwards.length).toBe(1)
    })
+
+   describe('nearly got it bonus (+84 points)', () => {
+      it('awards +84 points when a prior guess has all greens except one letter (HILLY -> BILLY)', () => {
+         // Target: BILLY (5 letters). Row 0 has 4 greens (H-I-L-L-Y), Row 1 solves it (B-I-L-L-Y)
+         const guessesWithNearlyGotIt = [
+            [g('H', 'absent'), g('I', 'correct'), g('L', 'correct'), g('L', 'correct'), g('Y', 'correct')],
+            [g('B', 'correct'), g('I', 'correct'), g('L', 'correct'), g('L', 'correct'), g('Y', 'correct')],
+         ]
+         const resultWithBonus = calculateSkillIndexJuly2026({
+            attempts: 2,
+            maxAttempts: 6,
+            usedHint: false,
+            guesses: guessesWithNearlyGotIt,
+         })
+
+         // Control: guess with only 3 greens in row 0
+         const guessesWithoutNearlyGotIt = [
+            [g('H', 'absent'), g('A', 'absent'), g('L', 'correct'), g('L', 'correct'), g('Y', 'correct')],
+            [g('B', 'correct'), g('I', 'correct'), g('L', 'correct'), g('L', 'correct'), g('Y', 'correct')],
+         ]
+         const resultWithoutBonus = calculateSkillIndexJuly2026({
+            attempts: 2,
+            maxAttempts: 6,
+            usedHint: false,
+            guesses: guessesWithoutNearlyGotIt,
+         })
+
+         expect(resultWithBonus.nearlyGotIt).toBe(84)
+         expect(resultWithBonus.bonus).toBe(resultWithBonus.rows[0] + resultWithBonus.rows[1])
+         expect(resultWithBonus.finalScore).toBe(resultWithBonus.base + resultWithBonus.rows[0] + resultWithBonus.rows[1] + 84)
+
+         expect(resultWithoutBonus.nearlyGotIt).toBe(0)
+         expect(resultWithoutBonus.bonus).toBe(resultWithoutBonus.rows[0] + resultWithoutBonus.rows[1])
+      })
+
+      it('awards +84 points for 4-letter words with 3 greens in prior row (CROW -> BROW)', () => {
+         const guesses = [
+            [g('C', 'absent'), g('R', 'correct'), g('O', 'correct'), g('W', 'correct')],
+            [g('T', 'absent'), g('R', 'correct'), g('O', 'correct'), g('W', 'correct')],
+            [g('B', 'correct'), g('R', 'correct'), g('O', 'correct'), g('W', 'correct')],
+         ]
+         const result = calculateSkillIndexJuly2026({
+            attempts: 3,
+            maxAttempts: 6,
+            usedHint: false,
+            guesses,
+         })
+         const sumRows = result.rows.reduce((a, b) => a + b, 0)
+         expect(result.nearlyGotIt).toBe(84)
+         expect(result.bonus).toBe(sumRows)
+         expect(result.finalScore).toBe(result.base + sumRows + 84)
+      })
+
+      it('does not award bonus if game is lost', () => {
+         const guesses = [
+            [g('H', 'absent'), g('I', 'correct'), g('L', 'correct'), g('L', 'correct'), g('Y', 'correct')],
+            [g('M', 'absent'), g('I', 'correct'), g('L', 'correct'), g('L', 'correct'), g('Y', 'correct')],
+         ]
+         const result = calculateSkillIndexJuly2026({
+            attempts: 2,
+            maxAttempts: 2,
+            usedHint: false,
+            guesses,
+         })
+         const sumRows = result.rows.reduce((a, b) => a + b, 0)
+         expect(result.nearlyGotIt).toBe(0)
+         expect(result.bonus).toBe(sumRows)
+         expect(result.finalScore).toBe(sumRows)
+      })
+   })
 })
