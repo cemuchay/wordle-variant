@@ -4,7 +4,7 @@ import { getRandomWord, obfuscateWord } from "@/lib/game-logic";
 import { supabase } from "@/lib/supabaseClient";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { MAX_ATTEMPTS, DEFAULT_WORD_LENGTH } from "@/constants/game";
-import getMatchCount from "../helpers/getMatchCount";
+import { generateHandicapStarters, type HandicapLevel, type HandicapRows } from "../helpers/handicapStarters";
 
 const useCreateChallenge = () => {
    const queryClient = useQueryClient();
@@ -24,6 +24,8 @@ const useCreateChallenge = () => {
          handicapStarter = null,
          handicapStarters = null,
          handicapEnforced = false,
+         handicapLevel = "normal" as HandicapLevel,
+         handicapRows = 1 as HandicapRows,
          lifespanHours = 24,
          marathonTimers = null,
          marathonGames = null,
@@ -150,64 +152,17 @@ const useCreateChallenge = () => {
          let finalHandicapStarter = handicapStarter;
          let finalHandicapStarters = handicapStarters;
 
-         if (handicapStarter === "__SYSTEM_RANDOM__") {
-            if (resolvedMarathonGames) {
-               // Marathon
-               const startersList: string[] = [];
-               for (let idx = 0; idx < resolvedMarathonGames.length; idx++) {
-                  const l = resolvedMarathonGames[idx];
-                  const target =
-                     plainMarathonTargets[idx] ||
-                     (
-                        await getRandomWord(l, resolveDiff(idx), true)
-                     ).toUpperCase();
-                  const maxAllowed = l <= 4 ? 1 : 3;
-                  let starter = (
-                     await getRandomWord(l, resolveDiff(idx), true)
-                  ).toUpperCase();
-                  let limit = 0;
-                  while (limit < 200) {
-                     if (
-                        starter !== target &&
-                        getMatchCount(starter, target) <= maxAllowed
-                     ) {
-                        break;
-                     }
-                     starter = (
-                        await getRandomWord(l, resolveDiff(idx), true)
-                     ).toUpperCase();
-                     limit++;
-                  }
-                  startersList.push(starter);
-               }
-               finalHandicapStarters = startersList;
-               finalHandicapStarter = null;
-            } else {
-               const target =
-                  plainRegularTarget ||
-                  (
-                     await getRandomWord(actualLength, resolveDiff(), true)
-                  ).toUpperCase();
-               const maxAllowed = actualLength <= 4 ? 1 : 3;
-               let starter = (
-                  await getRandomWord(actualLength, resolveDiff(), true)
-               ).toUpperCase();
-               let limit = 0;
-               while (limit < 200) {
-                  if (
-                     starter !== target &&
-                     getMatchCount(starter, target) <= maxAllowed
-                  ) {
-                     break;
-                  }
-                  starter = (
-                     await getRandomWord(actualLength, resolveDiff(), true)
-                  ).toUpperCase();
-                  limit++;
-               }
-               finalHandicapStarter = starter;
-               finalHandicapStarters = null;
-            }
+         if (isHandicapRandom) {
+            const generated = await generateHandicapStarters({
+               targetWord: plainRegularTarget,
+               length: actualLength,
+               marathonGames: resolvedMarathonGames,
+               plainMarathonTargets,
+               handicapLevel,
+               handicapRows,
+            });
+            finalHandicapStarter = generated.finalHandicapStarter;
+            finalHandicapStarters = generated.finalHandicapStarters;
          }
 
          const expiresAt = new Date();

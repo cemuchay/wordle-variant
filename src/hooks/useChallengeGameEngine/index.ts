@@ -23,7 +23,7 @@ import { logger } from "../../lib/logger";
 import {
    parseMarathonGames,
    getMarathonTimer,
-   getHandicapStarter,
+   getHandicapStartersList,
 } from "../../utils/marathon";
 import { supabase } from "../../lib/supabaseClient";
 
@@ -496,35 +496,35 @@ export const useChallengeGameEngine = ({
                   : initialTargetWord
                : targetWord;
             if (localGuesses.length === 0 && currentWordForStarter) {
-               const starter = isMarathon
-                  ? getHandicapStarter(challenge, gameIndex!, wordLength)
-                  : challenge.handicap_starter;
-               if (starter && challenge.handicap_enforced) {
-                  const upperStarter = starter.toUpperCase();
-                  const result = checkGuess(upperStarter, currentWordForStarter);
-                  localGuesses = [result];
+               const startersList = isMarathon
+                  ? getHandicapStartersList(challenge, gameIndex!, wordLength)
+                  : getHandicapStartersList(challenge);
+               if (startersList.length > 0 && challenge.handicap_enforced) {
+                  localGuesses = startersList.map((starter) =>
+                     checkGuess(starter.toUpperCase(), currentWordForStarter)
+                  );
                   isStarterEnforced = true;
                }
             }
 
-             dispatch({
-                type: "START_GAME",
-                payload: {
-                   guesses: localGuesses,
-                   letterStatuses: getLetterStatuses(localGuesses),
-                   usedHint: localUsedHint,
-                   hintRecord: localHintRecord,
-                   isGameOver:
-                      isFinishedStatus ||
-                      (initialTimeLeft !== null && initialTimeLeft <= 0) ||
-                      localGuesses.some((g: any) =>
-                         g.every((r: any) => r.status === "correct"),
-                      ) ||
-                      localGuesses.length >= maxAttempts,
-                   status: serverStatus,
-                   timeLeft: initialTimeLeft,
-                   currentGuess: recoveredCurrentGuess,
-                   cursorIndex: recoveredCursorIndex,
+            dispatch({
+               type: "START_GAME",
+               payload: {
+                  guesses: localGuesses,
+                  letterStatuses: getLetterStatuses(localGuesses),
+                  usedHint: localUsedHint,
+                  hintRecord: localHintRecord,
+                  isGameOver:
+                     isFinishedStatus ||
+                     (initialTimeLeft !== null && initialTimeLeft <= 0) ||
+                     localGuesses.some((g: any) =>
+                        g.every((r: any) => r.status === "correct"),
+                     ) ||
+                     localGuesses.length >= maxAttempts,
+                  status: serverStatus,
+                  timeLeft: initialTimeLeft,
+                  currentGuess: recoveredCurrentGuess,
+                  cursorIndex: recoveredCursorIndex,
                },
             });
          } catch (e) {

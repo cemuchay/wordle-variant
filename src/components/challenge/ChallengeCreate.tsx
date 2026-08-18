@@ -542,9 +542,13 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
     const [disableHints, setDisableHints] = useState(false);
     const [isShapeshifter, setIsShapeshifter] = useState(false);
     const [handicapMode, setHandicapMode] = useState<'random' | 'custom'>('random');
+    const [handicapLevel, setHandicapLevel] = useState<'easy' | 'normal' | 'difficult'>('normal');
+    const [handicapRows, setHandicapRows] = useState<1 | 2>(1);
     const [handicapEnforced, setHandicapEnforced] = useState(false);
     const [handicapStarter, setHandicapStarter] = useState('');
+    const [handicapStarter2, setHandicapStarter2] = useState('');
     const [handicapStartersArray, setHandicapStartersArray] = useState<string[]>(() => Array(5).fill(''));
+    const [handicapStartersArray2, setHandicapStartersArray2] = useState<string[]>(() => Array(5).fill(''));
 
     // Handle pre-selected user from Chat DM
     useEffect(() => {
@@ -689,6 +693,8 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             marathonTimersInput,
             isHandicap,
             handicapMode,
+            handicapLevel,
+            handicapRows,
             handicapEnforced,
             handicapStarter,
             handicapStartersArray,
@@ -701,7 +707,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             name,
             config
         });
-    }, [mode, length, maxTime, marathonForceOrder, marathonGames, marathonType, isPublic, maxParticipants, lifespanHours, isCustomWord, customWord, customMarathonWords, timerType, marathonTimersArray, marathonTimersInput, isHandicap, handicapMode, handicapEnforced, handicapStarter, handicapStartersArray, disableHints, isShapeshifter, isBotMarathon, addChallengePreset]);
+    }, [mode, length, maxTime, marathonForceOrder, marathonGames, marathonType, isPublic, maxParticipants, lifespanHours, isCustomWord, customWord, customMarathonWords, timerType, marathonTimersArray, marathonTimersInput, isHandicap, handicapMode, handicapLevel, handicapRows, handicapEnforced, handicapStarter, handicapStartersArray, disableHints, isShapeshifter, isBotMarathon, addChallengePreset]);
 
     const handleLoadPreset = useCallback((preset: ChallengePreset) => {
         const c = preset.config;
@@ -727,6 +733,8 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         if (c.marathonTimersInput !== undefined) setMarathonTimersInput(c.marathonTimersInput);
         if (c.isHandicap !== undefined) setIsHandicap(c.isHandicap);
         if (c.handicapMode !== undefined) setHandicapMode(c.handicapMode);
+        if (c.handicapLevel !== undefined) setHandicapLevel(c.handicapLevel);
+        if (c.handicapRows !== undefined) setHandicapRows(c.handicapRows);
         if (c.handicapEnforced !== undefined) setHandicapEnforced(c.handicapEnforced);
         if (c.handicapStarter !== undefined) setHandicapStarter(c.handicapStarter);
         if (c.handicapStartersArray !== undefined) setHandicapStartersArray(c.handicapStartersArray);
@@ -934,6 +942,21 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                 alert(`Game #${idx + 1} (${l}-letter): Starter word cannot match target word.`);
                             }
                         }
+
+                        if (handicapRows === 2) {
+                            const w2 = handicapStartersArray2[idx];
+                            if (!w2) {
+                                if (!editingChallenge) {
+                                    errs.push(`Game #${idx + 1} (${l}-letter) Row 2: Starter word is empty.`);
+                                }
+                            } else if (w2 !== '__MASKED__') {
+                                const valError = await validateCustomWord(w2, l);
+                                if (valError) errs.push(`Game #${idx + 1} (${l}-letter) Row 2: ${valError}`);
+                                if (isCustomWord && customMarathonWords[idx] && w2.toUpperCase() === customMarathonWords[idx].toUpperCase()) {
+                                    alert(`Game #${idx + 1} (${l}-letter) Row 2: Starter word cannot match target word.`);
+                                }
+                            }
+                        }
                     }
                 } else {
                     if (!handicapStarter) {
@@ -945,6 +968,20 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                         if (valError) errs.push(`Handicap Starter: ${valError}`);
                         if (isCustomWord && customWord && handicapStarter.toUpperCase() === customWord.toUpperCase()) {
                             errs.push(`Handicap starter cannot match target word.`);
+                        }
+                    }
+
+                    if (handicapRows === 2) {
+                        if (!handicapStarter2) {
+                            if (!editingChallenge) {
+                                errs.push(`Handicap Row 2 Starter: Cannot be empty.`);
+                            }
+                        } else if (handicapStarter2 !== '__MASKED__') {
+                            const valError = await validateCustomWord(handicapStarter2, resolvedLength);
+                            if (valError) errs.push(`Handicap Row 2 Starter: ${valError}`);
+                            if (isCustomWord && customWord && handicapStarter2.toUpperCase() === customWord.toUpperCase()) {
+                                errs.push(`Handicap Row 2 starter cannot match target word.`);
+                            }
                         }
                     }
                 }
@@ -962,7 +999,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         };
 
         validate();
-    }, [length, marathonGames, isCustomWord, customWord, customMarathonWords, customSentence, isHandicap, handicapMode, handicapStarter, handicapStartersArray, editingChallenge, isBotMarathon, lifespanHours]);
+    }, [length, marathonGames, isCustomWord, customWord, customMarathonWords, customSentence, isHandicap, handicapMode, handicapRows, handicapStarter, handicapStarter2, handicapStartersArray, handicapStartersArray2, editingChallenge, isBotMarathon, lifespanHours]);
 
     const resetAllFormState = useCallback(() => {
         setStep(0);
@@ -992,9 +1029,13 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         setDisableHints(false);
         setIsShapeshifter(false);
         setHandicapMode('random');
+        setHandicapLevel('normal');
+        setHandicapRows(1);
         setHandicapEnforced(false);
         setHandicapStarter('');
+        setHandicapStarter2('');
         setHandicapStartersArray(Array(5).fill(''));
+        setHandicapStartersArray2(Array(5).fill(''));
     }, []);
 
     const handleCreateTrigger = useCallback(async () => {
@@ -1045,13 +1086,19 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         customParams.isHandicap = isHandicap;
         if (isHandicap) {
             customParams.handicapEnforced = handicapEnforced;
+            customParams.handicapLevel = handicapLevel;
+            customParams.handicapRows = handicapRows;
             if (handicapMode === 'random') {
                 customParams.handicapStarter = '__SYSTEM_RANDOM__';
             } else {
                 if (length === 1) {
-                    customParams.handicapStarters = handicapStartersArray;
+                    customParams.handicapStarters = handicapRows === 2
+                        ? marathonGames.map((_, idx) => [handicapStartersArray[idx], handicapStartersArray2[idx]].filter(Boolean))
+                        : handicapStartersArray;
                 } else {
-                    customParams.handicapStarter = handicapStarter;
+                    customParams.handicapStarter = handicapRows === 2
+                        ? [handicapStarter, handicapStarter2].filter(Boolean)
+                        : handicapStarter;
                 }
             }
         }
@@ -1079,7 +1126,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         if (onSuccess) {
             onSuccess();
         }
-    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, customSentence, sentenceWordCount, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStartersArray, lifespanHours, length, handleCreate, handleEdit, mode, timerType, marathonTimersArray, marathonGames, marathonForceOrder, onSuccess, editingChallenge, invitedIds, ask, isShapeshifter, isBotMarathon, disableHints, globalDifficulty, marathonDifficultyMode, marathonDifficulties, notifyCreator, resetAllFormState]);
+    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, customSentence, sentenceWordCount, isHandicap, handicapEnforced, handicapMode, handicapLevel, handicapRows, handicapStarter, handicapStarter2, handicapStartersArray, handicapStartersArray2, lifespanHours, length, handleCreate, handleEdit, mode, timerType, marathonTimersArray, marathonGames, marathonForceOrder, onSuccess, editingChallenge, invitedIds, ask, isShapeshifter, isBotMarathon, disableHints, globalDifficulty, marathonDifficultyMode, marathonDifficulties, notifyCreator, resetAllFormState]);
 
     const summarySettings = useMemo((): ChallengeFormSettings => ({
         mode,
@@ -1099,13 +1146,15 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         customWordCount: customMarathonWords.filter(Boolean).length,
         isHandicap,
         handicapMode,
+        handicapLevel,
+        handicapRows,
         handicapEnforced,
         isShapeshifter,
         disableHints,
         isBotMarathon,
         isEditing: !!editingChallenge,
         errorCount: errors.length,
-    }), [mode, length, maxAttempts, maxTime, marathonGames, marathonForceOrder, timerType, marathonTimersArray, invitedIds, isPublic, maxParticipants, lifespanHours, isCustomWord, customMarathonWords, isHandicap, handicapMode, handicapEnforced, isShapeshifter, disableHints, isBotMarathon, editingChallenge, errors]);
+    }), [mode, length, maxAttempts, maxTime, marathonGames, marathonForceOrder, timerType, marathonTimersArray, invitedIds, isPublic, maxParticipants, lifespanHours, isCustomWord, customMarathonWords, isHandicap, handicapMode, handicapLevel, handicapRows, handicapEnforced, isShapeshifter, disableHints, isBotMarathon, editingChallenge, errors]);
 
     const handleNextStep = useCallback(() => {
         setStep(s => Math.min(s + 1, 3));
@@ -1339,25 +1388,108 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                         >Custom Word</button>
                                     </div>
                                 </div>
-                                <div className="flex items-center justify-between pt-3">
-                                    <OptionLabel label="Enforce Starter Word" tooltip="If enabled, the starter word is automatically submitted as the player's first guess." activeTooltip={activeTooltip} setActiveTooltip={setActiveTooltip} tooltipId="enforceStarter" />
+
+                                {handicapMode === 'random' && (
+                                    <div className="space-y-2 pt-1">
+                                        <OptionLabel
+                                            label="Handicap Level"
+                                            tooltip="Easy: intelligently picks a starter that narrows down possibilities without revealing the answer. Normal: standard random starter with balanced overlap. Difficult: worst starter with minimal unhelpful letters."
+                                            activeTooltip={activeTooltip}
+                                            setActiveTooltip={setActiveTooltip}
+                                            tooltipId="handicapLevel"
+                                        />
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setHandicapLevel('easy')}
+                                                className={`py-2 rounded-xl border text-[10px] font-black uppercase transition-all ${handicapLevel === 'easy' ? 'border-emerald-400 bg-emerald-400/15 text-emerald-400 shadow-md shadow-emerald-500/10' : 'border-white/10 bg-black/20 text-white/70 hover:text-white'}`}
+                                            >
+                                                Easy
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setHandicapLevel('normal')}
+                                                className={`py-2 rounded-xl border text-[10px] font-black uppercase transition-all ${handicapLevel === 'normal' ? 'border-correct bg-correct/15 text-correct shadow-md shadow-correct/10' : 'border-white/10 bg-black/20 text-white/70 hover:text-white'}`}
+                                            >
+                                                Normal
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setHandicapLevel('difficult')}
+                                                className={`py-2 rounded-xl border text-[10px] font-black uppercase transition-all ${handicapLevel === 'difficult' ? 'border-rose-400 bg-rose-400/15 text-rose-400 shadow-md shadow-rose-500/10' : 'border-white/10 bg-black/20 text-white/70 hover:text-white'}`}
+                                            >
+                                                Difficult
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="space-y-2 pt-1">
+                                    <OptionLabel
+                                        label="Handicap Rows"
+                                        tooltip="Choose whether the handicap starter populates only Row 1, or both Row 1 and Row 2."
+                                        activeTooltip={activeTooltip}
+                                        setActiveTooltip={setActiveTooltip}
+                                        tooltipId="handicapRows"
+                                    />
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setHandicapRows(1)}
+                                            className={`py-2 rounded-xl border text-[10px] font-black uppercase transition-all ${handicapRows === 1 ? 'border-correct bg-correct/10 text-correct' : 'border-white/10 bg-black/20 text-white/70'}`}
+                                        >
+                                            Row 1 Only
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setHandicapRows(2)}
+                                            className={`py-2 rounded-xl border text-[10px] font-black uppercase transition-all ${handicapRows === 2 ? 'border-correct bg-correct/10 text-correct' : 'border-white/10 bg-black/20 text-white/70'}`}
+                                        >
+                                            Rows 1 & 2
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-2">
+                                    <OptionLabel label="Enforce Starter Word" tooltip="If enabled, the starter word is automatically submitted as the player's opening guess(es)." activeTooltip={activeTooltip} setActiveTooltip={setActiveTooltip} tooltipId="enforceStarter" />
                                     <input type="checkbox" checked={handicapEnforced} onChange={(e) => setHandicapEnforced(e.target.checked)} className="w-5 h-5 accent-correct cursor-pointer" />
                                 </div>
                                 {handicapMode === 'custom' && (
                                     <div className="space-y-2.5 pt-3">
                                         {length === 1 ? marathonGames.map((l, idx) => (
-                                            <div key={idx} className="flex flex-col gap-1">
-                                                <span className="text-xs font-black uppercase text-white">Game #{idx + 1} ({l}-letter Starter):</span>
-                                                <input type={handicapStartersArray[idx] === '__MASKED__' ? "password" : "text"} maxLength={handicapStartersArray[idx] === '__MASKED__' ? undefined : l} placeholder={`Enter ${l}-letter starter`} value={handicapStartersArray[idx] || ''}
-                                                    onChange={(e) => { const prev = handicapStartersArray[idx] || ''; const val = resolveNewStarterInput(e.target.value, prev); setHandicapStartersArray(prevArr => { const next = [...prevArr]; next[idx] = val; return next; }); }}
-                                                    className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs focus:border-correct/60 focus:bg-black/60 outline-none uppercase text-white transition-all" />
+                                            <div key={idx} className="flex flex-col gap-2 p-3 bg-black/30 rounded-xl border border-white/5">
+                                                <span className="text-xs font-black uppercase text-white">Game #{idx + 1} ({l}-letter):</span>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] uppercase font-bold text-white/60">Row 1 Starter:</label>
+                                                    <input type={handicapStartersArray[idx] === '__MASKED__' ? "password" : "text"} maxLength={handicapStartersArray[idx] === '__MASKED__' ? undefined : l} placeholder={`Enter ${l}-letter starter`} value={handicapStartersArray[idx] || ''}
+                                                        onChange={(e) => { const prev = handicapStartersArray[idx] || ''; const val = resolveNewStarterInput(e.target.value, prev); setHandicapStartersArray(prevArr => { const next = [...prevArr]; next[idx] = val; return next; }); }}
+                                                        className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs focus:border-correct/60 focus:bg-black/60 outline-none uppercase text-white transition-all" />
+                                                </div>
+                                                {handicapRows === 2 && (
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] uppercase font-bold text-white/60">Row 2 Starter:</label>
+                                                        <input type={handicapStartersArray2[idx] === '__MASKED__' ? "password" : "text"} maxLength={handicapStartersArray2[idx] === '__MASKED__' ? undefined : l} placeholder={`Enter ${l}-letter row 2 starter`} value={handicapStartersArray2[idx] || ''}
+                                                            onChange={(e) => { const prev = handicapStartersArray2[idx] || ''; const val = resolveNewStarterInput(e.target.value, prev); setHandicapStartersArray2(prevArr => { const next = [...prevArr]; next[idx] = val; return next; }); }}
+                                                            className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs focus:border-correct/60 focus:bg-black/60 outline-none uppercase text-white transition-all" />
+                                                    </div>
+                                                )}
                                             </div>
                                         )) : (
-                                            <div className="space-y-1">
-                                                <label className="text-xs font-black uppercase text-white">Starter Word ({length === 0 ? '5-letter' : `${length}-letter`}):</label>
-                                                <input type={handicapStarter === '__MASKED__' ? "password" : "text"} maxLength={handicapStarter === '__MASKED__' ? undefined : (length === 0 ? 5 : length)} placeholder={`Enter starter word`} value={handicapStarter}
-                                                    onChange={(e) => { const val = resolveNewStarterInput(e.target.value, handicapStarter); setHandicapStarter(val); }}
-                                                    className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs focus:border-correct/60 focus:bg-black/60 outline-none uppercase text-white transition-all" />
+                                            <div className="space-y-2.5">
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-black uppercase text-white">Row 1 Starter ({length === 0 ? '5-letter' : `${length}-letter`}):</label>
+                                                    <input type={handicapStarter === '__MASKED__' ? "password" : "text"} maxLength={handicapStarter === '__MASKED__' ? undefined : (length === 0 ? 5 : length)} placeholder={`Enter starter word`} value={handicapStarter}
+                                                        onChange={(e) => { const val = resolveNewStarterInput(e.target.value, handicapStarter); setHandicapStarter(val); }}
+                                                        className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs focus:border-correct/60 focus:bg-black/60 outline-none uppercase text-white transition-all" />
+                                                </div>
+                                                {handicapRows === 2 && (
+                                                    <div className="space-y-1">
+                                                        <label className="text-xs font-black uppercase text-white">Row 2 Starter ({length === 0 ? '5-letter' : `${length}-letter`}):</label>
+                                                        <input type={handicapStarter2 === '__MASKED__' ? "password" : "text"} maxLength={handicapStarter2 === '__MASKED__' ? undefined : (length === 0 ? 5 : length)} placeholder={`Enter second starter word`} value={handicapStarter2}
+                                                        onChange={(e) => { const val = resolveNewStarterInput(e.target.value, handicapStarter2); setHandicapStarter2(val); }}
+                                                        className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs focus:border-correct/60 focus:bg-black/60 outline-none uppercase text-white transition-all" />
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>

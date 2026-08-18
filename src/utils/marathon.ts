@@ -116,18 +116,32 @@ export function getMarathonTimer(challenge: any, gameIndex: number, wordLength: 
 }
 
 /**
- * Safely lookup handicap starter by game index or fallback to length-based starter
+ * Safely lookup handicap starter(s) by game index or fallback to length-based starter
  */
-export function getHandicapStarter(challenge: any, gameIndex: number, wordLength: number): string | null {
-    if (!challenge || !challenge.handicap_starters) {
-        return challenge?.handicap_starter || null;
+export function getHandicapStartersList(challenge: any, gameIndex?: number, wordLength?: number): string[] {
+    if (!challenge) return [];
+    
+    // Check if challenge has single-game starter(s)
+    if (challenge.handicap_starter) {
+        if (Array.isArray(challenge.handicap_starter)) {
+            return challenge.handicap_starter.filter(Boolean);
+        }
+        if (typeof challenge.handicap_starter === 'string') {
+            return [challenge.handicap_starter];
+        }
     }
+
+    if (!challenge.handicap_starters) {
+        return [];
+    }
+
     const starters = challenge.handicap_starters;
+    let found: any = null;
 
     if (Array.isArray(starters)) {
-        if (starters.length === 0) return null;
-        // Modulo mapping for starters
-        return starters[gameIndex % starters.length] || null;
+        if (starters.length === 0) return [];
+        const idx = (gameIndex ?? 0) % starters.length;
+        found = starters[idx];
     } else if (typeof starters === 'object') {
         const keys = Object.keys(starters).filter(k => !isNaN(Number(k)));
         if (keys.length > 0) {
@@ -136,21 +150,36 @@ export function getHandicapStarter(challenge: any, gameIndex: number, wordLength
 
             if (isIndexBased) {
                 const cycleLength = Math.max(...numericKeys.filter(k => k < 30)) + 1;
-                const effectiveIdx = gameIndex % cycleLength;
-                
-                return starters[String(effectiveIdx)] ?? 
-                       starters[effectiveIdx] ?? 
-                       starters[String(wordLength)] ?? 
-                       starters[wordLength] ?? 
-                       null;
+                const effectiveIdx = (gameIndex ?? 0) % cycleLength;
+                found = starters[String(effectiveIdx)] ?? 
+                        starters[effectiveIdx] ?? 
+                        (wordLength !== undefined ? starters[String(wordLength)] : null) ?? 
+                        (wordLength !== undefined ? starters[wordLength] : null);
             }
         }
 
-        return starters[String(wordLength)] ?? 
-               starters[wordLength] ?? 
-               starters[String(gameIndex)] ?? 
-               starters[gameIndex] ?? 
-               null;
+        if (!found && wordLength !== undefined) {
+            found = starters[String(wordLength)] ?? 
+                    starters[wordLength] ?? 
+                    starters[String(gameIndex ?? 0)] ?? 
+                    starters[gameIndex ?? 0];
+        }
     }
-    return null;
+
+    if (Array.isArray(found)) {
+        return found.filter(Boolean);
+    }
+    if (typeof found === 'string') {
+        return [found];
+    }
+    return [];
 }
+
+/**
+ * Safely lookup primary handicap starter by game index or fallback to length-based starter
+ */
+export function getHandicapStarter(challenge: any, gameIndex: number, wordLength: number): string | null {
+    const list = getHandicapStartersList(challenge, gameIndex, wordLength);
+    return list.length > 0 ? list[0] : null;
+}
+
