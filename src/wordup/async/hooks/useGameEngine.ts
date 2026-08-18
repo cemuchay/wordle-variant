@@ -456,6 +456,13 @@ export function useGameEngine(props: EngineProps) {
 
             safeSessionStorage.setItem("wordup_completed_" + match.id, "true");
             safeLocalStorage.removeItem("wordup_async_active_game");
+            try {
+               import("../../../lib/telemetry").then(({ trackGameCompleted }) => {
+                  trackGameCompleted("wordup");
+               });
+            } catch (e) {
+               console.warn("Telemetry wordup completion tracking skipped:", e);
+            }
          } catch (e) {
             console.error("[WordUp] endGame DB failed:", e);
             triggerToast("Failed to save final results.", TOAST_DURATION.VERY_LONG);

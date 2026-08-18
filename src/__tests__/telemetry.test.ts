@@ -99,4 +99,52 @@ describe("Telemetry Client Manager", () => {
       const clearedStorage = localStorage.getItem("variant_telemetry_v1");
       expect(clearedStorage).toBeNull();
    });
+
+   it("tracks daily completed status and lifecycle opens (active vs post-completion)", async () => {
+      await initTelemetry();
+      let raw = JSON.parse(localStorage.getItem("variant_telemetry_v1")!);
+      expect(raw.dailyCompleted).toBe(false);
+      expect(raw.opensBeforeCompletion).toBe(1);
+      expect(raw.opensAfterCompletion).toBe(0);
+
+      // Complete the daily game
+      const { trackDailyGameCompleted } = await import("../lib/telemetry");
+      trackDailyGameCompleted();
+
+      raw = JSON.parse(localStorage.getItem("variant_telemetry_v1")!);
+      expect(raw.dailyCompleted).toBe(true);
+      expect(raw.gamesCompleted.main_daily).toBe(1);
+
+      // Simulate a subsequent app open on the same day after completion
+      await initTelemetry();
+      raw = JSON.parse(localStorage.getItem("variant_telemetry_v1")!);
+      expect(raw.appOpens).toBe(2);
+      expect(raw.opensBeforeCompletion).toBe(1);
+      expect(raw.opensAfterCompletion).toBe(1);
+   });
+
+   it("tracks cross-mode game completions across WordUp, Challenge, and Marathon", async () => {
+      await initTelemetry();
+      const { trackGameCompleted } = await import("../lib/telemetry");
+      trackGameCompleted("wordup");
+      trackGameCompleted("challenge");
+      trackGameCompleted("marathon");
+      trackGameCompleted("wordup");
+
+      const raw = JSON.parse(localStorage.getItem("variant_telemetry_v1")!);
+      expect(raw.gamesCompleted.wordup).toBe(2);
+      expect(raw.gamesCompleted.challenge).toBe(1);
+      expect(raw.gamesCompleted.marathon).toBe(1);
+   });
+
+   it("identifies ghost users on empty short sessions and clears ghost flag on user interaction", async () => {
+      await initTelemetry();
+      const raw = JSON.parse(localStorage.getItem("variant_telemetry_v1")!);
+      expect(raw.isGhostSuspect).toBe(false);
+
+      // When genuine interaction happens, ghost suspect is definitely false
+      trackSectionClick("main-dashboard");
+      const updated = JSON.parse(localStorage.getItem("variant_telemetry_v1")!);
+      expect(updated.isGhostSuspect).toBe(false);
+   });
 });

@@ -212,6 +212,16 @@ export const useActions = ({
                timeTaken = effectiveMaxTime * 60 - state.timeLeft;
             }
 
+            if (won || lost) {
+               try {
+                  import("../../lib/telemetry").then(({ trackGameCompleted }) => {
+                     trackGameCompleted(isMarathon ? "marathon" : "challenge");
+                  });
+               } catch (e) {
+                  console.warn("Telemetry challenge completion tracking skipped:", e);
+               }
+            }
+
             let resultPayload: any;
             if (isMarathon) {
                if (won || lost) {
