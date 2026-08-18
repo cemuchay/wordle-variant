@@ -167,6 +167,32 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     setExchangeSelections(next);
   };
 
+  const [splashMove, setSplashMove] = useState<{
+    playerName: string;
+    word: string;
+    score: number;
+    isSwap?: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    let timer: any = null;
+    const handleOpponentMove = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (detail && detail.word) {
+        setSplashMove(detail);
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+          setSplashMove(null);
+        }, 4500);
+      }
+    };
+    window.addEventListener('opponent-played-move', handleOpponentMove);
+    return () => {
+      window.removeEventListener('opponent-played-move', handleOpponentMove);
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
+
   const handleConfirmExchange = async () => {
     // Current working rack after recalling all placed tiles
     const fullRack = [...rack, ...placedTiles.map((t: any) => t.letter)];
@@ -206,32 +232,6 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
       { id: player1?.id || 'p1', username: player1?.username || 'Player 1', score: p1Score, rack: [] },
       { id: player2?.id || 'p2', username: player2?.username || 'Player 2', score: p2Score, rack: [] },
     ];
-
-  const [splashMove, setSplashMove] = useState<{
-    playerName: string;
-    word: string;
-    score: number;
-    isSwap?: boolean;
-  } | null>(null);
-
-  useEffect(() => {
-    let timer: any = null;
-    const handleOpponentMove = (e: Event) => {
-      const detail = (e as CustomEvent)?.detail;
-      if (detail && detail.word) {
-        setSplashMove(detail);
-        if (timer) clearTimeout(timer);
-        timer = setTimeout(() => {
-          setSplashMove(null);
-        }, 4500);
-      }
-    };
-    window.addEventListener('opponent-played-move', handleOpponentMove);
-    return () => {
-      window.removeEventListener('opponent-played-move', handleOpponentMove);
-      if (timer) clearTimeout(timer);
-    };
-  }, []);
 
   return (
     <div

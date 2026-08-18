@@ -89,6 +89,14 @@ async function dispatchNotificationWithRetry(
          if (!error) {
             return true;
          }
+
+         // If Supabase RLS policy rejects the client insert (42501 / Forbidden),
+         // retrying will not succeed. Discard gracefully without stalling.
+         if (error.code === "42501" || error.message?.includes("row-level security")) {
+            console.info("[ClientPush] Notification insert restricted by RLS policy. Skipping item.");
+            return true; // Mark resolved so it is evicted from retry queue
+         }
+
          console.warn(`[ClientPush] Attempt ${attempt}/${maxRetries} failed:`, error.message);
       } catch (err: any) {
          console.warn(`[ClientPush] Attempt ${attempt}/${maxRetries} error:`, err?.message || err);
