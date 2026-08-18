@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { loadWordLists } from '../../data/words';
 import { Search, Filter, RefreshCw, X, ArrowLeft } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
+import { useAdminStatus } from '../../hooks/useAdminStatus';
 
 type ListType = 'official' | 'allowed';
 
 export const WordFinderPage: React.FC = () => {
+  const { user, loading: authLoading } = useAuth();
+  const { isAdmin, loading: adminLoading } = useAdminStatus(user?.id);
+
   const [wordLength, setWordLength] = useState<number>(() => {
     const saved = sessionStorage.getItem('wf_wordLength');
     return saved ? Number(saved) : 5;
@@ -336,6 +341,40 @@ export const WordFinderPage: React.FC = () => {
     };
   }, [filteredWords, loading, words, wordLength]);
 
+  // Loading screen while verifying admin authorization
+  if (authLoading || (user && adminLoading)) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400">
+        <RefreshCw className="w-8 h-8 animate-spin text-amber-400 mb-3" />
+        <span className="text-[11px] font-mono uppercase tracking-widest text-slate-500">Checking credentials...</span>
+      </div>
+    );
+  }
+
+  // If not admin: Throw a generic not found with weird html
+  if (!isAdmin) {
+    return (
+      <div style={{ margin: 0, padding: '24px', backgroundColor: '#fff', color: '#222', fontFamily: 'Times New Roman, serif', minHeight: '100vh' }}>
+        <h1 style={{ fontSize: '2em', fontWeight: 'bold', margin: '0 0 10px 0', borderBottom: '1px solid #000', paddingBottom: '4px' }}>
+          404 Not Found
+        </h1>
+        <p style={{ fontSize: '14px', margin: '10px 0' }}>
+          The requested URL <code style={{ fontFamily: 'Courier, monospace', color: '#900' }}>{typeof window !== 'undefined' ? window.location.pathname : '/word-finder-xyz'}</code> was not found on this server.
+        </p>
+        <p style={{ fontSize: '12px', color: '#555', marginTop: '20px' }}>
+          <i>Additionally, a 404 Not Found error was encountered while trying to use an ErrorDocument to handle the request.</i>
+        </p>
+        <hr style={{ border: 'none', borderTop: '1px solid #aaa', margin: '20px 0' }} />
+        <address style={{ fontSize: '11px', fontStyle: 'italic', color: '#666' }}>
+          Apache/2.4.52 (Ubuntu) Server at {typeof window !== 'undefined' ? window.location.hostname : 'localhost'} Port 443
+        </address>
+        <div style={{ display: 'none' }}>
+          <span>&lt;!-- [DEBUG: null_pointer_exception in route_handler.c:line_1049] --&gt;</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center p-4 sm:p-6 overflow-y-auto">
       {/* Dev Server Header Badge */}
@@ -457,8 +496,12 @@ export const WordFinderPage: React.FC = () => {
               onClick={() => {
                 setSlots(Array(wordLength).fill(''));
                 setYellowSlots(Array(wordLength).fill(''));
+                setExcludeLetters('');
+                setMustContainLetters('');
+                setExcludeWordsInput('');
+                ['wf_slots', 'wf_yellowSlots', 'wf_excludeLetters', 'wf_mustContainLetters', 'wf_excludeWordsInput'].forEach((k) => sessionStorage.removeItem(k));
               }}
-              className="text-[10px] font-bold text-slate-500 hover:text-slate-300 uppercase tracking-wider"
+              className="text-[10px] font-bold text-slate-500 hover:text-slate-300 uppercase tracking-wider cursor-pointer"
             >
               Clear Grid
             </button>

@@ -777,6 +777,27 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                                                 </ol>
                                             </div>
                                         )}
+
+                                        <button
+                                            onClick={() => {
+                                                onClose();
+                                                window.dispatchEvent(new CustomEvent('open-wordgrid-match', { detail: {} }));
+                                            }}
+                                            className="w-full mt-3 flex items-center justify-between p-3 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 rounded-xl transition-all text-left cursor-pointer group"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-lg bg-indigo-600/30 border border-indigo-500/30 flex items-center justify-center text-base shrink-0 group-hover:scale-105 transition-transform">
+                                                    🔠
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs font-bold text-indigo-300">WordGrid Mode</p>
+                                                    <p className="text-[10px] text-gray-400">Play asynchronous tactical board matches.</p>
+                                                </div>
+                                            </div>
+                                            <span className="text-[9px] font-black text-indigo-400 uppercase tracking-wider bg-indigo-500/20 px-2 py-1 rounded-md border border-indigo-500/30">
+                                                Play
+                                            </span>
+                                        </button>
                                     </div>
                                 </section>
                             )}
@@ -795,7 +816,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
 
                                     <a
                                         href="/admin"
-                                        className="flex items-center justify-between p-4 bg-correct/5 border border-correct/20 rounded-xl hover:bg-correct/10 transition-all group"
+                                        className="flex items-center justify-between p-4 bg-correct/5 border border-correct/20 rounded-xl hover:bg-correct/10 transition-all group mb-3"
                                     >
                                         <div className="flex-1 pr-4">
                                             <p className="text-sm font-bold text-correct">Admin Vetting Portal</p>
@@ -804,6 +825,19 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                                             </p>
                                         </div>
                                         <Shield size={20} className="text-correct opacity-40 group-hover:opacity-100 transition-opacity" />
+                                    </a>
+
+                                    <a
+                                        href="/word-finder-xyz"
+                                        className="flex items-center justify-between p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl hover:bg-amber-500/10 transition-all group"
+                                    >
+                                        <div className="flex-1 pr-4">
+                                            <p className="text-sm font-bold text-amber-400">Word Finder Tool</p>
+                                            <p className="text-[11px] text-gray-500 leading-relaxed">
+                                                Strategic word elimination, positional filter & anagram finder.
+                                            </p>
+                                        </div>
+                                        <Search size={20} className="text-amber-400 opacity-40 group-hover:opacity-100 transition-opacity" />
                                     </a>
                                 </section>
                             )}

@@ -34,6 +34,9 @@
     { "source": "/wordup", "destination": "/index.html" },
     { "source": "/challenges", "destination": "/index.html" },
     { "source": "/chat", "destination": "/index.html" },
-    { "source": "/leaderboard", "destination": "/index.html" }
+    { "source": "/leaderboard", "destination": "/index.html" },
+    { "source": "/word-finder-xyz", "destination": "/index.html" },
+    { "source": "/word-grid", "destination": "/index.html" },
+    { "source": "/wordgrid", "destination": "/index.html" }
   ]
 }

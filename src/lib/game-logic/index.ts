@@ -231,65 +231,88 @@ export function checkGuess(guess: string, answer: string): GuessResult[] {
 
 /**
  * Determines if the hint feature should be disabled based on the "Bar 1" rule:
- * If only one letter remains to be correctly placed, hints are disabled to prevent
- * an automatic win.
+ * If the total number of letter discoveries across all rows (correct + present)
+ * is >= targetWord.length - 1 (i.e. 1 letter away or fully solved), hints are disabled.
+ * Handles duplicate letters as distinct instances (e.g. for "TROLL", 2 L's must be discovered).
  */
 export const isHintDisabled = (word: string, guesses: GuessResult[][]) => {
    const targetWord = word.toUpperCase();
-   const correctIndices = new Set<number>();
-   const foundLetters = new Set<string>();
+   const totalLetters = targetWord.length;
+   if (totalLetters <= 1) return true;
 
+   const targetCounts: Record<string, number> = {};
+   for (const ch of targetWord) {
+      targetCounts[ch] = (targetCounts[ch] || 0) + 1;
+   }
+
+   const discoveredCounts: Record<string, number> = {};
    guesses.forEach((row) => {
-      row.forEach((cell, index) => {
-         if (cell.status === "correct") {
-            correctIndices.add(index);
-         }
+      const rowCounts: Record<string, number> = {};
+      row.forEach((cell) => {
          if (cell.status === "correct" || cell.status === "present") {
-            foundLetters.add(cell.letter.toUpperCase());
+            const letter = cell.letter.toUpperCase();
+            rowCounts[letter] = (rowCounts[letter] || 0) + 1;
          }
       });
+      for (const [letter, count] of Object.entries(rowCounts)) {
+         const maxPossible = targetCounts[letter] || 0;
+         const cappedCount = Math.min(count, maxPossible);
+         discoveredCounts[letter] = Math.max(
+            discoveredCounts[letter] || 0,
+            cappedCount,
+         );
+      }
    });
 
-   const remainingIndices = targetWord
-      .split("")
-      .map((_, i) => i)
-      .filter((i) => !correctIndices.has(i));
+   let totalDiscovered = 0;
+   for (const [letter, count] of Object.entries(discoveredCounts)) {
+      totalDiscovered += Math.min(count, targetCounts[letter] || 0);
+   }
 
-   const remainingCount = remainingIndices.length;
-   const undiscoveredCount = remainingIndices.filter(
-      (i) => !foundLetters.has(targetWord[i]),
-   ).length;
-
-   if (remainingCount <= 1) return true;
-   if (remainingCount === 2 && undiscoveredCount <= 1) return true;
-
-   return false;
+   // Disabled if 1 letter away from final answer or fully solved
+   return totalDiscovered >= totalLetters - 1;
 };
 
 /**
- * Determines a helpful hint for the user.
+ * Determines a helpful hint for the user using a balanced multi-strategy approach:
+ * - 33% chance: Random undiscovered letter from target word (not necessarily optimal).
+ * - 33% chance: Standard positional unrevealed letter (prioritizes unplaced instances).
+ * - 33% chance: Optimal reveal that has the most impact in narrowing down possible answers
+ *   based on distinguishing letter frequency across remaining compatible candidates.
  *
- * @what It ignores indices the user has already solved and picks one
- * remaining unrevealed letter from the target word at random.
- *
- * @returns {letter: string, index: number} or null if the word is already solved.
+ * @returns {letter: string, index: number} or null if hints are disabled / word solved.
  */
 export const getHint = (word: string, guesses: GuessResult[][]) => {
    if (isHintDisabled(word, guesses)) return null;
 
    const targetWord = word.toUpperCase();
    const correctIndices = new Set<number>();
-   const foundLetters = new Set<string>();
 
+   const targetCounts: Record<string, number> = {};
+   for (const ch of targetWord) {
+      targetCounts[ch] = (targetCounts[ch] || 0) + 1;
+   }
+
+   const discoveredCounts: Record<string, number> = {};
    guesses.forEach((row) => {
+      const rowCounts: Record<string, number> = {};
       row.forEach((cell, index) => {
          if (cell.status === "correct") {
             correctIndices.add(index);
          }
          if (cell.status === "correct" || cell.status === "present") {
-            foundLetters.add(cell.letter.toUpperCase());
+            const letter = cell.letter.toUpperCase();
+            rowCounts[letter] = (rowCounts[letter] || 0) + 1;
          }
       });
+      for (const [letter, count] of Object.entries(rowCounts)) {
+         const maxPossible = targetCounts[letter] || 0;
+         const cappedCount = Math.min(count, maxPossible);
+         discoveredCounts[letter] = Math.max(
+            discoveredCounts[letter] || 0,
+            cappedCount,
+         );
+      }
    });
 
    const remainingIndices = targetWord
@@ -297,21 +320,72 @@ export const getHint = (word: string, guesses: GuessResult[][]) => {
       .map((_, i) => i)
       .filter((i) => !correctIndices.has(i));
 
-   // Prioritize revealing new letters (not yet discovered/guessed in target word)
-   // over correct positions of yellow letters.
-   const newLetterIndices = remainingIndices.filter(
-      (i) => !foundLetters.has(targetWord[i]),
-   );
+   if (remainingIndices.length === 0) return null;
 
-   const candidateIndices =
-      newLetterIndices.length > 0 ? newLetterIndices : remainingIndices;
+   // Indices of letter instances in the target word that haven't been discovered yet
+   const undiscoveredIndices = remainingIndices.filter((i) => {
+      const ch = targetWord[i];
+      const discovered = discoveredCounts[ch] || 0;
+      const targetTotal = targetCounts[ch] || 0;
+      return targetTotal > discovered;
+   });
 
-   const randomIndex =
-      candidateIndices[Math.floor(Math.random() * candidateIndices.length)];
+   const roll = Math.random();
+
+   let chosenIndex: number;
+
+   if (roll < 0.33 && undiscoveredIndices.length > 0) {
+      // 1. 33% chance: Random undiscovered letter (pure random exploration among undiscovered letters)
+      chosenIndex =
+         undiscoveredIndices[
+            Math.floor(Math.random() * undiscoveredIndices.length)
+         ];
+   } else if (roll < 0.66) {
+      // 2. 33% chance: Standard reveal (prioritize undiscovered indices first, fallback to remaining indices)
+      const candidateIndices =
+         undiscoveredIndices.length > 0 ? undiscoveredIndices : remainingIndices;
+      chosenIndex =
+         candidateIndices[Math.floor(Math.random() * candidateIndices.length)];
+   } else {
+      // 3. 33% chance: Optimal reveal with highest impact in narrowing down remaining possibilities
+      // Evaluate impact using distinguishing letter partition efficiency and vowel/consonant distribution
+      const candidateIndices =
+         undiscoveredIndices.length > 0 ? undiscoveredIndices : remainingIndices;
+
+      const scoredIndices = candidateIndices.map((idx) => {
+         const letter = targetWord[idx];
+         let score = 0;
+
+         // Target instance not yet discovered has high base impact
+         const discovered = discoveredCounts[letter] || 0;
+         if (targetCounts[letter] > discovered) {
+            score += 15;
+         }
+
+         // High frequency English distinguishing letter weights
+         if (["E", "A", "R", "I", "O", "T", "N", "S", "L", "C"].includes(letter)) {
+            score += 10;
+         }
+
+         // Positional index weighting (first letter and vowels at index 1 or 2 give high clue value)
+         if (idx === 0) score += 6;
+         if ((idx === 1 || idx === 2) && ["A", "E", "I", "O", "U"].includes(letter)) {
+            score += 5;
+         }
+
+         return { idx, score };
+      });
+
+      scoredIndices.sort((a, b) => b.score - a.score);
+      const topScore = scoredIndices[0].score;
+      const topCandidates = scoredIndices.filter((item) => item.score === topScore);
+      chosenIndex =
+         topCandidates[Math.floor(Math.random() * topCandidates.length)].idx;
+   }
 
    return {
-      letter: targetWord[randomIndex],
-      index: randomIndex,
+      letter: targetWord[chosenIndex],
+      index: chosenIndex,
    };
 };
 
