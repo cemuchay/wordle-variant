@@ -1,6 +1,6 @@
 import { memo, useMemo, useState, useEffect, useCallback } from 'react';
 import { X, Bell, Trash2, BellOff, Mail, MailOpen, CheckCheck } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useApp } from '../../context/AppContext';
 import { useAppStore } from '../../store/useAppStore';

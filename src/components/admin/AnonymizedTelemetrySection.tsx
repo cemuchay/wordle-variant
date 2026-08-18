@@ -4,7 +4,6 @@ import {
    BarChart3,
    Clock,
    MousePointerClick,
-   Smartphone,
    RefreshCw,
    ArrowLeftRight,
    Activity,
@@ -12,7 +11,6 @@ import {
    Search,
    Layers,
    TrendingUp,
-   TrendingDown,
    Sparkles,
    UserCheck,
    AlertCircle,
@@ -1194,17 +1192,22 @@ export const AnonymizedTelemetrySection: React.FC<AnonymizedTelemetrySectionProp
          </div>
 
          {/* Most Clicked & Most Time Spent Section Rankings */}
-         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Most Clicked Sections */}
-            <div className="bg-gray-900 border border-white/10 rounded-2xl p-6 space-y-4">
-               <div className="flex items-center justify-between border-b border-white/10 pb-3.5">
-                  <h4 className="text-base font-black uppercase tracking-tight text-white flex items-center gap-2">
-                     <MousePointerClick className="text-correct" size={18} /> Most Clicked Sections & Modals
-                  </h4>
-                  <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">
-                     Mean & Median Clicks
-                  </span>
-               </div>
+         {(() => {
+            const maxClicks = Math.max(0, ...primaryMetrics.sectionClicks.map((s) => s.total));
+            const maxTime = Math.max(0, ...primaryMetrics.sectionTimes.map((s) => s.total));
+
+            return (
+               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Most Clicked Sections */}
+                  <div className="bg-gray-900 border border-white/10 rounded-2xl p-6 space-y-4">
+                     <div className="flex items-center justify-between border-b border-white/10 pb-3.5">
+                        <h4 className="text-base font-black uppercase tracking-tight text-white flex items-center gap-2">
+                           <MousePointerClick className="text-correct" size={18} /> Most Clicked Sections & Modals
+                        </h4>
+                        <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">
+                           Mean & Median Clicks
+                        </span>
+                     </div>
 
                {primaryMetrics.sectionClicks.length === 0 ? (
                   <div className="py-12 text-center text-sm font-bold text-gray-300 uppercase tracking-wider border border-dashed border-white/10 rounded-xl">
@@ -1293,8 +1296,10 @@ export const AnonymizedTelemetrySection: React.FC<AnonymizedTelemetrySectionProp
                )}
             </div>
          </div>
+      );
+   })()}
 
-         {/* Raw Anonymized Logs Data Table */}
+   {/* Raw Anonymized Logs Data Table */}
          <div className="bg-gray-900 border border-white/10 rounded-2xl p-6 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
                <div>
