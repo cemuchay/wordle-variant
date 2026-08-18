@@ -195,13 +195,16 @@ function findBestEntropyStarter(
 
 /**
  * Finds the optimal bot move for a state. Supports strategic elimination moves
- * that intentionally drop green/yellow letters to clear candidate traps.
+ * that intentionally drop green/yellow letters to clear candidate traps, BUT NEVER
+ * plays discarded letters ("absent" / gray letters from previous guesses).
+ * Only plays present, correct, or undiscovered letters.
  */
 export function findOptimalBotMove(
    poolBefore: string[],
    allowedWords: string[],
    wordLength: number,
    turn: number,
+   knownAbsentLetters: Set<string> = new Set(),
 ): { word: string; reason: string; expectedPoolReduction: string } {
    const poolBeforeCount = poolBefore.length;
 
@@ -246,9 +249,21 @@ export function findOptimalBotMove(
    let bestTestWord = poolBefore[0];
    let maxScore = -1;
 
-   const candidateList = allowedWords.length > 0 ? allowedWords : poolBefore;
+   // Filter allowed candidate list so that NO discarded/absent letters are reused by the bot
+   const baseList = allowedWords.length > 0 ? allowedWords : poolBefore;
+   const candidateList =
+      knownAbsentLetters.size > 0
+         ? baseList.filter((w) => {
+              for (const ch of w) {
+                 if (knownAbsentLetters.has(ch)) return false;
+              }
+              return true;
+           })
+         : baseList;
 
-   for (const w of candidateList) {
+   const poolToSearch = candidateList.length > 0 ? candidateList : poolBefore;
+
+   for (const w of poolToSearch) {
       const uniqueChars = new Set(w.split(""));
       let distinguishingTested = 0;
       distinguishingChars.forEach((ch) => {
@@ -284,7 +299,7 @@ export function findOptimalBotMove(
    if (isCandidate) {
       botReason = `Candidate answer testing key letter(s) (${testedStr}) from remaining ${poolBeforeCount} possibilities.`;
    } else {
-      botReason = `Strategic elimination play: intentionally drops green/yellow letters to test ${testedList.length} distinguishing letters (${testedStr}) simultaneously across ${poolBeforeCount} candidates.`;
+      botReason = `Strategic elimination play: tests ${testedList.length} distinguishing letters (${testedStr}) using fresh/undiscovered letters across ${poolBeforeCount} candidates without repeating discarded letters.`;
    }
 
    const expectedPoolReduction = `${Math.min(99, Math.round(((poolBeforeCount - 1) / poolBeforeCount) * 100))}%`;
@@ -366,6 +381,26 @@ export async function simulateBotGame(
       const poolBefore = [...currentPool];
       if (poolBefore.length === 0) break;
 
+      // Track known absent/discarded letters from previous bot turns
+      const knownAbsentLetters = new Set<string>();
+      for (const prevRow of botGuesses) {
+         if (Array.isArray(prevRow)) {
+            prevRow.forEach((cell: any) => {
+               if (cell.status === "absent") {
+                  const char = (cell.letter || "").toUpperCase();
+                  const usedPresentOrCorrect = botGuesses.some((r: any) =>
+                     r.some(
+                        (c: any) =>
+                           (c.letter || "").toUpperCase() === char &&
+                           c.status !== "absent",
+                     ),
+                  );
+                  if (!usedPresentOrCorrect) knownAbsentLetters.add(char);
+               }
+            });
+         }
+      }
+
       // Strategic Bot Hint logic:
       if (
          !usedHint &&
@@ -389,6 +424,7 @@ export async function simulateBotGame(
          allowedWords,
          wordLength,
          turn,
+         knownAbsentLetters,
       );
       const nextGuess = optimalMove.word;
 
@@ -526,23 +562,9 @@ export async function analyzeGame(
          luckBonus = 1.0;
       }
 
-      // Bot Recommendation logic using findOptimalBotMove
-      const botMove = findOptimalBotMove(
-         poolBefore,
-         allowedWords,
-         wordLength,
-         turn,
-      );
-      const botWord = botMove.word;
-      const botReason = botMove.reason;
-      const expectedPoolReduction = botMove.expectedPoolReduction;
-
-      // Tough Move Rating calculation (0.0 to 10.0)
-      let moveRating = 7.0;
-
-      let repeatedGrayLetter = false;
+      // Extract known absent/discarded letters from previous user guesses
+      const knownAbsent = new Set<string>();
       if (turn > 0) {
-         const knownAbsent = new Set<string>();
          for (let prevT = 0; prevT < turn; prevT++) {
             const prevRow = guesses[prevT];
             if (Array.isArray(prevRow)) {
@@ -561,6 +583,25 @@ export async function analyzeGame(
                });
             }
          }
+      }
+
+      // Bot Recommendation logic using findOptimalBotMove (excluding discarded letters)
+      const botMove = findOptimalBotMove(
+         poolBefore,
+         allowedWords,
+         wordLength,
+         turn,
+         knownAbsent,
+      );
+      const botWord = botMove.word;
+      const botReason = botMove.reason;
+      const expectedPoolReduction = botMove.expectedPoolReduction;
+
+      // Tough Move Rating calculation (0.0 to 10.0)
+      let moveRating = 7.0;
+
+      let repeatedGrayLetter = false;
+      if (turn > 0) {
          for (const ch of guessWord) {
             if (knownAbsent.has(ch)) {
                repeatedGrayLetter = true;

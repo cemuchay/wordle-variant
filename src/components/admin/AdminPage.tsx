@@ -1358,8 +1358,71 @@ export const AdminPage: React.FC = () => {
     const { user, loading: authLoading, signInWithEmail, signOut } = useAuth();
     const { isAdmin, loading: adminLoading } = useAdminStatus(user?.id);
 
-    // Navigation state
-    const [activeTab, setActiveTab] = useState<'words' | 'marathon' | 'wordup' | 'topics' | 'dynamic_topics' | 'stats' | 'telemetry' | 'broadcast'>('words');
+    // Admin tab configuration
+    type AdminTabId = 'words' | 'marathon' | 'wordup' | 'topics' | 'dynamic_topics' | 'stats' | 'telemetry' | 'broadcast';
+
+    const TAB_CLICK_STORAGE_KEY = 'variant_admin_tab_clicks_v1';
+
+    // Baseline fallback click frequency
+    const DEFAULT_TAB_FREQUENCIES: Record<AdminTabId, number> = {
+        telemetry: 100,
+        stats: 80,
+        words: 70,
+        wordup: 60,
+        topics: 50,
+        dynamic_topics: 40,
+        marathon: 30,
+        broadcast: 20,
+    };
+
+    const getStoredTabFrequencies = (): Record<AdminTabId, number> => {
+        if (typeof window === 'undefined') return DEFAULT_TAB_FREQUENCIES;
+        try {
+            const raw = localStorage.getItem(TAB_CLICK_STORAGE_KEY);
+            if (!raw) return DEFAULT_TAB_FREQUENCIES;
+            return { ...DEFAULT_TAB_FREQUENCIES, ...JSON.parse(raw) };
+        } catch {
+            return DEFAULT_TAB_FREQUENCIES;
+        }
+    };
+
+    const [tabFrequencies, setTabFrequencies] = useState<Record<AdminTabId, number>>(getStoredTabFrequencies);
+
+    // Dynamic tabs ordered by click frequency
+    const orderedTabs = useMemo(() => {
+        const tabDefs: { id: AdminTabId; label: string; icon: React.ReactNode; colorClass: string }[] = [
+            { id: 'telemetry', label: 'Telemetry', icon: <Activity size={14} />, colorClass: 'bg-correct text-black shadow-lg shadow-correct/25' },
+            { id: 'stats', label: 'Game Stats', icon: <BarChart2 size={14} />, colorClass: 'bg-correct text-black shadow-lg shadow-correct/25' },
+            { id: 'words', label: 'Word Vetting', icon: <FileCode size={14} />, colorClass: 'bg-white text-black shadow-lg shadow-white/5' },
+            { id: 'wordup', label: 'WordUp Curator', icon: <Image size={14} />, colorClass: 'bg-correct text-black shadow-lg shadow-correct/25' },
+            { id: 'topics', label: 'Topic Hub', icon: <BookOpen size={14} />, colorClass: 'bg-correct text-black shadow-lg shadow-correct/25' },
+            { id: 'dynamic_topics', label: 'Dynamic Topics', icon: <Sparkles size={14} />, colorClass: 'bg-correct text-black shadow-lg shadow-correct/25' },
+            { id: 'marathon', label: 'Bot Marathon', icon: <Trophy size={14} />, colorClass: 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' },
+            { id: 'broadcast', label: 'Broadcast', icon: <Bell size={14} />, colorClass: 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25' },
+        ];
+
+        return [...tabDefs].sort((a, b) => (tabFrequencies[b.id] || 0) - (tabFrequencies[a.id] || 0));
+    }, [tabFrequencies]);
+
+    // Set initial active tab to the most clicked tab
+    const [activeTab, setActiveTab] = useState<AdminTabId>(() => {
+        const freqs = getStoredTabFrequencies();
+        const sorted = (Object.keys(freqs) as AdminTabId[]).sort((a, b) => (freqs[b] || 0) - (freqs[a] || 0));
+        return sorted[0] || 'telemetry';
+    });
+
+    const handleTabClick = (tabId: AdminTabId) => {
+        setActiveTab(tabId);
+        setTabFrequencies((prev) => {
+            const next = { ...prev, [tabId]: (prev[tabId] || 0) + 1 };
+            try {
+                localStorage.setItem(TAB_CLICK_STORAGE_KEY, JSON.stringify(next));
+            } catch (e) {
+                console.warn('Failed to save admin tab frequency:', e);
+            }
+            return next;
+        });
+    };
 
 
 
@@ -2115,81 +2178,25 @@ const WordUpTopicsManager = ({ triggerToast }: { triggerToast: (text: string, ty
 
             <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8 flex flex-col gap-6">
 
-                {/* Dashboard Navigation Tabs */}
-                <div className="flex items-center gap-2 bg-gray-900 border border-white/10 p-1.5 rounded-2xl self-start">
-                    <button
-                        onClick={() => setActiveTab('words')}
-                        className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'words'
-                            ? 'bg-white text-black shadow-lg shadow-white/5'
-                            : 'text-gray-500 hover:text-white'
-                            }`}
-                    >
-                        <FileCode size={14} /> Word Vetting
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('marathon')}
-                        className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'marathon'
-                            ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20'
-                            : 'text-gray-500 hover:text-white'
-                            }`}
-                    >
-                        <Trophy size={14} /> Bot Marathon
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('wordup')}
-                        className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'wordup'
-                            ? 'bg-correct text-black shadow-lg shadow-correct/25'
-                            : 'text-gray-500 hover:text-white'
-                            }`}
-                    >
-                        <Image size={14} /> WordUp Curator
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('topics')}
-                        className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'topics'
-                            ? 'bg-correct text-black shadow-lg shadow-correct/25'
-                            : 'text-gray-500 hover:text-white'
-                            }`}
-                    >
-                        <BookOpen size={14} /> Topic Hub
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('dynamic_topics')}
-                        className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'dynamic_topics'
-                            ? 'bg-correct text-black shadow-lg shadow-correct/25'
-                            : 'text-gray-500 hover:text-white'
-                            }`}
-                    >
-                        <Sparkles size={14} /> Dynamic Topics
-                    </button>
-
-                    <button
-                        onClick={() => setActiveTab('stats')}
-                        className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'stats'
-                            ? 'bg-correct text-black shadow-lg shadow-correct/25'
-                            : 'text-gray-500 hover:text-white'
-                            }`}
-                    >
-                        <BarChart2 size={14} /> Game Stats
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('telemetry')}
-                        className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'telemetry'
-                            ? 'bg-correct text-black shadow-lg shadow-correct/25'
-                            : 'text-gray-500 hover:text-white'
-                            }`}
-                    >
-                        <Activity size={14} /> Telemetry
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('broadcast')}
-                        className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'broadcast'
-                            ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
-                            : 'text-gray-500 hover:text-white'
-                            }`}
-                    >
-                        <Bell size={14} /> Broadcast
-                    </button>
+                {/* Dashboard Navigation Tabs (Ordered by User Click Frequency) */}
+                <div className="flex flex-wrap items-center gap-2 bg-gray-900 border border-white/10 p-1.5 rounded-2xl self-start">
+                    {orderedTabs.map((tab) => {
+                        const isActive = activeTab === tab.id;
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => handleTabClick(tab.id)}
+                                className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${
+                                    isActive
+                                        ? tab.colorClass
+                                        : 'text-gray-500 hover:text-white hover:bg-white/5'
+                                }`}
+                            >
+                                {tab.icon}
+                                <span>{tab.label}</span>
+                            </button>
+                        );
+                    })}
                 </div>
 
 

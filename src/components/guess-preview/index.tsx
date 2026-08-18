@@ -530,6 +530,15 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameData, isChallenge, isMarathon, marathonGameIndex, date, challengeShortId, targetWordToUse]);
 
+  const isGameComplete = useMemo(() => {
+    if (!gameData?.guesses || gameData.guesses.length === 0) return false;
+    const lastRow = gameData.guesses[gameData.guesses.length - 1];
+    const isWon = Array.isArray(lastRow) && lastRow.length > 0 && lastRow.every((c: any) => c.status === "correct");
+    const isLost = gameData.guesses.length >= MAX_ATTEMPTS;
+    const isEntryCompleted = entry?.status === "won" || entry?.status === "lost" || entry?.status === "completed" || entry?.status === "timed_out";
+    return isWon || isLost || isEntryCompleted;
+  }, [gameData?.guesses, entry?.status]);
+
   const isOwnEntry = profile?.id === entry.user_id || (!profile && !!entry.guest_id);
   const username = entry.username || entry.profiles?.username || "Player";
   const canSeeDetails = viewerHasFinished || isCreator || isOwnEntry;
@@ -724,8 +733,8 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
               </div>
             )}
 
-            {/* Game Analysis Button */}
-            {revealTargetWord && gameData?.guesses && gameData.guesses.length > 0 && targetWordToUse && (
+            {/* Game Analysis Button - Only accessible when game is completed (won or lost) */}
+            {revealTargetWord && isGameComplete && gameData?.guesses && gameData.guesses.length > 0 && targetWordToUse && (
               <div className="mb-3">
                 <button
                   onClick={() => setShowGameAnalysis(true)}
@@ -793,7 +802,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
 
         <ShowScoringInfo showScoringInfo={showScoringInfo} setShowScoringInfo={setShowScoringInfo} />
 
-        {showGameAnalysis && revealTargetWord && gameData?.guesses && targetWordToUse && (
+        {showGameAnalysis && revealTargetWord && isGameComplete && gameData?.guesses && targetWordToUse && (
           <GameAnalysisModal
             guesses={gameData.guesses}
             targetWord={targetWordToUse}

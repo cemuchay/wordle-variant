@@ -180,6 +180,14 @@ export const useActions = ({
             const updatedStats = updateStats(won, newGuesses.length);
             updateOptimistically(updatedStats);
             refresh();
+            try {
+               // Record game completion in daily telemetry
+               import("../../lib/telemetry").then(({ trackGameCompleted }) => {
+                  trackGameCompleted("main_daily");
+               });
+            } catch (e) {
+               console.warn("Telemetry game completion tracking skipped:", e);
+            }
          }
 
          // 4. Sync to cloud in background (not awaited)

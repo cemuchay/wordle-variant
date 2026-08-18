@@ -1,6 +1,6 @@
 import { memo, useMemo, useState, useEffect, useCallback } from 'react';
 import { X, Bell, Trash2, BellOff, Mail, MailOpen, CheckCheck } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useApp } from '../../context/AppContext';
 import { useAppStore } from '../../store/useAppStore';
@@ -26,13 +26,9 @@ const NotificationItem = memo(({
     const isNew = isSessionNew;
 
     return (
-        <motion.div
-            layout
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
+        <div
             onClick={onClick ? () => onClick(notification) : undefined}
-            className={`p-4 rounded-2xl border transition-all ${onClick ? 'cursor-pointer hover:bg-white/10 hover:border-white/20 active:scale-[0.98]' : ''
+            className={`p-4 rounded-2xl border transition-colors ${onClick ? 'cursor-pointer hover:bg-white/10 hover:border-white/20 active:scale-[0.98]' : ''
                 } ${isNew
                     ? 'bg-white/8 border-l-4 border-l-correct border-y-white/10 border-r-white/10 shadow-lg shadow-black/30'
                     : isUnread
@@ -83,7 +79,7 @@ const NotificationItem = memo(({
                     </button>
                 </div>
             </div>
-        </motion.div>
+        </div>
     );
 });
 
@@ -91,23 +87,34 @@ export const NotificationModal = memo(() => {
     const { profile, isNotificationsOpen, setIsNotificationsOpen, setIsChallengeOpen, setIsChatOpen } = useApp();
     const { notifications, unreadCount, markAsRead, markAsUnread, markAllAsRead, deleteNotification, isLoading } = useNotifications(profile?.id, { enableRealtime: false });
 
-    const [sessionNewIds, setSessionNewIds] = useState<Set<string>>(new Set());
+    // Track which notification IDs were unread when the modal opened
+    const [sessionNewIds, setSessionNewIds] = useState<Set<string>>(() => {
+        const unread = notifications.filter(n => !n.is_read).map(n => n.id);
+        return new Set(unread);
+    });
     const [hasAutoMarked, setHasAutoMarked] = useState(false);
 
-    // Reset session tracking when modal opens/closes
+    // Synchronize session unread tracking when modal opens
     useEffect(() => {
-        if (!isNotificationsOpen) {
+        if (isNotificationsOpen) {
+            const unread = notifications.filter(n => !n.is_read).map(n => n.id);
+            if (unread.length > 0) {
+                setSessionNewIds(new Set(unread));
+                markAllAsRead();
+            }
+            setHasAutoMarked(true);
+        } else {
             setSessionNewIds(new Set());
             setHasAutoMarked(false);
         }
-    }, [isNotificationsOpen]);
+    }, [isNotificationsOpen]); // Only run on modal open / close
 
-    // Automatically mark all as read once notifications load when the modal is open
+    // Fallback if notifications finished loading after modal was already open
     useEffect(() => {
         if (isNotificationsOpen && !isLoading && notifications.length > 0 && !hasAutoMarked) {
-            const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
-            if (unreadIds.length > 0) {
-                setSessionNewIds(new Set(unreadIds));
+            const unread = notifications.filter(n => !n.is_read).map(n => n.id);
+            if (unread.length > 0) {
+                setSessionNewIds(new Set(unread));
                 markAllAsRead();
             }
             setHasAutoMarked(true);
@@ -261,7 +268,7 @@ export const NotificationModal = memo(() => {
                             </div>
                         </div>
                     ) : (
-                        <AnimatePresence mode="popLayout">
+                        <div className="space-y-3">
                             {sortedNotifications.map(n => {
                                 const isInteractive = n.type === 'CHALLENGE_INVITE' ||
                                     n.type === 'CHALLENGE_COMPLETED' ||
@@ -291,7 +298,7 @@ export const NotificationModal = memo(() => {
                                     />
                                 );
                             })}
-                        </AnimatePresence>
+                        </div>
                     )}
                 </div>
 

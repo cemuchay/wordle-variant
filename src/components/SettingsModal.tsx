@@ -827,18 +827,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                                         <Shield size={20} className="text-correct opacity-40 group-hover:opacity-100 transition-opacity" />
                                     </a>
 
-                                    <a
-                                        href="/word-finder-xyz"
-                                        className="flex items-center justify-between p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl hover:bg-amber-500/10 transition-all group"
-                                    >
-                                        <div className="flex-1 pr-4">
-                                            <p className="text-sm font-bold text-amber-400">Word Finder Tool</p>
-                                            <p className="text-[11px] text-gray-500 leading-relaxed">
-                                                Strategic word elimination, positional filter & anagram finder.
-                                            </p>
-                                        </div>
-                                        <Search size={20} className="text-amber-400 opacity-40 group-hover:opacity-100 transition-opacity" />
-                                    </a>
+
                                 </section>
                             )}
 
