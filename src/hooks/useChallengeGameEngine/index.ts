@@ -450,38 +450,47 @@ export const useChallengeGameEngine = ({
                   saved = safeLocalStorage.getItem(legacyKey);
                }
                if (saved) {
-                  const parsed = JSON.parse(saved);
-                  const localStatus = parsed.status || "playing";
-
-                  const hasMoreGuesses =
-                     (parsed.guesses?.length || 0) > incoming.length;
-                  const hasNewHint = parsed.hints_used && !localUsedHint;
-                  const hasAdvancedStatus =
-                     (localStatus === "completed" ||
-                        localStatus === "timed_out") &&
-                     serverStatus === "playing";
-
-                  if (
-                     hasMoreGuesses ||
-                     hasNewHint ||
-                     hasAdvancedStatus ||
-                     parsed.needsSync
-                  ) {
-                     if (
-                        parsed.guesses &&
-                        parsed.guesses.length >= incoming.length
-                     ) {
-                        localGuesses = parsed.guesses;
+                  if (isFinishedStatus) {
+                     // DB is already completed/timed_out: DB state must override and purge local storage
+                     safeLocalStorage.removeItem(storageKey);
+                     if (isMarathon && activeGame) {
+                        const legacyKey = `challenge-prog-${challenge.id}-m-${activeGame.wordLength}`;
+                        safeLocalStorage.removeItem(legacyKey);
                      }
-                     localUsedHint = parsed.hints_used || localUsedHint;
-                     localHintRecord = parsed.hint_record || localHintRecord;
+                  } else {
+                     const parsed = JSON.parse(saved);
+                     const localStatus = parsed.status || "playing";
 
-                     needsBackgroundSync = true;
-                     recoveredPayload = parsed;
+                     const hasMoreGuesses =
+                        (parsed.guesses?.length || 0) > incoming.length;
+                     const hasNewHint = parsed.hints_used && !localUsedHint;
+                     const hasAdvancedStatus =
+                        (localStatus === "completed" ||
+                           localStatus === "timed_out") &&
+                        serverStatus === "playing";
+
+                     if (
+                        hasMoreGuesses ||
+                        hasNewHint ||
+                        hasAdvancedStatus ||
+                        parsed.needsSync
+                     ) {
+                        if (
+                           parsed.guesses &&
+                           parsed.guesses.length >= incoming.length
+                        ) {
+                           localGuesses = parsed.guesses;
+                        }
+                        localUsedHint = parsed.hints_used || localUsedHint;
+                        localHintRecord = parsed.hint_record || localHintRecord;
+
+                        needsBackgroundSync = true;
+                        recoveredPayload = parsed;
+                     }
+
+                     recoveredCurrentGuess = parsed.currentGuess || '';
+                     recoveredCursorIndex = parsed.cursorIndex || 0;
                   }
-
-                  recoveredCurrentGuess = parsed.currentGuess || '';
-                  recoveredCursorIndex = parsed.cursorIndex || 0;
                }
             } catch (e) {
                logger.error("Local recovery failed", {
@@ -534,6 +543,20 @@ export const useChallengeGameEngine = ({
          }
 
          try {
+            if (isFinishedStatus) {
+               // Ensure local storage is clean for finished games to prevent stale recovery
+               try {
+                  safeLocalStorage.removeItem(storageKey);
+                  if (isMarathon && activeGame) {
+                     const legacyKey = `challenge-prog-${challenge.id}-m-${activeGame.wordLength}`;
+                     safeLocalStorage.removeItem(legacyKey);
+                  }
+               } catch (e) {
+                  console.error("Failed to clean storage for finished game:", e);
+               }
+               return;
+            }
+
             if (
                needsBackgroundSync &&
                recoveredPayload &&
@@ -547,7 +570,7 @@ export const useChallengeGameEngine = ({
                );
             }
 
-            if (isStarterEnforced && !startTimerRef.current) {
+            if (isStarterEnforced && !isFinishedStatus && !startTimerRef.current) {
                startTimerRef.current = true;
                await wrappedSubmitResult(
                   {
@@ -570,6 +593,7 @@ export const useChallengeGameEngine = ({
                challenge.mode === "LIVE" &&
                effectiveMaxTime &&
                !hasTimedOutOffline &&
+               !isFinishedStatus &&
                !startTimerRef.current
             ) {
                const startTime = isMarathon
