@@ -70,20 +70,25 @@ class SafeStorage implements Storage {
   }
 
   private checkAvailability(): boolean {
+    const storage = this.getUnderlyingStorage();
+    if (!storage) return false;
     try {
-      const storage = this.getUnderlyingStorage();
-      if (!storage) return false;
       const testKey = '__storage_test__';
       storage.setItem(testKey, testKey);
       storage.removeItem(testKey);
       return true;
-    } catch (e) {
-      return false;
+    } catch {
+      return true; // Still available for memory & fallback writes
     }
   }
 
   private getUnderlyingStorage(): Storage | null {
-    return this.type === 'local' ? originalLocalStorage : originalSessionStorage;
+    if (typeof window === 'undefined') return null;
+    try {
+      return this.type === 'local' ? window.localStorage : window.sessionStorage;
+    } catch {
+      return this.type === 'local' ? originalLocalStorage : originalSessionStorage;
+    }
   }
 
   get length(): number {
@@ -168,13 +173,23 @@ class SafeStorage implements Storage {
   setItem(key: string, value: string): void {
     this.memoryStore[key] = String(value);
     if (this.isAvailable) {
-      try {
-        const storage = this.getUnderlyingStorage();
-        if (storage) {
+      const storage = this.getUnderlyingStorage();
+      if (storage) {
+        try {
           storage.setItem(key, value);
+        } catch (e) {
+          if (isQuotaExceededError(e)) {
+            console.warn(`[SafeStorage] Quota exceeded on "${key}", running auto-purge...`);
+            purgeStaleStorage();
+            try {
+              storage.setItem(key, value);
+            } catch (retryErr) {
+              console.warn(`[SafeStorage] Write still failed after purge for "${key}". Backed by memory & IndexedDB.`, retryErr);
+            }
+          } else {
+            console.warn(`[SafeStorage] failed to write "${key}" to native storage:`, e);
+          }
         }
-      } catch (e) {
-        console.warn(`[SafeStorage] failed to write "${key}" to native storage:`, e);
       }
     }
     this._scheduleFlush(key);
@@ -197,6 +212,134 @@ class SafeStorage implements Storage {
   }
 }
 
+export function isQuotaExceededError(e: unknown): boolean {
+  if (!e) return false;
+  if (e instanceof DOMException) {
+    return (
+      e.code === 22 ||
+      e.code === 1014 ||
+      e.name === 'QuotaExceededError' ||
+      e.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+    );
+  }
+  if (typeof e === 'object' && 'name' in e) {
+    const name = (e as any).name;
+    const message = (e as any).message || '';
+    return (
+      name === 'QuotaExceededError' ||
+      name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+      message.includes('QuotaExceededError') ||
+      message.includes('quota')
+    );
+  }
+  return false;
+}
+
+/**
+ * Returns estimated bytes occupied in LocalStorage and percentage of standard 5MB quota.
+ */
+export function getStorageUsage(): { bytes: number; percentage: number } {
+  let totalBytes = 0;
+  if (originalLocalStorage) {
+    try {
+      for (let i = 0; i < originalLocalStorage.length; i++) {
+        const key = originalLocalStorage.key(i);
+        if (!key) continue;
+        const val = originalLocalStorage.getItem(key) || '';
+        // UTF-16 strings take ~2 bytes per character
+        totalBytes += (key.length + val.length) * 2;
+      }
+    } catch {}
+  }
+  const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+  return {
+    bytes: totalBytes,
+    percentage: Math.min(100, Math.round((totalBytes / MAX_BYTES) * 100 * 10) / 10),
+  };
+}
+
+/**
+ * Intelligently evicts stale, non-critical entries from LocalStorage:
+ * - Daily games older than 7 days that are already synced (status won/lost, !needsSync)
+ * - Backup keys for old daily games
+ * - Finished challenge progress keys
+ * - Match history caches
+ * - Telemetry batches
+ * 
+ * Never evicts:
+ * - Supabase auth sessions
+ * - Active uncompleted games (status 'playing' or needsSync === true)
+ * - User preferences, streaks, stats
+ */
+export function purgeStaleStorage(): number {
+  const storage = typeof window !== 'undefined' ? window.localStorage : originalLocalStorage;
+  if (!storage) return 0;
+
+  const keysToRemove: string[] = [];
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .split('T')[0];
+
+  try {
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (!key) continue;
+
+      // 1. Old Daily Game Keys: wordle-YYYY-MM-DD and backups
+      if (key.startsWith('wordle-') && !key.includes('active') && !key.includes('statistics') && !key.includes('preferences')) {
+        const cleanKey = key.replace('-backup', '');
+        const dateMatch = cleanKey.match(/^wordle-(\d{4}-\d{2}-\d{2})$/);
+        if (dateMatch && dateMatch[1] < sevenDaysAgo) {
+          const raw = storage.getItem(key);
+          if (raw) {
+            try {
+              const parsed = JSON.parse(raw);
+              if (!parsed.needsSync && (parsed.status === 'won' || parsed.status === 'lost')) {
+                keysToRemove.push(key);
+              }
+            } catch {
+              keysToRemove.push(key);
+            }
+          }
+        }
+      }
+
+      // 2. Finished Challenge Progress keys
+      if (key.startsWith('challenge-prog-')) {
+        const raw = storage.getItem(key);
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (!parsed.needsSync && (parsed.status === 'completed' || parsed.status === 'timed_out')) {
+              keysToRemove.push(key);
+            }
+          } catch {
+            keysToRemove.push(key);
+          }
+        }
+      }
+
+      // 3. Stale view states & temporary caches
+      if (
+        key.startsWith('challenge-view-state-') ||
+        key === 'wordup_cached_history_matches' ||
+        key === 'wordup_cached_async_history_matches' ||
+        key === 'wordup_seen_matches'
+      ) {
+        keysToRemove.push(key);
+      }
+    }
+
+    for (const key of keysToRemove) {
+      safeLocalStorage.removeItem(key);
+    }
+  } catch (e) {
+    console.warn('[SafeStorage] Auto-purge failed:', e);
+  }
+
+  return keysToRemove.length;
+}
+
 export const safeLocalStorage = new SafeStorage('local');
 export const safeSessionStorage = new SafeStorage('session');
 
@@ -207,6 +350,11 @@ export const asyncStorage = {
 };
 
 export async function runLegacyMigration(): Promise<void> {
+  // Run proactive auto-purge of stale items on boot
+  try {
+    purgeStaleStorage();
+  } catch {}
+
   const alreadyMigrated = await idbGetItem('__migrated_v2');
   if (alreadyMigrated) return;
   try {
