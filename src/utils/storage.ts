@@ -83,12 +83,7 @@ class SafeStorage implements Storage {
   }
 
   private getUnderlyingStorage(): Storage | null {
-    if (typeof window === 'undefined') return null;
-    try {
-      return this.type === 'local' ? window.localStorage : window.sessionStorage;
-    } catch {
-      return this.type === 'local' ? originalLocalStorage : originalSessionStorage;
-    }
+    return this.type === 'local' ? originalLocalStorage : originalSessionStorage;
   }
 
   get length(): number {
@@ -272,8 +267,7 @@ export function getStorageUsage(): { bytes: number; percentage: number } {
  * - User preferences, streaks, stats
  */
 export function purgeStaleStorage(): number {
-  const storage = typeof window !== 'undefined' ? window.localStorage : originalLocalStorage;
-  if (!storage) return 0;
+  if (!originalLocalStorage) return 0;
 
   const keysToRemove: string[] = [];
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
@@ -281,8 +275,8 @@ export function purgeStaleStorage(): number {
     .split('T')[0];
 
   try {
-    for (let i = 0; i < storage.length; i++) {
-      const key = storage.key(i);
+    for (let i = 0; i < originalLocalStorage.length; i++) {
+      const key = originalLocalStorage.key(i);
       if (!key) continue;
 
       // 1. Old Daily Game Keys: wordle-YYYY-MM-DD and backups
@@ -290,7 +284,7 @@ export function purgeStaleStorage(): number {
         const cleanKey = key.replace('-backup', '');
         const dateMatch = cleanKey.match(/^wordle-(\d{4}-\d{2}-\d{2})$/);
         if (dateMatch && dateMatch[1] < sevenDaysAgo) {
-          const raw = storage.getItem(key);
+          const raw = originalLocalStorage.getItem(key);
           if (raw) {
             try {
               const parsed = JSON.parse(raw);
@@ -306,7 +300,7 @@ export function purgeStaleStorage(): number {
 
       // 2. Finished Challenge Progress keys
       if (key.startsWith('challenge-prog-')) {
-        const raw = storage.getItem(key);
+        const raw = originalLocalStorage.getItem(key);
         if (raw) {
           try {
             const parsed = JSON.parse(raw);
