@@ -58,6 +58,9 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
     canSeeDetails,
 }) => {
     const { user: currentUser } = useAuth();
+    // Reactions/comments only exist for daily games — challenge & marathon
+    // previews arrive with empty targetUserId/gameDate and render a bare row.
+    const isDailyGame = !!targetUserId && !!gameDate;
     const [comments, setComments] = useState<Comment[]>([]);
     const [reactions, setReactions] = useState<Reaction[]>([]);
     const [reactionUsernames, setReactionUsernames] = useState<{ reaction: string; username: string }[]>([]);
@@ -159,9 +162,9 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
         await Promise.all([fetchReactionsPromise(), fetchCommentsPromise()]);
     };
 
-    // Fetch comments and reactions
+    // Fetch comments and reactions (daily games only)
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
+        if (!isDailyGame) return;
         fetchData();
 
         // Set up Realtime subscriptions
@@ -218,7 +221,7 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
             supabase.removeChannel(cRxChannel);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [targetUserId, gameDate, guessIndex, commentsDisabledByTarget]);
+    }, [targetUserId, gameDate, guessIndex, commentsDisabledByTarget, isDailyGame]);
 
     // Handle custom event to open the comment drawer
     useEffect(() => {
@@ -394,9 +397,9 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
 
     const myActiveReaction = reactions.find(r => r.user_id === currentUser?.id)?.reaction;
 
-    // Hold to react triggers
+    // Hold to react triggers (daily games only)
     const handleTouchStart = () => {
-        if (!currentUser) return;
+        if (!currentUser || !isDailyGame) return;
         longPressTimer.current = setTimeout(() => {
             setShowEmojiPicker(true);
         }, 500); // 500ms long press
@@ -557,30 +560,32 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
         >
-            <div className="flex items-center justify-between px-1 py-1">
+            <div className={`flex items-center px-1 py-1 ${isDailyGame ? 'justify-between' : 'justify-center'}`}>
                 {/* Reactions list */}
-                <div className="flex flex-wrap items-center gap-1">
-                    {reactionCounts.map(({ emoji, count, hasReacted }) => (
+                {isDailyGame && (
+                    <div className="flex flex-wrap items-center gap-1">
+                        {reactionCounts.map(({ emoji, count, hasReacted }) => (
+                            <button
+                                key={emoji}
+                                onClick={() => setSelectedEmojiFilter(emoji)}
+                                className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] transition-all ${hasReacted
+                                    ? 'bg-correct/20 border border-correct/30 text-correct'
+                                    : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10'
+                                    }`}
+                            >
+                                <span>{emoji}</span>
+                                <span className="font-bold">{count}</span>
+                            </button>
+                        ))}
                         <button
-                            key={emoji}
-                            onClick={() => setSelectedEmojiFilter(emoji)}
-                            className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] transition-all ${hasReacted
-                                ? 'bg-correct/20 border border-correct/30 text-correct'
-                                : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10'
-                                }`}
+                            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                            className={`text-gray-500 hover:text-white p-1 rounded-full hover:bg-white/5 transition-colors cursor-pointer ${showEmojiPicker ? 'text-indigo-400' : ''}`}
+                            title="Add Reaction"
                         >
-                            <span>{emoji}</span>
-                            <span className="font-bold">{count}</span>
+                            <Heart size={12} className={myActiveReaction ? 'fill-indigo-400 text-indigo-400' : ''} />
                         </button>
-                    ))}
-                    <button
-                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                        className={`text-gray-500 hover:text-white p-1 rounded-full hover:bg-white/5 transition-colors ${showEmojiPicker ? 'text-indigo-400' : ''}`}
-                        title="Add Reaction"
-                    >
-                        <Heart size={12} className={myActiveReaction ? 'fill-indigo-400 text-indigo-400' : ''} />
-                    </button>
-                </div>
+                    </div>
+                )}
 
                 {/* Timestamp in the middle */}
                 {formattedTime && (
@@ -590,10 +595,10 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
                 )}
 
                 {/* Comments button */}
-                {!commentsDisabledByTarget && (
+                {isDailyGame && !commentsDisabledByTarget && (
                     <button
                         onClick={() => setShowCommentDrawer(true)}
-                        className="flex items-center gap-1 text-[10px] font-bold text-gray-500 hover:text-white transition-colors"
+                        className="flex items-center gap-1 text-[10px] font-bold text-gray-500 hover:text-white transition-colors cursor-pointer"
                     >
                         <MessageCircle size={12} />
                         <span>{comments.length}</span>

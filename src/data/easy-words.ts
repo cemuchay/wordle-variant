@@ -390,6 +390,7 @@ export const EASY_WORDS_4: string[] = [
    "FURY",
    "FUSE",
    "GAIN",
+   "MARS",
    "GAME",
    "GANG",
    "GATE",
@@ -467,6 +468,8 @@ export const EASY_WORDS_4: string[] = [
    "JAIL",
    "JAZZ",
    "JEAN",
+   "HIDE",
+   "EXIT",
    "JOKE",
    "JUMP",
    "JURY",
@@ -747,10 +750,12 @@ export const EASY_WORDS_4: string[] = [
    "SLAM",
    "SLAP",
    "SLIP",
+   "BEAM",
    "SLOT",
    "SLOW",
    "SNAP",
    "SNOW",
+   "CUTE",
    "SNUG",
    "SOAK",
    "SOAP",
@@ -920,6 +925,7 @@ export const EASY_WORDS_4: string[] = [
    "ZINC",
    "ZONE",
    "ZOOM",
+   "BAKE",
 ];
 
 export const EASY_WORDS_5: string[] = [
