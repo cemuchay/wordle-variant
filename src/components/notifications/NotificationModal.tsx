@@ -1,10 +1,9 @@
 import { memo, useMemo, useState, useEffect, useCallback } from 'react';
 import { X, Bell, Trash2, BellOff, Mail, MailOpen, CheckCheck } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useApp } from '../../context/AppContext';
 import { useAppStore } from '../../store/useAppStore';
-import { Z_INDEX, ANIMATION_DURATION } from '../../constants/ui';
+import { ModalLayout } from '../layout/ModalLayout';
 import { type AppNotification } from '../../types/notifications';
 
 const NotificationItem = memo(({
@@ -201,19 +200,14 @@ export const NotificationModal = memo(() => {
     if (!isNotificationsOpen) return null;
 
     return (
-        <div
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-            style={{ zIndex: Z_INDEX.MODAL_CONTENT }}
-            onClick={() => setIsNotificationsOpen(false)}
+        <ModalLayout
+            isOpen
+            onClose={() => setIsNotificationsOpen(false)}
+            maxWidth="md"
+            showCloseButton={false}
+            containerClassName="p-0!"
         >
-            <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                transition={{ duration: ANIMATION_DURATION.FAST / 1000 }}
-                className="bg-gray-900 border border-white/10 w-full max-w-md rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh]"
-                onClick={e => e.stopPropagation()}
-            >
+            <div className="flex flex-col h-full min-h-0 w-full">
                 {/* Header */}
                 <div className="p-6 border-b border-white/5 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-3">
@@ -249,7 +243,7 @@ export const NotificationModal = memo(() => {
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-white/10">
+                <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-white/10">
                     {isLoading ? (
                         <div className="py-12 flex flex-col items-center justify-center gap-4 text-gray-500">
                             <div className="w-8 h-8 border-2 border-correct border-t-transparent rounded-full animate-spin" />
@@ -303,7 +297,7 @@ export const NotificationModal = memo(() => {
                 </div>
 
                 {/* Footer */}
-                <div className="p-4 border-t border-white/5 bg-white/2">
+                <div className="p-4 border-t border-white/5 bg-white/2 shrink-0">
                     <button
                         onClick={() => setIsNotificationsOpen(false)}
                         className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white transition-all"
@@ -311,8 +305,8 @@ export const NotificationModal = memo(() => {
                         Close
                     </button>
                 </div>
-            </motion.div>
-        </div>
+            </div>
+        </ModalLayout>
     );
 });
 

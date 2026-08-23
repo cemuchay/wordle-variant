@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/refs */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue } from "framer-motion";
 import type { PanInfo } from "framer-motion";
 import { Search, MessageCircle, X, Send, ArrowLeft, ExternalLink, Edit2, Trash2, Check, CheckCheck, ShieldAlert, Mic, Image as ImageIcon, Smile, Reply, Users } from "lucide-react";
 import { useApp } from "../../context/AppContext";
@@ -24,6 +24,50 @@ import { Z_INDEX } from "../../constants/ui";
 
 const CLOSE_DELAY = 10000;
 
+// --- Bubble drag boundary configuration ---
+// Vertical no-go zones: status bar / dynamic island row at the top,
+// app bottom navigation bar + home indicator area at the bottom.
+const BUBBLE_SIZE = 40;
+const EDGE_MARGIN_X = 8;
+const TOP_CLEARANCE = 60;       // px below safe-area-inset-top (dynamic island / header row)
+const BOTTOM_NAV_CLEARANCE = 76; // px above viewport bottom edge (AppNavigation + home indicator)
+
+// Reads env(safe-area-inset-*) by measuring an offscreen probe element.
+const readSafeAreaInset = (edge: "top" | "bottom"): number => {
+   try {
+      const probe = document.createElement("div");
+      probe.style.cssText = `position:fixed;top:0;left:0;width:0;visibility:hidden;pointer-events:none;height:${edge === "top" ? "env(safe-area-inset-top, 0px)" : "env(safe-area-inset-bottom, 0px)"};`;
+      document.body.appendChild(probe);
+      const value = probe.offsetHeight || 0;
+      probe.remove();
+      return value;
+   } catch {
+      return 0;
+   }
+};
+
+// The draggable region for the bubble. The bubble can never rest above minY
+// (under the dynamic island / menu row) or below maxY (behind the navbar).
+const getBubbleBounds = () => {
+   const insetTop = readSafeAreaInset("top");
+   const insetBottom = readSafeAreaInset("bottom");
+   const minX = EDGE_MARGIN_X;
+   const maxX = Math.max(minX, window.innerWidth - BUBBLE_SIZE - EDGE_MARGIN_X);
+   const minY = insetTop + TOP_CLEARANCE;
+   let maxY = window.innerHeight - insetBottom - BOTTOM_NAV_CLEARANCE - BUBBLE_SIZE;
+   if (maxY < minY) maxY = minY;
+   return { minX, maxX, minY, maxY };
+};
+
+// Clamps any position back into the allowed region (out-of-bounds recovery).
+const clampToBounds = (pos: { x: number; y: number }) => {
+   const b = getBubbleBounds();
+   return {
+      x: Math.min(Math.max(pos.x, b.minX), b.maxX),
+      y: Math.min(Math.max(pos.y, b.minY), b.maxY),
+   };
+};
+
 export default function FloatingChatBubble() {
    const { unreadCount, isChatOpen, date } = useApp();
    const [dismissed, setDismissed] = useState(false);
@@ -40,23 +84,52 @@ export default function FloatingChatBubble() {
    const inactivityTimerRef = useRef<number | null>(null);
 
    // Bubble position persistence
-   const [bubblePos, setBubblePos] = useState(() => {
+   const [bubblePos, setBubblePos] = useState<{ x: number; y: number } | null>(() => {
       try {
          const saved = safeLocalStorage.getItem('floating_bubble_pos');
          if (saved) {
             const pos = JSON.parse(saved) as { x: number; y: number };
-            const maxX = window.innerWidth - 40;
-            const maxY = window.innerHeight - 40;
-            return {
-               x: Math.max(0, Math.min(pos.x, maxX)),
-               y: Math.max(0, Math.min(pos.y, maxY)),
-            };
+            // Restore clamped into bounds — stale saves (rotation, PWA viewport
+            // changes, pre-boundary versions) snap back into the allowed region.
+            return clampToBounds(pos);
          }
          // eslint-disable-next-line no-empty
       } catch { }
       return null;
    });
    const dragStartPos = useRef({ x: 0, y: 0 });
+
+   // Live drag coordinates (motion values so out-of-bounds corrections apply
+   // instantly without fighting React re-renders mid-drag)
+   const bubbleX = useMotionValue(bubblePos?.x ?? (typeof window !== "undefined" ? window.innerWidth - 80 : 320));
+   const bubbleY = useMotionValue(bubblePos?.y ?? 120);
+
+   // Draggable region as state so drag constraints stay in sync with viewport
+   const [bubbleBounds, setBubbleBounds] = useState(getBubbleBounds);
+
+   // Out-of-bounds recovery: recompute the allowed region whenever the
+   // viewport changes (rotation, PWA install, keyboard) and pull the bubble
+   // back if it ended up outside it.
+   useEffect(() => {
+      const recover = () => {
+         setBubbleBounds(getBubbleBounds());
+         const next = clampToBounds({ x: bubbleX.get(), y: bubbleY.get() });
+         if (next.x !== bubbleX.get() || next.y !== bubbleY.get()) {
+            bubbleX.set(next.x);
+            bubbleY.set(next.y);
+            setBubblePos(next);
+            safeLocalStorage.setItem('floating_bubble_pos', JSON.stringify(next));
+         }
+      };
+      window.addEventListener('resize', recover);
+      window.addEventListener('orientationchange', recover);
+      window.visualViewport?.addEventListener('resize', recover);
+      return () => {
+         window.removeEventListener('resize', recover);
+         window.removeEventListener('orientationchange', recover);
+         window.visualViewport?.removeEventListener('resize', recover);
+      };
+   }, [bubbleX, bubbleY]);
 
    const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
    const [replyText, setReplyText] = useState("");
@@ -850,10 +923,7 @@ export default function FloatingChatBubble() {
 
    const handleDragStart = () => {
       setIsDragging(true);
-      dragStartPos.current = {
-         x: bubblePos?.x ?? window.innerWidth - 80,
-         y: bubblePos?.y ?? 120,
-      };
+      dragStartPos.current = { x: bubbleX.get(), y: bubbleY.get() };
    };
 
    const handleDrag = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
@@ -880,16 +950,14 @@ export default function FloatingChatBubble() {
       }
       setIsNearDismiss(false);
 
-      // Persist bubble position
-      const finalX = Math.max(0, Math.min(
-         dragStartPos.current.x + info.offset.x,
-         window.innerWidth - 40,
-      ));
-      const finalY = Math.max(0, Math.min(
-         dragStartPos.current.y + info.offset.y,
-         window.innerHeight - 40,
-      ));
-      const newPos = { x: finalX, y: finalY };
+      // Persist bubble position — always clamped back into bounds so the
+      // bubble can never be saved (or left) outside the allowed region.
+      const newPos = clampToBounds({
+         x: dragStartPos.current.x + info.offset.x,
+         y: dragStartPos.current.y + info.offset.y,
+      });
+      bubbleX.set(newPos.x);
+      bubbleY.set(newPos.y);
       setBubblePos(newPos);
       safeLocalStorage.setItem('floating_bubble_pos', JSON.stringify(newPos));
    };
@@ -983,10 +1051,17 @@ export default function FloatingChatBubble() {
 
    return (
       <>
-         {/* Drag constraint boundary covering the screen */}
+         {/* Drag constraint boundary — excludes the top island row and the
+             bottom navbar zone so the bubble can never rest there */}
          <div
             ref={constraintsRef}
-            className="fixed inset-0 pointer-events-none z-9999 overflow-hidden"
+            className="fixed pointer-events-none z-9999 overflow-hidden"
+            style={{
+               left: bubbleBounds.minX,
+               top: bubbleBounds.minY,
+               width: bubbleBounds.maxX - bubbleBounds.minX + BUBBLE_SIZE,
+               height: bubbleBounds.maxY - bubbleBounds.minY + BUBBLE_SIZE,
+            }}
          >
             <AnimatePresence>
                {isVisible && (
@@ -998,7 +1073,7 @@ export default function FloatingChatBubble() {
                      onDragStart={handleDragStart}
                      onDrag={handleDrag}
                      onDragEnd={handleDragEnd}
-                     initial={{ scale: 0, opacity: 0, x: bubblePos?.x ?? window.innerWidth - 80, y: bubblePos?.y ?? 120 }}
+                     initial={{ scale: 0, opacity: 0 }}
                      animate={{
                         scale: 1,
                         opacity: 1,
@@ -1010,7 +1085,9 @@ export default function FloatingChatBubble() {
                      whileTap={{ scale: 0.95 }}
                      className="absolute w-10 h-10 rounded-full bg-transparent border-none shadow-lg flex items-center justify-center cursor-pointer pointer-events-auto select-none touch-none"
                      style={{
-                         zIndex: Z_INDEX.CHAT_BUBBLE,
+                        x: bubbleX,
+                        y: bubbleY,
+                        zIndex: Z_INDEX.CHAT_BUBBLE,
                      }}
                   >
                      {unreadCount > 0 && latestUnreadMsg ? (
