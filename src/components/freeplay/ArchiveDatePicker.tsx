@@ -97,10 +97,10 @@ export const ArchiveDatePicker = ({
       showCloseButton={false}
       isOverlay={true}
       zIndex="z-160"
-      maxWidth="md"
+      maxWidth="full"
       containerClassName="p-0!"
     >
-      <div className="flex flex-col h-full w-full bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4 text-white overflow-hidden">
+      <div className="flex flex-col h-full w-full max-w-md mx-auto p-5 space-y-4 text-white overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-3">
           <div className="flex items-center gap-2.5">
