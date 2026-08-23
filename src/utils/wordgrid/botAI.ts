@@ -13,6 +13,7 @@ export interface BotMove {
   placedTiles: PlacedTile[];
   score: number;
   direction: 'horizontal' | 'vertical';
+  breakdown?: string;
 }
 
 const VALID_2_LETTER_WORDS = [
@@ -186,6 +187,7 @@ interface CandidateMove {
   score: number;
   direction: 'horizontal' | 'vertical';
   premiumCount: number;
+  breakdown?: string;
 }
 
 function isPremiumBlockingCell(x: number, y: number, premiumCells: Record<string, string>): boolean {
@@ -199,6 +201,7 @@ async function validateCandidateMove(
   gridSize: number,
   direction: 'horizontal' | 'vertical',
   premiumCells: Record<string, string>,
+  rackSizeBeforeMove: number,
 ): Promise<CandidateMove | null> {
   const validation = validateBoardPlacement(placedTiles, board, gridSize);
   if (!validation.isValid || !validation.wordsFormed || validation.wordsFormed.length === 0) {
@@ -212,7 +215,7 @@ async function validateCandidateMove(
     }
   }
 
-  const scoreResult = calculateTurnScore(validation.wordsFormed, placedTiles.length, board, gridSize);
+  const scoreResult = calculateTurnScore(validation.wordsFormed, rackSizeBeforeMove, board, gridSize);
   const premiumCount = placedTiles.filter(t => isPremiumBlockingCell(t.x, t.y, premiumCells)).length;
 
   return {
@@ -221,6 +224,7 @@ async function validateCandidateMove(
     score: scoreResult.totalScore,
     direction,
     premiumCount,
+    breakdown: scoreResult.words.map(w => `${w.word}: ${w.breakdown}`).join(' | ') + (scoreResult.bingoApplied ? ' + 50 (Bingo)' : ''),
   };
 }
 
@@ -241,7 +245,7 @@ export async function findBotWordMove(
     for (const w of pool) {
       const result = tryWordOnEmptyBoard(w, gridSize, rackUpper);
       if (result) {
-        const candidate = await validateCandidateMove(result.placedTiles, board, gridSize, 'horizontal', premiumCells);
+        const candidate = await validateCandidateMove(result.placedTiles, board, gridSize, 'horizontal', premiumCells, rackUpper.length);
         if (candidate) {
           candidates.push(candidate);
         }
@@ -254,7 +258,7 @@ export async function findBotWordMove(
           const result = tryWordInDirection(w, boardMap, cell, direction, gridSize, rackUpper);
           if (!result) continue;
 
-          const candidate = await validateCandidateMove(result.placedTiles, board, gridSize, direction, premiumCells);
+          const candidate = await validateCandidateMove(result.placedTiles, board, gridSize, direction, premiumCells, rackUpper.length);
           if (candidate) {
             candidates.push(candidate);
           }
@@ -270,7 +274,7 @@ export async function findBotWordMove(
       .sort((a, b) => a.score - b.score)
       .slice(0, Math.max(1, Math.floor(candidates.length / 2)));
     const pick = bottomHalf[Math.floor(Math.random() * bottomHalf.length)];
-    return { word: pick.word, placedTiles: pick.placedTiles, score: pick.score, direction: pick.direction };
+    return { word: pick.word, placedTiles: pick.placedTiles, score: pick.score, direction: pick.direction, breakdown: pick.breakdown };
   }
 
   if (difficulty === 'normal') {
@@ -278,7 +282,7 @@ export async function findBotWordMove(
       .sort((a, b) => b.score - a.score)
       .slice(0, Math.min(3, candidates.length));
     const pick = top[Math.floor(Math.random() * top.length)];
-    return { word: pick.word, placedTiles: pick.placedTiles, score: pick.score, direction: pick.direction };
+    return { word: pick.word, placedTiles: pick.placedTiles, score: pick.score, direction: pick.direction, breakdown: pick.breakdown };
   }
 
   const scored = candidates.map(c => ({
@@ -290,5 +294,5 @@ export async function findBotWordMove(
 
   const best = scored[0];
 
-  return { word: best.word, placedTiles: best.placedTiles, score: best.score, direction: best.direction };
+  return { word: best.word, placedTiles: best.placedTiles, score: best.score, direction: best.direction, breakdown: best.breakdown };
 }

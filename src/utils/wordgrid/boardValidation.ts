@@ -206,5 +206,34 @@ export function validateBoardPlacement(
   };
 }
 
+/**
+ * Detects which drafted tiles conflict with the committed board.
+ * - Tiles overlapping committed cells are always conflicting.
+ * - If the draft is structurally invalid (misaligned, gapped, or not
+ *   connected), every drafted tile is flagged so the user can see and fix it.
+ * Returns coordinate keys in "x,y" form.
+ */
+export function detectDraftConflicts(
+  draftTiles: PlacedTile[],
+  existingBoard: GridCell[],
+  gridSize = DEFAULT_GRID_SIZE
+): string[] {
+  if (!draftTiles || draftTiles.length === 0) return [];
+
+  const boardKeys = new Set(existingBoard.map((c) => `${c.x},${c.y}`));
+  const overlaps: string[] = [];
+  for (const tile of draftTiles) {
+    if (boardKeys.has(`${tile.x},${tile.y}`)) {
+      overlaps.push(`${tile.x},${tile.y}`);
+    }
+  }
+  if (overlaps.length > 0) return overlaps;
+
+  const validation = validateBoardPlacement(draftTiles, existingBoard, gridSize);
+  if (validation.isValid) return [];
+
+  return draftTiles.map((t) => `${t.x},${t.y}`);
+}
+
 
 

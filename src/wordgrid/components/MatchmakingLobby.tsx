@@ -6,6 +6,8 @@ import { useApp } from '../../context/AppContext';
 import { ProtectedAvatar } from '../../components/chat/ProtectedAvatar';
 import { supabase } from '../../lib/supabaseClient';
 import { ALLOWED_GRID_SIZES, RECOMMENDED_MAX_PLAYERS } from '../../utils/wordgrid/constants';
+import { getLastActivityAt } from '../../utils/wordgrid/staleMatches';
+import formatLastSeen from '../../utils/formatLastSeen';
 import { useTheme } from '@/hooks/useTheme';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
 import { Trash2 } from 'lucide-react';
@@ -30,6 +32,9 @@ interface WordGridMatchRecord {
   status: string;
   current_turn: string;
   grid_size?: number;
+  last_move_at?: string | null;
+  created_at?: string | null;
+  moves?: Array<{ created_at?: string | null }>;
 }
 
 interface MatchmakingLobbyProps {
@@ -157,7 +162,8 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
   );
 
   const activeMatches = (matchesList as WordGridMatchRecord[]).filter(m => m.status === 'active');
-  const completedMatches = (matchesList as WordGridMatchRecord[]).filter(m => m.status === 'completed');
+  const completedMatches = (matchesList as WordGridMatchRecord[]).filter(m => m.status === 'completed' || m.status === 'abandoned');
+  const isExpiredMatch = (m: WordGridMatchRecord) => m.status === 'abandoned';
 
   return (
     <div className="flex flex-col max-h-[85vh] md:max-h-[90vh] overflow-y-auto scrollbar-hide p-4 sm:p-6 bg-[#101828] border border-slate-800 rounded-3xl w-full max-w-none mx-auto shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
@@ -293,6 +299,7 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
                   const isMyTurn = match.current_turn === userId;
                   const myScore = match.player1_id === userId ? match.p1_score : match.p2_score;
                   const oppScore = match.player1_id === userId ? match.p2_score : match.p1_score;
+                  const lastActivity = getLastActivityAt(match);
 
                   return (
                     <div
@@ -308,9 +315,20 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
                         />
                         <div className="min-w-0 flex flex-col">
                           <span className="text-xs font-black text-white truncate">{opp.username}</span>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
-                            {myScore} pts vs {oppScore} pts ({match.grid_size || 7}×{match.grid_size || 7})
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                            <span className="text-[10px] text-slate-400 font-bold">
+                              {myScore} pts vs {oppScore} pts
+                            </span>
+                            <span className="text-[8px] font-black px-1.5 py-0.5 bg-indigo-950 border border-indigo-800 text-indigo-300 rounded-md">
+                              {match.grid_size || 7}×{match.grid_size || 7}
+                            </span>
+                            <span
+                              className="text-[9px] text-slate-500 font-bold flex items-center gap-0.5"
+                              title={`Last play: ${formatLastSeen(lastActivity || undefined)}`}
+                            >
+                              ⏱ {formatLastSeen(lastActivity || undefined)}
+                            </span>
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
@@ -409,6 +427,8 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
                   const myScore = match.player1_id === userId ? match.p1_score : match.p2_score;
                   const oppScore = match.player1_id === userId ? match.p2_score : match.p1_score;
                   const won = myScore > oppScore;
+                  const expired = isExpiredMatch(match);
+                  const lastActivity = getLastActivityAt(match);
 
                   return (
                     <div
@@ -417,16 +437,29 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
                     >
                       <div className="min-w-0 flex flex-col">
                         <span className="text-xs font-black text-white/80 truncate">vs {opp.username}</span>
-                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
-                          Final: {myScore} - {oppScore}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                            Final: {myScore} - {oppScore}
+                          </span>
+                          <span className="text-[8px] font-black px-1.5 py-0.5 bg-indigo-950 border border-indigo-800 text-indigo-300 rounded-md">
+                            {match.grid_size || 7}×{match.grid_size || 7}
+                          </span>
+                          <span
+                            className="text-[9px] text-slate-500 font-bold flex items-center gap-0.5"
+                            title={`Last play: ${formatLastSeen(lastActivity || undefined)}`}
+                          >
+                            ⏱ {formatLastSeen(lastActivity || undefined)}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border ${won
+                        <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border ${expired
+                          ? 'bg-amber-950 border-amber-500/40 text-amber-400'
+                          : won
                           ? 'bg-emerald-950 border-emerald-500/40 text-emerald-400'
                           : 'bg-rose-950 border-rose-500/40 text-rose-400'
                           }`}>
-                          {won ? 'Won' : 'Lost'}
+                          {expired ? 'Expired' : won ? 'Won' : 'Lost'}
                         </span>
                         {match.is_bot_match && (
                           <button

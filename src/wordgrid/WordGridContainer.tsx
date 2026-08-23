@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWordGridStore } from '../store/useWordGridStore';
 import { MatchmakingLobby } from './components/MatchmakingLobby';
@@ -12,6 +12,8 @@ import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabaseClient';
 import { useTheme } from '../hooks/useTheme';
 import { TOAST_DURATION } from '../constants/ui';
+import { buildPlayerColorMap } from '../utils/wordgrid/playerColors';
+import formatUsername from '../utils/formatUsername';
 
 interface WordGridContainerProps {
   onBackToClassic: () => void;
@@ -54,10 +56,11 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
   const p2Score = useWordGridStore((s: any) => s.p2Score);
   const reorderRack = useWordGridStore((s: any) => s.reorderRack);
   const loading = useWordGridStore((s: any) => s.loading);
+  const lastMove = useWordGridStore((s: any) => s.lastMove);
+  const conflictCoords = useWordGridStore((s: any) => s.conflictCoords);
 
   const isBotThinking = useWordGridStore((s: any) => s.isBotThinking);
   const lastBotMove = useWordGridStore((s: any) => s.lastBotMove);
-  const lastBotPlacedCoords = useWordGridStore((s: any) => s.lastBotPlacedCoords);
 
   const [selectedRackIdx, setSelectedRackIdx] = useState<number | null>(null);
   const [showExchangeModal, setShowExchangeModal] = useState(false);
@@ -79,6 +82,47 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
   const handleTutorialComplete = () => {
     localStorage.setItem('wordgrid_tutorial_completed', 'true');
     setShowTutorial(false);
+  };
+
+  // Active players list for scores header
+  const activePlayersList = players.length > 0
+    ? players
+    : [
+      { id: player1?.id || 'p1', username: player1?.username || 'Player 1', score: p1Score, rack: [] },
+      { id: player2?.id || 'p2', username: player2?.username || 'Player 2', score: p2Score, rack: [] },
+    ];
+
+  // Deterministic per-user color schemes shared across header, timeline & board
+  const colorMap = buildPlayerColorMap(activePlayersList.map((p: any) => p.id));
+
+  // Profile lookup (usernames/avatars) for the play timeline & notifications
+  const profileLookup: Record<string, { username?: string; avatar_url?: string | null }> = {};
+  allProfiles.forEach((p: any) => {
+    if (p?.id) profileLookup[p.id] = { username: p.username, avatar_url: p.avatar_url };
+  });
+  [player1, player2].forEach((p: any) => {
+    if (p?.id) profileLookup[p.id] = { username: p.username, avatar_url: p.avatar_url };
+  });
+
+  // Latest identity context for async event handlers (splash notifications)
+  const identityRef = useRef<{
+    players: any[];
+    lookup: Record<string, { username?: string; avatar_url?: string | null }>;
+  }>({ players: activePlayersList, lookup: profileLookup });
+  useEffect(() => {
+    identityRef.current = { players: activePlayersList, lookup: profileLookup };
+  });
+
+  // Resolve a player's display name from live state, formatted app-wide
+  const resolvePlayerDisplayName = (playerId?: string, fallback?: string): string => {
+    if (!playerId || playerId === 'bot') return fallback || 'Opponent';
+    const { players: ps, lookup } = identityRef.current;
+    const rawName =
+      ps.find((p: any) => p?.id === playerId)?.username ||
+      lookup[playerId]?.username;
+    if (rawName) return formatUsername(rawName);
+    if (fallback && fallback !== 'Opponent') return formatUsername(fallback);
+    return 'Opponent';
   };
 
 
@@ -122,11 +166,9 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     setSelectedRackIdx(idx < 0 ? null : idx);
   };
 
+  // Tiles can be arranged any time (even off-turn) for strategizing; only
+  // submission/exchange remain turn-gated.
   const handlePlaceTile = (x: number, y: number, rackIdx: number) => {
-    if (!isMyTurn) {
-      triggerToast("It's your opponent's turn!");
-      return;
-    }
     const letter = rack[rackIdx];
     if (letter !== undefined) {
       placeTile(x, y, letter);
@@ -135,7 +177,6 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
   };
 
   const handleRecallTile = (x: number, y: number) => {
-    if (!isMyTurn) return;
     recallTile(x, y);
   };
 
@@ -179,7 +220,10 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     const handleOpponentMove = (e: Event) => {
       const detail = (e as CustomEvent)?.detail;
       if (detail && detail.word) {
-        setSplashMove(detail);
+        setSplashMove({
+          ...detail,
+          playerName: resolvePlayerDisplayName(detail.playerId, detail.playerName),
+        });
         if (timer) clearTimeout(timer);
         timer = setTimeout(() => {
           setSplashMove(null);
@@ -224,14 +268,6 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
       </div>
     );
   }
-
-  // Active players list for scores header
-  const activePlayersList = players.length > 0
-    ? players
-    : [
-      { id: player1?.id || 'p1', username: player1?.username || 'Player 1', score: p1Score, rack: [] },
-      { id: player2?.id || 'p2', username: player2?.username || 'Player 2', score: p2Score, rack: [] },
-    ];
 
   return (
     <div
@@ -355,13 +391,14 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
                 {activePlayersList.map((p: any, i: number) => {
                   const isYou = p.id === userId;
                   const isCurrent = currentTurn === p.id && status === 'active';
+                  const scheme = colorMap[p.id];
                   return (
                     <div key={p.id} className="flex items-center gap-1.5 text-[10px] font-black">
                       {i > 0 && <span className="text-slate-700 font-bold">•</span>}
-                      <span className={isCurrent ? 'text-emerald-400 font-extrabold' : 'text-slate-400'}>
+                      <span className={`${isCurrent ? `${scheme?.name || 'text-slate-400'} font-extrabold` : scheme?.name || 'text-slate-400'}`}>
                         {isYou ? 'You' : p.username}:
                       </span>
-                      <span className="text-white text-xs font-black">{p.score}</span>
+                      <span className={`text-xs font-black ${isCurrent ? 'text-white' : 'text-slate-200'}`}>{p.score}</span>
                     </div>
                   );
                 })}
@@ -433,7 +470,9 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
             board={board}
             placedTiles={placedTiles}
             selectedIdx={selectedRackIdx}
-            highlightedCoords={lastBotPlacedCoords}
+            conflictCoords={conflictCoords}
+            lastMove={lastMove}
+            colorMap={colorMap}
             onMoveTileInGrid={moveTileInGrid}
             onPlaceTile={handlePlaceTile}
             onRecallTile={handleRecallTile}
@@ -442,7 +481,14 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
 
         {/* Move History / Timeline (Mobile: 4th/Bottom, Desktop: 3rd block of left column) */}
         <div className="order-4 md:col-span-5 md:col-start-1 flex flex-col space-y-4 w-full max-w-[480px] mx-auto md:max-w-none">
-          <MoveHistory moves={moves} player1={player1} player2={player2} />
+          <MoveHistory
+            moves={moves}
+            player1={player1}
+            player2={player2}
+            players={activePlayersList}
+            currentUserId={userId}
+            profileLookup={profileLookup}
+          />
         </div>
 
       </div>

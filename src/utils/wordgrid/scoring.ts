@@ -18,13 +18,15 @@ export interface TurnScoreResult {
 /**
  * Calculates the score of a turn.
  * @param wordsFormed - list of words formed with their new tiles
- * @param placedTilesCount - number of tiles placed in this turn (to check for 7-tile bingo)
+ * @param rackSizeBeforeMove - number of tiles the player's rack held before this turn
+ *                             (a play using every rack tile earns a +50 Scrabble-style
+ *                              bingo, including sub-7 racks at endgame)
  * @param existingBoard - existing tiles on the board before this turn
  * @param gridSize - size of the grid (default 7)
  */
 export function calculateTurnScore(
   wordsFormed: { word: string; tiles: PlacedTile[] }[],
-  placedTilesCount: number,
+  rackSizeBeforeMove: number,
   existingBoard: GridCell[],
   gridSize = 7
 ): TurnScoreResult {
@@ -134,8 +136,12 @@ export function calculateTurnScore(
     });
   }
 
-  const isFirstPlay = existingBoard.length === 0;
-  const bingoApplied = isFirstPlay && placedTilesCount === 7;
+  // Scrabble-style bingo: using ALL tiles from the rack in one play earns +50
+  const placedTilesCount = wordsFormed.reduce(
+    (sum, item) => sum + (item.tiles ? new Set(item.tiles.map((t) => `${t.x},${t.y}`)).size : 0),
+    0
+  );
+  const bingoApplied = rackSizeBeforeMove > 0 && placedTilesCount === rackSizeBeforeMove;
   if (bingoApplied) {
     totalScore += 50;
   }

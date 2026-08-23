@@ -1,26 +1,57 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/wordgrid/components/MoveHistory.tsx
 
 import { useState } from 'react';
 import { fetchWordDefinition } from '../../utils/wordgrid/dictionary';
 import type { DictionaryDefinition } from '../../utils/wordgrid/dictionary';
+import { buildPlayerColorMap } from '../../utils/wordgrid/playerColors';
+import type { PlayerColorScheme } from '../../utils/wordgrid/playerColors';
+import { ProtectedAvatar } from '../../components/chat/ProtectedAvatar';
 
 interface MoveHistoryProps {
   moves: any[];
   player1: any;
   player2: any;
+  players?: any[];
+  currentUserId?: string;
+  profileLookup?: Record<string, { username?: string; avatar_url?: string | null }>;
 }
 
-export const MoveHistory = ({ moves, player1, player2 }: MoveHistoryProps) => {
+export const MoveHistory = ({ moves, player1, player2, players = [], currentUserId, profileLookup }: MoveHistoryProps) => {
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
   const [definition, setDefinition] = useState<DictionaryDefinition | null>(null);
   const [loadingDef, setLoadingDef] = useState(false);
 
-  const getUsername = (id: string) => {
-    if (id === player1?.id) return player1?.username || 'Player 1';
-    if (id === player2?.id) return player2?.username || 'Player 2';
-    if (id === 'bot') return 'AI (Bot)';
-    return 'Opponent';
+  const colorMap: Record<string, PlayerColorScheme> = buildPlayerColorMap([
+    ...players.map((p) => p?.id),
+    player1?.id,
+    player2?.id,
+    ...(moves || []).map((m) => m?.player_id),
+  ]);
+
+  const resolvePlayer = (id: string) => {
+    if (id === 'bot') return { id, username: 'AI (Bot)', avatar_url: null as string | null };
+    const fromPlayers = players.find((p) => p.id === id);
+    const fromLookup = profileLookup?.[id];
+    const isYou = !!currentUserId && id === currentUserId;
+    const fallback =
+      id === player1?.id ? player1 : id === player2?.id ? player2 : null;
+    const username =
+      fromPlayers?.username ||
+      fromLookup?.username ||
+      fallback?.username ||
+      'Opponent';
+    return {
+      id,
+      username: isYou ? 'You' : username,
+      avatar_url: (fromPlayers?.avatar_url || fromLookup?.avatar_url || null) as
+        | string
+        | null,
+    };
   };
+
+  const schemeOf = (id: string): PlayerColorScheme =>
+    colorMap[id] || buildPlayerColorMap([id])[id];
 
   const handleWordClick = async (wordStr: string) => {
     // A move can contain comma separated words, let's grab the first clean word
@@ -53,51 +84,78 @@ export const MoveHistory = ({ moves, player1, player2 }: MoveHistoryProps) => {
 
           const isPass = !move.word || move.word === 'PASS' || move.word.startsWith('[') || move.word.startsWith('SWAP');
           const hasBreakdown = !!move.breakdown;
+          const hasBingo = typeof move.breakdown === 'string' && move.breakdown.includes('(Bingo)');
 
           // Extract all words formed on this turn (stored in move.word)
           const wordsFormedOnTurn = move.word ? move.word.split(',').map((w: string) => w.trim().toUpperCase()) : [];
+
+          const player = resolvePlayer(move.player_id);
+          const scheme = schemeOf(move.player_id);
 
           return (
             <div
               key={chronologicalIdx}
               className={`flex items-center justify-between p-2.5 rounded-xl text-xs gap-2.5 transition-all ${
                 isLatestMove
-                  ? 'bg-indigo-950/70 border border-emerald-500/60 shadow-lg shadow-emerald-950/20'
+                  ? `bg-slate-850/80 border-2 ${scheme.avatarBorder} shadow-lg`
                   : 'bg-slate-850/80 border border-slate-800 shadow-sm hover:border-slate-700'
               }`}
             >
-              <div className="flex flex-col min-w-0 flex-1 space-y-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[9px] text-slate-400 font-bold uppercase truncate">
-                    {getUsername(move.player_id)}
-                  </span>
-                  {isLatestMove && !isPass && (
-                    <span className="text-[8px] font-black uppercase px-1.5 py-0.2 bg-emerald-500 text-slate-950 rounded-md tracking-wider shadow-xs animate-pulse">
-                      LATEST PLAY
-                    </span>
+              <div className="flex items-start gap-2 min-w-0 flex-1">
+                {/* Player avatar with per-user color ring */}
+                <div className={`shrink-0 rounded-full border-2 ${scheme.avatarBorder}`}>
+                  {move.player_id === 'bot' ? (
+                    <div className="w-7 h-7 rounded-full bg-emerald-500/20 flex items-center justify-center text-sm">
+                      🤖
+                    </div>
+                  ) : (
+                    <ProtectedAvatar
+                      userId={player.id}
+                      src={player.avatar_url || undefined}
+                      username={player.username}
+                      className="w-7 h-7 rounded-full"
+                    />
                   )}
                 </div>
 
-                {isPass ? (
-                  <span className="text-slate-500 font-black italic text-[11px] truncate">{move.word || 'PASSED'}</span>
-                ) : (
-                  <div className="flex items-center flex-wrap gap-1.5 text-[11px] font-black">
-                    {wordsFormedOnTurn.map((w: string, wIdx: number) => (
-                      <button
-                        key={wIdx}
-                        onClick={() => handleWordClick(w)}
-                        className="px-2 py-0.5 rounded-md bg-emerald-950/80 border border-emerald-800/80 text-emerald-300 hover:bg-emerald-900/80 hover:text-white transition-all underline cursor-pointer truncate shadow-xs"
-                        title="Click to view dictionary definition"
-                      >
-                        {w}
-                      </button>
-                    ))}
+                <div className="flex flex-col min-w-0 flex-1 space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-[9px] font-bold uppercase truncate ${scheme.name}`}>
+                      {player.username}
+                    </span>
+                    {isLatestMove && !isPass && (
+                      <span className="text-[8px] font-black uppercase px-1.5 py-0.2 bg-emerald-500 text-slate-950 rounded-md tracking-wider shadow-xs animate-pulse">
+                        LATEST PLAY
+                      </span>
+                    )}
                   </div>
-                )}
+
+                  {isPass ? (
+                    <span className="text-slate-500 font-black italic text-[11px] truncate">{move.word || 'PASSED'}</span>
+                  ) : (
+                    <div className="flex items-center flex-wrap gap-1.5 text-[11px] font-black">
+                      {wordsFormedOnTurn.map((w: string, wIdx: number) => (
+                        <button
+                          key={wIdx}
+                          onClick={() => handleWordClick(w)}
+                          className={`px-2 py-0.5 rounded-md border transition-all underline cursor-pointer truncate shadow-xs ${scheme.chip}`}
+                          title="Click to view dictionary definition"
+                        >
+                          {w}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center gap-1.5 font-black text-right shrink-0">
-                <span className={`text-[11px] ${isPass ? 'text-slate-500' : isLatestMove ? 'text-emerald-300 font-extrabold' : 'text-emerald-400'}`}>
+                {!isPass && hasBingo && (
+                  <span className="text-[7px] font-black uppercase px-1 py-0.5 bg-linear-to-r from-fuchsia-600 to-amber-500 text-white rounded-md tracking-wider shadow-xs animate-pulse" title="Used all rack tiles in one play!">
+                    🎉 BINGO
+                  </span>
+                )}
+                <span className={`text-[11px] ${isPass ? 'text-slate-500' : scheme.score}`}>
                   {isPass ? '0' : `+${move.score}`} pts
                 </span>
                 {hasBreakdown && (
@@ -201,3 +259,5 @@ export const MoveHistory = ({ moves, player1, player2 }: MoveHistoryProps) => {
     </div>
   );
 };
+
+export default MoveHistory;

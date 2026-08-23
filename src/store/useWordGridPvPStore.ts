@@ -14,6 +14,18 @@ import {
    drawBalancedRack,
 } from "../utils/wordgrid/bagBalancing";
 import { WordGridPvPEngine } from "../utils/wordgrid/WordGridPvPEngine";
+import { detectDraftConflicts } from "../utils/wordgrid/boardValidation";
+import {
+   scheduleWordGridDraftSave,
+   cancelWordGridDraftSave,
+   clearWordGridDraft,
+   loadWordGridDraft,
+} from "../utils/wordgrid/draftStorage";
+import {
+   findStaleMatchIds,
+   isStaleMatch,
+} from "../utils/wordgrid/staleMatches";
+import formatUsername from "../utils/formatUsername";
 import { safeLocalStorage } from "../utils/storage";
 import {
    sendWordGridChallengeNotification,
@@ -95,9 +107,36 @@ export function clearPvPSnapshot(matchId: string | null) {
    if (!matchId) return;
    try {
       safeLocalStorage.removeItem(`wordgrid_pvp_snapshot_${matchId}`);
-      safeLocalStorage.removeItem(`wordgrid_draft_${matchId}`);
+      clearWordGridDraft(matchId);
    } catch (e) {
       console.warn("[WordGridPvP] Clear snapshot failed:", e);
+   }
+}
+
+let lastMoveTimer: any = null;
+
+const LAST_MOVE_CLEAR_MS = 4000;
+
+function startLastMoveTimer(set: (partial: any) => void) {
+   if (lastMoveTimer) clearTimeout(lastMoveTimer);
+   lastMoveTimer = setTimeout(() => {
+      set({ lastMove: null });
+   }, LAST_MOVE_CLEAR_MS);
+}
+
+// Client-owned expiry: mark this player's stale matches as abandoned.
+async function abandonMatchesByIds(ids: string[]): Promise<void> {
+   if (ids.length === 0) return;
+   try {
+      await supabase
+         .from("wordgrid_matches")
+         .update({
+            status: "abandoned",
+            completed_at: new Date().toISOString(),
+         })
+         .in("id", ids);
+   } catch (e) {
+      console.warn("[WordGridPvP] Stale match sweep failed:", e);
    }
 }
 
@@ -120,12 +159,18 @@ interface WordGridPvPState {
    loading: boolean;
    error: string | null;
    pvpMatchesList: any[];
+   lastMove: { coords: string[]; playerId: string } | null;
+   conflictCoords: string[];
 
    // Actions
    setView: (view: WordGridPvPViewType) => void;
    resetGame: () => void;
    loadMatch: (matchId: string, currentUserId: string) => Promise<void>;
-   updateFromMatchRecord: (record: any, currentUserId: string) => void;
+   updateFromMatchRecord: (
+      record: any,
+      currentUserId: string,
+      opts?: { suppressNewMoveFx?: boolean },
+   ) => void;
    loadMatchesList: (userId: string) => Promise<void>;
 
    // Board & Rack actions
@@ -145,6 +190,7 @@ interface WordGridPvPState {
       userId: string,
       triggerToast: (msg: string, duration?: number, isLarge?: boolean) => void,
    ) => Promise<boolean>;
+   hydrateLocalDraft: () => void;
    exchangeTiles: (
       userId: string,
       lettersToExchange: string[],
@@ -171,7 +217,26 @@ interface WordGridPvPState {
    ) => Promise<void>;
 }
 
-export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
+export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => {
+   // Re-run conflict detection against the committed board and schedule the
+   // debounced local-draft save after any draft-mutating action.
+   const syncDraftFx = () => {
+      const { matchId, placedTiles, board, gridSize } = get();
+      scheduleWordGridDraftSave(matchId, () => {
+         const cur = useWordGridPvPStore.getState();
+         if (cur.matchId !== matchId) return null;
+         return {
+            placedTiles: cur.placedTiles,
+            rack: cur.rack,
+            savedAt: Date.now(),
+         };
+      });
+      set({
+         conflictCoords: detectDraftConflicts(placedTiles, board, gridSize),
+      });
+   };
+
+   return {
    matchId: null,
    gridSize: DEFAULT_GRID_SIZE,
    maxPlayers: 2,
@@ -190,11 +255,15 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
    loading: false,
    error: null,
    pvpMatchesList: [],
+   lastMove: null,
+   conflictCoords: [],
 
    setView: (view) => set({ view }),
 
    resetGame: () => {
+      cancelWordGridDraftSave(get().matchId);
       clearPvPSnapshot(get().matchId);
+      if (lastMoveTimer) clearTimeout(lastMoveTimer);
       set({
          matchId: null,
          gridSize: DEFAULT_GRID_SIZE,
@@ -212,6 +281,8 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
          rack: [],
          loading: false,
          error: null,
+         lastMove: null,
+         conflictCoords: [],
       });
    },
 
@@ -220,7 +291,9 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
       set({ loading: true, error: null });
       const local = loadPvPSnapshot(matchId);
       if (local) {
-         get().updateFromMatchRecord(local, currentUserId);
+         get().updateFromMatchRecord(local, currentUserId, {
+            suppressNewMoveFx: true,
+         });
       }
       try {
          const { data, error } = await supabase
@@ -232,20 +305,37 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
             .single();
          if (error) throw error;
          if (data) {
-            get().updateFromMatchRecord(data, currentUserId);
+            let record = data;
+            // Expired while away: cancel instead of resuming
+            if (isStaleMatch(record)) {
+               await abandonMatchesByIds([record.id]);
+               record = {
+                  ...record,
+                  status: "abandoned",
+                  completed_at: new Date().toISOString(),
+               };
+            }
+            get().updateFromMatchRecord(record, currentUserId, {
+               suppressNewMoveFx: true,
+            });
          }
       } catch (e: any) {
          console.warn("[WordGridPvP] loadMatch network error:", e);
          if (!local) set({ error: e.message });
       } finally {
+         get().hydrateLocalDraft();
          set({ loading: false });
       }
    },
 
-   updateFromMatchRecord: (record, currentUserId) => {
+   updateFromMatchRecord: (record, currentUserId, opts) => {
       const isP1 = record.player1_id === currentUserId || !record.player1_id;
       const isP2 = !isP1 && record.player2_id === currentUserId;
       const role = isP1 ? "player1" : isP2 ? "player2" : null;
+
+      // Preserve any in-progress local draft across incoming board updates
+      const prevPlacedTiles = get().placedTiles;
+      const keepDraft = prevPlacedTiles.length > 0;
 
       let playersList: WordGridPlayer[] = record.players_data || [];
       if (playersList.length === 0) {
@@ -266,7 +356,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
       }
 
       const activePlayer = playersList.find((p) => p.id === currentUserId);
-      const activeRack = activePlayer
+      const committedRack = activePlayer
          ? activePlayer.rack
          : (isP1 ? record.p1_rack : record.p2_rack) || [];
 
@@ -274,35 +364,59 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
       const currentTurn =
          record.current_turn || playersList[turnIndex]?.id || currentUserId;
 
+      const newBoard = record.board || [];
       const newMoves = record.moves || [];
       const prevMovesCount = get().moves?.length || 0;
-      if (newMoves.length > prevMovesCount) {
-         const lastMove = newMoves[newMoves.length - 1];
-         if (lastMove && lastMove.player_id !== currentUserId) {
-            const opponent = playersList.find(
-               (p) => p.id === lastMove.player_id,
-            );
-            const oppName =
-               opponent?.username ||
-               record.player1?.username ||
-               record.player2?.username ||
-               "Opponent";
-            const word = lastMove.primary_word || lastMove.word || "a word";
-            const score = lastMove.score || 0;
-            const isSwap = typeof word === "string" && word.includes("Swapped");
 
-            window.dispatchEvent(
-               new CustomEvent("opponent-played-move", {
-                  detail: {
-                     playerName: oppName,
-                     word,
-                     score,
-                     isSwap,
-                  },
-               }),
-            );
+      let lastMove = get().lastMove;
+      const suppressFx = !!opts?.suppressNewMoveFx;
+      if (!suppressFx && newMoves.length > prevMovesCount) {
+         const lastMoveRecord = newMoves[newMoves.length - 1];
+         if (lastMoveRecord) {
+            // Highlight the latest play regardless of who made it
+            lastMove = {
+               coords: Array.isArray(lastMoveRecord.coords)
+                  ? lastMoveRecord.coords
+                  : [],
+               playerId: lastMoveRecord.player_id,
+            };
+            startLastMoveTimer(set);
+
+            if (lastMoveRecord.player_id !== currentUserId) {
+               const word =
+                  lastMoveRecord.primary_word ||
+                  lastMoveRecord.word ||
+                  "a word";
+               const isSwap =
+                  typeof word === "string" && word.includes("Swapped");
+               const opponent = playersList.find(
+                  (p) => p.id === lastMoveRecord.player_id,
+               );
+               const oppName =
+                  opponent?.username ||
+                  record.player1?.username ||
+                  record.player2?.username ||
+                  "Opponent";
+
+               window.dispatchEvent(
+                  new CustomEvent("opponent-played-move", {
+                     detail: {
+                        playerName: oppName,
+                        playerId: lastMoveRecord.player_id,
+                        word,
+                        score: lastMoveRecord.score || 0,
+                        isSwap,
+                     },
+                  }),
+               );
+            }
          }
       }
+
+      // Flag drafted tiles that now conflict with the updated board
+      const conflictCoords = keepDraft
+         ? detectDraftConflicts(prevPlacedTiles, newBoard, record.grid_size || DEFAULT_GRID_SIZE)
+         : [];
 
       const snapshot = {
          matchId: record.id,
@@ -310,22 +424,59 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
          maxPlayers: record.max_players || 2,
          role: role as "player1" | "player2" | null,
          status: record.status,
-         board: record.board || [],
+         board: newBoard,
          tileBag: record.tile_bag || [],
          players: playersList,
          currentTurnIndex: turnIndex,
          currentTurn,
          moves: newMoves,
-         view: (record.status === "completed"
+         view: (record.status === "completed" || record.status === "abandoned"
             ? "completed"
             : "active") as WordGridPvPViewType,
-         placedTiles: [],
-         rack: activeRack,
+         placedTiles: keepDraft ? prevPlacedTiles : [],
+         // Keep the working rack when a draft exists (it already excludes drafted letters)
+         rack: keepDraft ? get().rack : committedRack,
          loading: false,
+         lastMove,
+         conflictCoords,
       };
 
       set(snapshot);
       savePvPSnapshot(record.id, snapshot);
+   },
+
+   hydrateLocalDraft: () => {
+      const { matchId, status, board, rack, gridSize } = get();
+      if (!matchId || status === "completed") return;
+      const draft = loadWordGridDraft(matchId);
+      if (!draft || draft.placedTiles.length === 0) return;
+
+      const inBounds = (n: number) =>
+         Number.isInteger(n) && n >= 0 && n < gridSize;
+      const boardKeys = new Set(board.map((c) => `${c.x},${c.y}`));
+
+      const remainingRack = [...rack];
+      const restoredTiles: PlacedTile[] = [];
+      draft.placedTiles.forEach((t) => {
+         if (!inBounds(t.x) || !inBounds(t.y)) return;
+         if (boardKeys.has(`${t.x},${t.y}`)) return;
+         const idx = remainingRack.indexOf(t.letter);
+         if (idx !== -1) {
+            remainingRack.splice(idx, 1);
+            restoredTiles.push({ x: t.x, y: t.y, letter: t.letter });
+         }
+      });
+
+      if (restoredTiles.length === 0) {
+         clearWordGridDraft(matchId);
+         return;
+      }
+
+      set({
+         placedTiles: restoredTiles,
+         rack: remainingRack,
+         conflictCoords: detectDraftConflicts(restoredTiles, board, gridSize),
+      });
    },
 
    loadMatchesList: async (userId) => {
@@ -340,7 +491,17 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
             .eq("is_bot_match", false)
             .order("created_at", { ascending: false });
          if (error) throw error;
-         set({ pvpMatchesList: data || [] });
+
+         let rows = data || [];
+         // Auto-cancel own stale matches (client-side sweep, no server schedule)
+         const staleIds = findStaleMatchIds(rows);
+         if (staleIds.length > 0) {
+            await abandonMatchesByIds(staleIds);
+            rows = rows.map((m) =>
+               staleIds.includes(m.id) ? { ...m, status: "abandoned" } : m,
+            );
+         }
+         set({ pvpMatchesList: rows });
       } catch (e) {
          console.warn("[WordGridPvP] loadMatchesList error:", e);
       }
@@ -361,6 +522,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
       const newPlaced = [...placedTiles];
       newPlaced[tileIdx] = { ...newPlaced[tileIdx], x: toX, y: toY };
       set({ placedTiles: newPlaced });
+      syncDraftFx();
    },
 
    placeTile: (x, y, letter) => {
@@ -374,6 +536,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
          placedTiles: [...placedTiles, { x, y, letter }],
          rack: newRack,
       });
+      syncDraftFx();
    },
 
    recallTile: (x, y) => {
@@ -388,6 +551,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
          placedTiles: newPlaced,
          rack: [...rack, tile.letter],
       });
+      syncDraftFx();
    },
 
    recallAllTiles: () => {
@@ -396,6 +560,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
          placedTiles: [],
          rack: [...rack, ...placedTiles.map((t) => t.letter)],
       });
+      syncDraftFx();
    },
 
    shuffleRack: () => {
@@ -406,6 +571,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
          [newRack[i], newRack[j]] = [newRack[j], newRack[i]];
       }
       set({ rack: newRack });
+      syncDraftFx();
    },
 
    reorderRack: (fromIdx, toIdx) => {
@@ -422,6 +588,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
       const [moved] = newRack.splice(fromIdx, 1);
       newRack.splice(toIdx, 0, moved);
       set({ rack: newRack });
+      syncDraftFx();
    },
 
    submitMove: async (userId, triggerToast) => {
@@ -452,15 +619,25 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
       const activePlayer = pvpRes.updatedState.players?.find(
          (p) => p.id === userId,
       );
+      const savedMoves = pvpRes.payloadToSave.moves as
+         | { coords?: string[] }[]
+         | undefined;
       const updatedState = {
          ...state,
          ...pvpRes.updatedState,
          placedTiles: [],
          rack: activePlayer?.rack || state.rack,
+         conflictCoords: [],
+         lastMove: {
+            coords: savedMoves?.[savedMoves.length - 1]?.coords || [],
+            playerId: userId,
+         },
       };
 
       set(updatedState);
       savePvPSnapshot(state.matchId, updatedState);
+      startLastMoveTimer(set);
+      clearWordGridDraft(state.matchId);
 
       const safePayload = {
          ...pvpRes.payloadToSave,
@@ -487,7 +664,8 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
       const nextTurnUserId = updatedState.currentTurn;
       const isCompleted = updatedState.status === "completed";
       const currentPlayer = state.players.find((p) => p.id === userId);
-      const playerName = currentPlayer?.username || "Your opponent";
+      const playerName =
+         formatUsername(currentPlayer?.username) || "Your opponent";
 
       if (
          nextTurnUserId &&
@@ -537,10 +715,12 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
          ...exRes.updatedState,
          placedTiles: [],
          rack: activePlayer?.rack || state.rack,
+         conflictCoords: [],
       };
 
       set(updatedState);
       savePvPSnapshot(state.matchId, updatedState);
+      clearWordGridDraft(state.matchId);
 
       const safeExPayload = {
          ...exRes.payloadToSave,
@@ -566,7 +746,8 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
       // Notify opponent that it is their turn after exchange
       const nextTurnUserId = updatedState.currentTurn;
       const currentPlayer = state.players.find((p) => p.id === userId);
-      const playerName = currentPlayer?.username || "Your opponent";
+      const playerName =
+         formatUsername(currentPlayer?.username) || "Your opponent";
 
       if (
          nextTurnUserId &&
@@ -706,4 +887,5 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
          set({ loading: false });
       }
    },
-}));
+   };
+});
