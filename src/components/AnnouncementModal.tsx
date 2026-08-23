@@ -13,8 +13,8 @@ export const AnnouncementModal: React.FC<Props> = ({ announcement, isOpen, onClo
   if (!isOpen) return null;
 
   return (
-    <ModalLayout isOpen onClose={onClose} maxWidth="lg" showCloseButton={false} containerClassName="p-0!">
-      <div className="flex flex-col h-full min-h-0 w-full">
+    <ModalLayout isOpen onClose={onClose} maxWidth="full" showCloseButton={false} containerClassName="p-0!">
+      <div className="flex flex-col h-full min-h-0 w-full max-w-lg mx-auto">
 
         {/* Header */}
         <div className="bg-primary/20 p-6 border-b border-white/10 flex items-center gap-4 shrink-0">

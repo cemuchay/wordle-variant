@@ -368,11 +368,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
             <ModalLayout
                 isOpen
                 onClose={onClose}
-                maxWidth="lg"
+                maxWidth="full"
                 showCloseButton={false}
                 containerClassName="p-0!"
             >
-                <div className="flex flex-col h-full min-h-0 w-full">
+                <div className="flex flex-col h-full min-h-0 w-full max-w-lg mx-auto">
                 {/* Header Profile Section */}
                 <div className="p-4 sm:p-6 border-b border-white/5 relative overflow-hidden bg-white/5 shrink-0 z-10">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-correct/5 blur-3xl -mr-12 -mt-12 pointer-events-none" />
@@ -780,11 +780,11 @@ const FollowListModal: React.FC<{
         <ModalLayout
             isOpen
             onClose={onClose}
-            maxWidth="md"
+            maxWidth="full"
             showCloseButton={false}
             containerClassName="p-0!"
         >
-            <div className="flex flex-col h-full min-h-0 w-full">
+            <div className="flex flex-col h-full min-h-0 w-full max-w-md mx-auto">
                 <div className="p-4 sm:p-5 border-b border-white/5 flex items-center justify-between bg-white/5 shrink-0">
                     <h3 className="text-sm sm:text-base font-black uppercase text-white tracking-wider flex items-center gap-2">
                         <Users size={16} className="text-correct" />

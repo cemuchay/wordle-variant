@@ -26,7 +26,8 @@ export const GuessGrid = memo(({
     commentsDisabledByTarget,
     hintRecord = null,
 }: GuessGridProps) => {
-    // hint_record.row is 1-based; highlight starts on that row and every row after
+    // hint_record.row is 1-based: the dot marks the hint row itself,
+    // cell highlight applies from every row after it
     const hintStartRow = hintRecord?.row !== undefined ? hintRecord.row - 1 : null;
 
     return (
@@ -59,7 +60,7 @@ export const GuessGrid = memo(({
                                     const isHintedCell =
                                         hintStartRow !== null &&
                                         hintRecord !== null &&
-                                        i >= hintStartRow &&
+                                        i > hintStartRow &&
                                         j === hintRecord.index;
                                     return (
                                         <div
@@ -79,6 +80,14 @@ export const GuessGrid = memo(({
                                     );
                                 })}
                             </div>
+
+                            {i === hintStartRow && (
+                                <span
+                                    className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse shrink-0"
+                                    title="Hint revealed here"
+                                />
+                            )}
+
                             <div
                                 className={`text-[12px] font-mono font-black px-2 py-0.5 rounded-full ${rowScore >= 0 ? "bg-correct/20 text-correct" : "bg-red-500/20 text-red-400"}`}
                             >
