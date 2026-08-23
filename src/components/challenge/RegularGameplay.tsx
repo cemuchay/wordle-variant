@@ -268,9 +268,10 @@ export const RegularGameplay = memo(function RegularGameplay({
                 )}
             </div>
 
-            {(showHint || showStarter) && (
-                <div className={`absolute left-4 right-4 flex items-center justify-between pointer-events-none z-45 ${isDynamicIslandVisible ? 'top-12' : 'top-3'}`}>
-                    <div className="flex items-center gap-3 pointer-events-auto">
+            <div ref={containerRef} className="flex-1 flex flex-col items-center justify-center min-h-0 overflow-hidden gap-3">
+                {/* Hint / Recommended Starter — in normal flow above the grid so it never blocks play */}
+                {(showHint || showStarter) && (
+                    <div className="w-full max-w-md shrink-0 flex items-center justify-center gap-3 px-2">
                         {showHint && (
                             <button
                                 onClick={actions.handleHint}
@@ -286,27 +287,25 @@ export const RegularGameplay = memo(function RegularGameplay({
                                 )}
                             </button>
                         )}
-                    </div>
 
-                    {showStarter && (
-                        <button
-                            onClick={() => {
-                                const starter = starterWord.toUpperCase();
-                                // Clear current input first
-                                for (let i = 0; i < currentGuess.length; i++) {
-                                    actions.onDelete();
-                                }
-                                // Type it letter by letter
-                                starter.split('').forEach((char: string) => actions.onChar(char));
-                            }}
-                            className="pointer-events-auto bg-yellow-500/10 border border-yellow-500/30 hover:bg-yellow-500/20 text-yellow-500 text-[10px] font-black uppercase px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 animate-in fade-in duration-300"
-                        >
-                            💡 Recommended Starter: {starterWord.toUpperCase()}
-                        </button>
-                    )}
-                </div>
-            )}
-            <div ref={containerRef} className="flex-1 flex flex-col items-center justify-center min-h-0 overflow-hidden gap-3">
+                        {showStarter && (
+                            <button
+                                onClick={() => {
+                                    const starter = starterWord.toUpperCase();
+                                    // Clear current input first
+                                    for (let i = 0; i < currentGuess.length; i++) {
+                                        actions.onDelete();
+                                    }
+                                    // Type it letter by letter
+                                    starter.split('').forEach((char: string) => actions.onChar(char));
+                                }}
+                                className="bg-yellow-500/10 border border-yellow-500/30 hover:bg-yellow-500/20 text-yellow-500 text-[10px] font-black uppercase px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 animate-in fade-in duration-300 cursor-pointer"
+                            >
+                                💡 Recommended Starter: {starterWord.toUpperCase()}
+                            </button>
+                        )}
+                    </div>
+                )}
                 {sentenceGames && (
                     <div className="bg-indigo-950/30 border border-indigo-500/25 p-3 rounded-xl max-w-md w-full shrink-0 flex flex-wrap gap-x-2.5 gap-y-1.5 items-center justify-center text-center">
                         {sentenceGames.map((g, idx) => {
