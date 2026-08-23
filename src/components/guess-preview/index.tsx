@@ -765,6 +765,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
               targetUserId={isChallenge ? "" : (entry.user_id || entry.user?.id || entry.profiles?.id || "")}
               gameDate={isChallenge ? "" : (targetDate || "")}
               commentsDisabledByTarget={commentsDisabledByTarget}
+              hintRecord={gameData.hint_record ?? null}
             />
 
             {isChallenge && isOwnEntry && shareText && (

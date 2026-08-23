@@ -12,6 +12,7 @@ interface GuessGridProps {
     targetUserId: string;
     gameDate: string;
     commentsDisabledByTarget: boolean;
+    hintRecord?: { letter: string; index: number; row?: number } | null;
 }
 
 export const GuessGrid = memo(({
@@ -23,7 +24,11 @@ export const GuessGrid = memo(({
     targetUserId,
     gameDate,
     commentsDisabledByTarget,
+    hintRecord = null,
 }: GuessGridProps) => {
+    // hint_record.row is 1-based; highlight starts on that row and every row after
+    const hintStartRow = hintRecord?.row !== undefined ? hintRecord.row - 1 : null;
+
     return (
         <div className="grid gap-4 mb-6 justify-center w-full">
             {guesses.map((row: any[], i: number) => {
@@ -50,19 +55,29 @@ export const GuessGrid = memo(({
                     >
                         <div className="flex items-center gap-3 justify-between">
                             <div className="flex gap-1">
-                                {row.map((cell: any, j: number) => (
-                                    <div
-                                        key={j}
-                                        className={`flex items-center justify-center font-black uppercase shadow-inner ${getTileSizeClass(targetWordLength)} ${cell.status === "correct"
-                                            ? "bg-correct text-white"
-                                            : cell.status === "present"
-                                                ? "bg-present text-white"
-                                                : "bg-gray-800 text-white border border-gray-700"
-                                            }`}
-                                    >
-                                        {canSeeDetails ? cell.letter : ""}
-                                    </div>
-                                ))}
+                                {row.map((cell: any, j: number) => {
+                                    const isHintedCell =
+                                        hintStartRow !== null &&
+                                        hintRecord !== null &&
+                                        i >= hintStartRow &&
+                                        j === hintRecord.index;
+                                    return (
+                                        <div
+                                            key={j}
+                                            className={`flex items-center justify-center font-black uppercase ${isHintedCell
+                                                ? "ring-2 ring-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.45)]"
+                                                : "shadow-inner"
+                                                } ${getTileSizeClass(targetWordLength)} ${cell.status === "correct"
+                                                    ? "bg-correct text-white"
+                                                    : cell.status === "present"
+                                                        ? "bg-present text-white"
+                                                        : "bg-gray-800 text-white border border-gray-700"
+                                                }`}
+                                        >
+                                            {canSeeDetails ? cell.letter : ""}
+                                        </div>
+                                    );
+                                })}
                             </div>
                             <div
                                 className={`text-[12px] font-mono font-black px-2 py-0.5 rounded-full ${rowScore >= 0 ? "bg-correct/20 text-correct" : "bg-red-500/20 text-red-400"}`}
