@@ -392,7 +392,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
             theme="dark"
             containerClassName="p-0!"
         >
-            <div className="flex flex-col h-full w-full max-w-2xl mx-auto bg-slate-950 text-white select-none overflow-hidden animate-in fade-in duration-200 settings-modal-content">
+            <div className="flex flex-col h-full w-full max-w-2xl mx-auto text-white select-none overflow-hidden animate-in fade-in duration-200 settings-modal-content">
                 <style dangerouslySetInnerHTML={{
                     __html: `
                     .settings-modal-content *:not(svg):not(path) {

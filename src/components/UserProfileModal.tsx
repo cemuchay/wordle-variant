@@ -10,9 +10,9 @@ import { ProfileSkeleton } from './common/Skeletons';
 import formatLastSeen from '../utils/formatLastSeen';
 import type { UserAward } from '../types/awards';
 import { calculateStreak } from '../utils/streak';
-import { Z_INDEX } from '../constants/ui';
 import { TIMEOUT } from '../constants/game';
 import { TOAST_DURATION } from '../constants/ui';
+import { ModalLayout } from './layout/ModalLayout';
 import { useUserFollowers, useUserFollowing, useIsFollowing, useToggleFollowMutation, type FollowUser } from '../hooks/queries/useFollows';
 import { useAppStore } from '../store/useAppStore';
 import { TrophyCabinet } from './awards/TrophyCabinet';
@@ -364,13 +364,15 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
     }, [dailyScores, challengeParticipations, allChallengeParticipations, currentUserChallenges, userId, currentUser, profile]);
 
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center" style={{ zIndex: Z_INDEX.USER_PROFILE }}>
-            <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 15 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 15 }}
-                className="w-full max-w-lg bg-gray-950/95 border border-white/10 rounded-[32px] overflow-hidden shadow-2xl relative flex flex-col max-h-[85vh]"
+        <>
+            <ModalLayout
+                isOpen
+                onClose={onClose}
+                maxWidth="lg"
+                showCloseButton={false}
+                containerClassName="p-0!"
             >
+                <div className="flex flex-col h-full min-h-0 w-full">
                 {/* Header Profile Section */}
                 <div className="p-4 sm:p-6 border-b border-white/5 relative overflow-hidden bg-white/5 shrink-0 z-10">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-correct/5 blur-3xl -mr-12 -mt-12 pointer-events-none" />
@@ -548,7 +550,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                 </div>
 
                 {/* Modal Body */}
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6 scrollbar-hide">
+                <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6 scrollbar-hide">
                     {loading ? (
                         <ProfileSkeleton />
                     ) : (
@@ -737,7 +739,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                         </>
                     )}
                 </div>
-            </motion.div>
+                </div>
+            </ModalLayout>
             {isWrappedOpen && (
                 <WeeklyWrappedModal
                     isOpen={isWrappedOpen}
@@ -763,7 +766,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                     onClose={() => setIsCabinetOpen(false)}
                 />
             )}
-        </div>
+        </>
     );
 };
 
@@ -774,14 +777,15 @@ const FollowListModal: React.FC<{
     onSelectUser: (id: string) => void;
 }> = ({ title, users, onClose, onSelectUser }) => {
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4" style={{ zIndex: Z_INDEX.USER_PROFILE }}>
-            <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="w-full max-w-md bg-gray-950 border border-white/10 rounded-[28px] overflow-hidden shadow-2xl flex flex-col max-h-[75vh]"
-            >
-                <div className="p-4 sm:p-5 border-b border-white/5 flex items-center justify-between bg-white/5">
+        <ModalLayout
+            isOpen
+            onClose={onClose}
+            maxWidth="md"
+            showCloseButton={false}
+            containerClassName="p-0!"
+        >
+            <div className="flex flex-col h-full min-h-0 w-full">
+                <div className="p-4 sm:p-5 border-b border-white/5 flex items-center justify-between bg-white/5 shrink-0">
                     <h3 className="text-sm sm:text-base font-black uppercase text-white tracking-wider flex items-center gap-2">
                         <Users size={16} className="text-correct" />
                         {title} ({users.length})
@@ -793,7 +797,7 @@ const FollowListModal: React.FC<{
                         <X size={16} />
                     </button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-white/10">
+                <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-white/10">
                     {users.length === 0 ? (
                         <div className="text-center py-8 text-gray-500 text-xs font-bold uppercase tracking-wider">
                             No {title.toLowerCase()} yet.
@@ -830,8 +834,8 @@ const FollowListModal: React.FC<{
                         ))
                     )}
                 </div>
-            </motion.div>
-        </div>
+            </div>
+        </ModalLayout>
     );
 };
 
