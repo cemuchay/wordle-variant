@@ -55,8 +55,11 @@ export class WordGridPvPEngine {
       }
     }
 
-    // 3. Score turn
-    const scoreResult = calculateTurnScore(words, placedTiles.length, board, gridSize);
+    // 3. Score turn (rack size before removal drives Scrabble-style bingo)
+    const activeIdx = players.findIndex((p) => p.id === userId);
+    if (activeIdx === -1) return { success: false };
+    const rackSizeBeforeMove = players[activeIdx]?.rack?.length ?? placedTiles.length;
+    const scoreResult = calculateTurnScore(words, rackSizeBeforeMove, board, gridSize);
 
     // 4. Update board
     const newBoard = [...board];
@@ -70,9 +73,6 @@ export class WordGridPvPEngine {
     });
 
     // 5. Rack update & draw from bag
-    const activeIdx = players.findIndex((p) => p.id === userId);
-    if (activeIdx === -1) return { success: false };
-
     const currentRack = [...players[activeIdx].rack];
     placedTiles.forEach((tile) => {
       const idx = currentRack.indexOf(tile.letter);
@@ -106,6 +106,7 @@ export class WordGridPvPEngine {
       primary_word: words[0]?.word || words.map((w) => w.word).join(", "),
       score: scoreResult.totalScore,
       breakdown: scoreResult.words.map((w) => `${w.word}: ${w.breakdown}`).join(" | ") + (scoreResult.bingoApplied ? " + 50 (Bingo)" : ""),
+      coords: placedTiles.map((t) => `${t.x},${t.y}`),
       created_at: new Date().toISOString(),
     };
 

@@ -15,6 +15,13 @@ import {
    drawBalancedRack,
 } from "../utils/wordgrid/bagBalancing";
 import { WordGridBotEngine } from "../utils/wordgrid/WordGridBotEngine";
+import { detectDraftConflicts } from "../utils/wordgrid/boardValidation";
+import {
+   scheduleWordGridDraftSave,
+   cancelWordGridDraftSave,
+   clearWordGridDraft,
+   loadWordGridDraft,
+} from "../utils/wordgrid/draftStorage";
 import { safeLocalStorage } from "../utils/storage";
 
 export type WordGridBotViewType =
@@ -88,10 +95,21 @@ export function clearBotSnapshot(matchId: string | null) {
    if (!matchId) return;
    try {
       safeLocalStorage.removeItem(`wordgrid_bot_snapshot_${matchId}`);
-      safeLocalStorage.removeItem(`wordgrid_draft_${matchId}`);
+      clearWordGridDraft(matchId);
    } catch (e) {
       console.warn("[WordGridBot] Clear snapshot failed:", e);
    }
+}
+
+let lastMoveTimer: any = null;
+
+const LAST_MOVE_CLEAR_MS = 4000;
+
+function startLastMoveTimer(set: (partial: any) => void) {
+   if (lastMoveTimer) clearTimeout(lastMoveTimer);
+   lastMoveTimer = setTimeout(() => {
+      set({ lastMove: null });
+   }, LAST_MOVE_CLEAR_MS);
 }
 
 interface WordGridBotState {
@@ -117,6 +135,8 @@ interface WordGridBotState {
    loading: boolean;
    error: string | null;
    botMatchesList: any[];
+   lastMove: { coords: string[]; playerId: string } | null;
+   conflictCoords: string[];
 
    // Actions
    setView: (view: WordGridBotViewType) => void;
@@ -132,7 +152,12 @@ interface WordGridBotState {
       userId: string,
       triggerToast?: (msg: string, duration?: number) => void,
    ) => Promise<void>;
-   updateFromMatchRecord: (record: any, currentUserId: string) => void;
+   updateFromMatchRecord: (
+      record: any,
+      currentUserId: string,
+      opts?: { suppressNewMoveFx?: boolean },
+   ) => void;
+   hydrateLocalDraft: () => void;
 
    // Tile play actions
    moveTileInGrid: (
@@ -158,7 +183,26 @@ interface WordGridBotState {
 
 let botHighlightTimer: any = null;
 
-export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
+export const useWordGridBotStore = create<WordGridBotState>((set, get) => {
+   // Re-run conflict detection against the committed board and schedule the
+   // debounced local-draft save after any draft-mutating action.
+   const syncDraftFx = () => {
+      const { matchId, placedTiles, board, gridSize } = get();
+      scheduleWordGridDraftSave(matchId, () => {
+         const cur = useWordGridBotStore.getState();
+         if (cur.matchId !== matchId) return null;
+         return {
+            placedTiles: cur.placedTiles,
+            rack: cur.rack,
+            savedAt: Date.now(),
+         };
+      });
+      set({
+         conflictCoords: detectDraftConflicts(placedTiles, board, gridSize),
+      });
+   };
+
+   return ({
    matchId: null,
    gridSize: DEFAULT_GRID_SIZE,
    status: "waiting",
@@ -181,11 +225,15 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
    loading: false,
    error: null,
    botMatchesList: [],
+   lastMove: null,
+   conflictCoords: [],
 
    setView: (view) => set({ view }),
 
    resetGame: () => {
       if (botHighlightTimer) clearTimeout(botHighlightTimer);
+      if (lastMoveTimer) clearTimeout(lastMoveTimer);
+      cancelWordGridDraftSave(get().matchId);
       clearBotSnapshot(get().matchId);
       set({
          matchId: null,
@@ -207,6 +255,8 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
          rack: [],
          loading: false,
          error: null,
+         lastMove: null,
+         conflictCoords: [],
       });
    },
 
@@ -323,6 +373,7 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
             rack: humanPlayer?.rack || local.rack || [],
             loading: false,
          });
+         get().hydrateLocalDraft();
          return;
       }
 
@@ -373,6 +424,7 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
             };
             set(loadedState);
             saveBotSnapshot(matchId, loadedState);
+            get().hydrateLocalDraft();
          }
       } catch (e: any) {
          console.warn("[WordGridBot] Network loadBotMatch error:", e);
@@ -382,32 +434,96 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
       }
    },
 
-   updateFromMatchRecord: (record, currentUserId) => {
+   updateFromMatchRecord: (record, currentUserId, opts) => {
       if (!record) return;
+
+      // Preserve any in-progress local draft across incoming board updates
+      const prevPlacedTiles = get().placedTiles;
+      const keepDraft = prevPlacedTiles.length > 0;
+
       const playersList: WordGridPlayer[] = record.players_data || [];
       const human = playersList.find((p) => p.id === currentUserId || p.id !== "bot");
       const turnIndex = record.current_turn_index ?? 0;
+      const gridSize = record.grid_size || DEFAULT_GRID_SIZE;
+
+      const newBoard = record.board || [];
+      const newMoves = record.moves || [];
+      const prevMovesCount = get().moves?.length || 0;
+
+      let lastMove = get().lastMove;
+      if (!opts?.suppressNewMoveFx && newMoves.length > prevMovesCount) {
+         const lastMoveRecord = newMoves[newMoves.length - 1];
+         if (lastMoveRecord) {
+            lastMove = {
+               coords: Array.isArray(lastMoveRecord.coords)
+                  ? lastMoveRecord.coords
+                  : [],
+               playerId: lastMoveRecord.player_id,
+            };
+            startLastMoveTimer(set);
+         }
+      }
+
+      const conflictCoords = keepDraft
+         ? detectDraftConflicts(prevPlacedTiles, newBoard, gridSize)
+         : [];
 
       const loadedState = {
          matchId: record.id,
-         gridSize: record.grid_size || DEFAULT_GRID_SIZE,
+         gridSize,
          status: record.status,
-         board: record.board || [],
+         board: newBoard,
          tileBag: record.tile_bag || [],
          players: playersList.length > 0 ? playersList : get().players,
          currentTurnIndex: turnIndex,
          currentTurn: record.current_turn || (turnIndex === 0 ? currentUserId : "bot"),
-         moves: record.moves || [],
+         moves: newMoves,
          botDifficulty: record.bot_difficulty || get().botDifficulty || "normal",
          isBotMatch: true,
          view: record.status === "completed" ? "completed" : ("active" as WordGridBotViewType),
-         placedTiles: [],
-         rack: human?.rack || get().rack,
+         placedTiles: keepDraft ? prevPlacedTiles : [],
+         rack: keepDraft ? get().rack : human?.rack || get().rack,
          loading: false,
+         lastMove,
+         conflictCoords,
       };
 
       set(loadedState);
       saveBotSnapshot(record.id, loadedState);
+   },
+
+   hydrateLocalDraft: () => {
+      const { matchId, status, board, rack, gridSize } = get();
+      if (!matchId || status === "completed") return;
+      const draft = loadWordGridDraft(matchId);
+      if (!draft || draft.placedTiles.length === 0) return;
+
+      const inBounds = (n: number) =>
+         Number.isInteger(n) && n >= 0 && n < gridSize;
+      const boardKeys = new Set(board.map((c) => `${c.x},${c.y}`));
+
+      const remainingRack = [...rack];
+      const restoredTiles: PlacedTile[] = [];
+      draft.placedTiles.forEach((t) => {
+         if (!inBounds(t.x) || !inBounds(t.y)) return;
+         if (boardKeys.has(`${t.x},${t.y}`)) return;
+         const idx = remainingRack.indexOf(t.letter);
+         if (idx !== -1) {
+            remainingRack.splice(idx, 1);
+            restoredTiles.push({ x: t.x, y: t.y, letter: t.letter });
+         }
+      });
+
+      if (restoredTiles.length === 0) {
+         clearWordGridDraft(matchId);
+         return;
+      }
+
+      set({
+         placedTiles: restoredTiles,
+         rack: remainingRack,
+         conflictCoords: detectDraftConflicts(restoredTiles, board, gridSize),
+      });
    },
 
    moveTileInGrid: (fromX, fromY, toX, toY) => {
@@ -425,6 +541,7 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
       const newPlaced = [...placedTiles];
       newPlaced[tileIdx] = { ...newPlaced[tileIdx], x: toX, y: toY };
       set({ placedTiles: newPlaced });
+      syncDraftFx();
    },
 
    placeTile: (x, y, letter) => {
@@ -438,6 +555,7 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
          placedTiles: [...placedTiles, { x, y, letter }],
          rack: newRack,
       });
+      syncDraftFx();
    },
 
    recallTile: (x, y) => {
@@ -452,6 +570,7 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
          placedTiles: newPlaced,
          rack: [...rack, tile.letter],
       });
+      syncDraftFx();
    },
 
    recallAllTiles: () => {
@@ -460,6 +579,7 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
          placedTiles: [],
          rack: [...rack, ...placedTiles.map((t) => t.letter)],
       });
+      syncDraftFx();
    },
 
    shuffleRack: () => {
@@ -470,6 +590,7 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
          [newRack[i], newRack[j]] = [newRack[j], newRack[i]];
       }
       set({ rack: newRack });
+      syncDraftFx();
    },
 
    reorderRack: (fromIdx, toIdx) => {
@@ -486,6 +607,7 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
       const [moved] = newRack.splice(fromIdx, 1);
       newRack.splice(toIdx, 0, moved);
       set({ rack: newRack });
+      syncDraftFx();
    },
 
    submitMove: async (userId, triggerToast) => {
@@ -529,15 +651,25 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
          const humanPlayer = humanRes.updatedState.players?.find(
             (p) => p.id === userId || p.id !== "bot",
          );
+         const submittedMoves = humanRes.updatedState.moves || [];
          const updatedState = {
             ...state,
             ...humanRes.updatedState,
             placedTiles: [],
             rack: humanPlayer?.rack || state.rack,
+            conflictCoords: [],
+            lastMove: {
+               coords:
+                  (submittedMoves[submittedMoves.length - 1] as any)?.coords ||
+                  [],
+               playerId: userId,
+            },
          };
 
          set(updatedState);
          saveBotSnapshot(state.matchId, updatedState);
+         startLastMoveTimer(set);
+         clearWordGridDraft(state.matchId);
 
          // Async DB update snapshot - convert turn to valid PostgreSQL UUID or null
          const dbTurn = toDbUuid(updatedState.currentTurn);
@@ -620,10 +752,12 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
             isBotThinking: false,
             lastBotMove: botMove,
             lastBotPlacedCoords: botCoords,
+            lastMove: { coords: botCoords, playerId: "bot" },
          };
 
          set(updatedState);
          saveBotSnapshot(state.matchId, updatedState);
+         startLastMoveTimer(set);
 
          if (botMove) {
             window.dispatchEvent(
@@ -708,4 +842,5 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
          console.warn("[WordGridBot] loadBotMatchesList error:", e);
       }
    },
-}));
+   });
+});

@@ -57,8 +57,12 @@ export class WordGridBotEngine {
       }
     }
 
-    // 3. Score calculation
-    const scoreResult = calculateTurnScore(words, placedTiles.length, board, gridSize);
+    // 3. Score calculation (rack size before removal drives Scrabble-style bingo)
+    const humanIdx = players.findIndex((p) => p.id === userId || p.id !== "bot");
+    const activeHumanIdx = humanIdx !== -1 ? humanIdx : 0;
+    const rackSizeBeforeMove =
+      players[activeHumanIdx]?.rack?.length ?? placedTiles.length;
+    const scoreResult = calculateTurnScore(words, rackSizeBeforeMove, board, gridSize);
 
     // 4. Update board
     const newBoard = [...board];
@@ -72,9 +76,6 @@ export class WordGridBotEngine {
     });
 
     // 5. Update rack & draw from bag
-    const humanIdx = players.findIndex((p) => p.id === userId || p.id !== "bot");
-    const activeHumanIdx = humanIdx !== -1 ? humanIdx : 0;
-
     const currentRack = [...players[activeHumanIdx].rack];
     placedTiles.forEach((tile) => {
       const idx = currentRack.indexOf(tile.letter);
@@ -100,6 +101,7 @@ export class WordGridBotEngine {
       primary_word: words[0]?.word || words.map((w) => w.word).join(", "),
       score: scoreResult.totalScore,
       breakdown: scoreResult.words.map((w) => `${w.word}: ${w.breakdown}`).join(" | ") + (scoreResult.bingoApplied ? " + 50 (Bingo)" : ""),
+      coords: placedTiles.map((t) => `${t.x},${t.y}`),
       created_at: new Date().toISOString(),
     };
 
@@ -177,6 +179,8 @@ export class WordGridBotEngine {
         word: botMove.word,
         primary_word: botMove.word.split(",")[0].trim(),
         score: botMove.score,
+        breakdown: botMove.breakdown || "",
+        coords: botMove.placedTiles.map((t) => `${t.x},${t.y}`),
         created_at: new Date().toISOString(),
       });
     } else {

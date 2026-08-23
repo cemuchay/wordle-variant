@@ -74,9 +74,10 @@ describe('WordGrid Scoring', () => {
         { x: 4, y: 3, letter: 'T' }
       ]
     }];
-    const res = calculateTurnScore(words, 3, []);
+    const res = calculateTurnScore(words, 7, []);
     // C=3, A=1, T=1 (Total = 5)
     expect(res.totalScore).toBeGreaterThanOrEqual(5);
+    expect(res.bingoApplied).toBe(false);
   });
 
   test('Double Word and Double Letter multiplier combination', () => {
@@ -88,11 +89,25 @@ describe('WordGrid Scoring', () => {
         { x: 3, y: 1, letter: 'G' }
       ]
     }];
-    const res = calculateTurnScore(words, 3, []);
+    const res = calculateTurnScore(words, 7, []);
     expect(res.totalScore).toBeGreaterThan(5);
+    expect(res.bingoApplied).toBe(false);
   });
 
-  test('Bingo bonus (+50 points) when using 7 tiles', () => {
+  test('No bingo when using fewer tiles than the rack holds', () => {
+    const words = [{
+      word: 'CAT',
+      tiles: [
+        { x: 3, y: 3, letter: 'C' },
+        { x: 4, y: 3, letter: 'A' },
+        { x: 5, y: 3, letter: 'T' }
+      ]
+    }];
+    const res = calculateTurnScore(words, 7, []);
+    expect(res.bingoApplied).toBe(false);
+  });
+
+  test('Bingo bonus (+50) when using all 7 rack tiles in one play', () => {
     const words = [{
       word: 'AMAZING',
       tiles: [
@@ -108,6 +123,40 @@ describe('WordGrid Scoring', () => {
     const res = calculateTurnScore(words, 7, []);
     expect(res.bingoApplied).toBe(true);
     expect(res.totalScore).toBeGreaterThan(50);
+  });
+
+  test('Bingo applies on any turn (not just the first play)', () => {
+    const existingBoard: GridCell[] = [
+      { x: 0, y: 0, letter: 'S' }
+    ];
+    const words = [{
+      word: 'END',
+      tiles: [
+        { x: 1, y: 1, letter: 'E' },
+        { x: 2, y: 1, letter: 'N' },
+        { x: 3, y: 1, letter: 'D' }
+      ]
+    }];
+    const res = calculateTurnScore(words, 3, existingBoard);
+    expect(res.bingoApplied).toBe(true);
+    expect(res.totalScore).toBeGreaterThan(50);
+  });
+
+  test('Endgame sub-7 rack bingo still awards +50', () => {
+    const existingBoard: GridCell[] = [
+      { x: 0, y: 0, letter: 'S' },
+      { x: 1, y: 0, letter: 'U' },
+      { x: 2, y: 0, letter: 'N' }
+    ];
+    const words = [{
+      word: 'AT',
+      tiles: [
+        { x: 1, y: 1, letter: 'A' },
+        { x: 2, y: 1, letter: 'T' }
+      ]
+    }];
+    const res = calculateTurnScore(words, 2, existingBoard);
+    expect(res.bingoApplied).toBe(true);
   });
 });
 

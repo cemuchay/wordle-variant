@@ -1,14 +1,26 @@
 // src/wordgrid/components/BoardGrid.tsx
 
+import { useState } from 'react';
 import { getPremiumCellsForGrid, TILE_VALUES } from '../../utils/wordgrid/constants';
 import type { GridCell, PlacedTile } from '../../utils/wordgrid/constants';
+import type { PlayerColorScheme } from '../../utils/wordgrid/playerColors';
+import { getPlayerColorScheme } from '../../utils/wordgrid/playerColors';
+
+const ZOOM_STEPS = [1, 1.25, 1.5, 2];
+
+export interface BoardLastMove {
+  coords: string[];
+  playerId: string | null;
+}
 
 interface BoardGridProps {
   gridSize?: number;
   board: GridCell[];
   placedTiles: PlacedTile[];
   selectedIdx: number | null;
-  highlightedCoords?: string[];
+  conflictCoords?: string[];
+  lastMove?: BoardLastMove | null;
+  colorMap?: Record<string, PlayerColorScheme>;
   onMoveTileInGrid?: (fromX: number, fromY: number, toX: number, toY: number) => void;
   onPlaceTile: (x: number, y: number, rackIdx: number) => void;
   onRecallTile: (x: number, y: number) => void;
@@ -19,13 +31,23 @@ export const BoardGrid = ({
   board,
   placedTiles,
   selectedIdx,
-  highlightedCoords = [],
+  conflictCoords = [],
+  lastMove = null,
+  colorMap = {},
   onMoveTileInGrid,
   onPlaceTile,
   onRecallTile,
 }: BoardGridProps) => {
+  const [zoomIdx, setZoomIdx] = useState(0);
   const premiumCells = getPremiumCellsForGrid(gridSize);
   const centerCoord = Math.floor(gridSize / 2);
+
+  const zoom = ZOOM_STEPS[zoomIdx];
+  const canZoomIn = zoomIdx < ZOOM_STEPS.length - 1;
+  const canZoomOut = zoomIdx > 0;
+
+  const schemeOf = (playerId: string | null | undefined): PlayerColorScheme =>
+    (playerId && colorMap[playerId]) || getPlayerColorScheme(playerId || null);
 
   const getBoardCell = (x: number, y: number) => board.find((c) => c.x === x && c.y === y);
   const getPlacedTile = (x: number, y: number) => placedTiles.find((t) => t.x === x && t.y === y);
@@ -35,36 +57,41 @@ export const BoardGrid = ({
     const boardCell = getBoardCell(x, y);
     const placedTile = getPlacedTile(x, y);
     const multiplier = premiumCells[key] || 'NONE';
-    const isBotHighlighted = highlightedCoords.includes(key);
+    const isLatestPlay = !!boardCell && (lastMove?.coords?.includes(key) ?? false);
+    const isConflict = !boardCell && conflictCoords.includes(key);
 
-    // 1. Permanently locked board tiles (bright wood/amber style or glowing bot highlight)
+    // 1. Permanently locked board tiles (bright wood/amber style or glowing latest-play highlight)
     if (boardCell) {
       const letter = boardCell.letter.toUpperCase();
       const val = TILE_VALUES[letter] || 0;
       const textClass = gridSize > 11 ? 'text-xs sm:text-sm font-black' : 'text-sm sm:text-base md:text-lg font-black';
+      const playScheme = isLatestPlay ? schemeOf(lastMove?.playerId) : null;
+
       return (
         <div
           key={key}
           className={`aspect-square rounded-lg sm:rounded-xl flex flex-col items-center justify-center relative shadow-lg transform transition-all select-none ${
-            isBotHighlighted
-              ? 'bg-linear-to-br from-emerald-300 via-teal-400 to-emerald-500 border-2 border-white ring-4 ring-emerald-400/90 shadow-emerald-500/60 scale-105 z-10 animate-pulse'
+            isLatestPlay && playScheme
+              ? `bg-linear-to-br from-amber-100 via-amber-200 to-amber-300 border-2 border-white ${playScheme.ring} ${playScheme.glowShadow} scale-105 z-10 animate-pulse`
               : 'bg-linear-to-br from-amber-200 via-amber-300 to-amber-400 border border-amber-200 hover:scale-[1.02]'
           }`}
         >
-          <span className={`${textClass} ${isBotHighlighted ? 'text-emerald-950 font-black' : 'text-slate-950'} select-none leading-none`}>{letter}</span>
+          <span className={`${textClass} text-slate-950 select-none leading-none`}>{letter}</span>
           {gridSize <= 11 && (
-            <span className={`text-[9px] font-black absolute bottom-0.5 right-1 select-none ${isBotHighlighted ? 'text-emerald-950' : 'text-slate-900'}`}>{val}</span>
+            <span className={`text-[9px] font-black absolute bottom-0.5 right-1 select-none text-slate-900`}>{val}</span>
           )}
-          {isBotHighlighted && (
-            <span className="absolute -top-1 -right-1 text-[6px] font-black bg-emerald-950 text-emerald-300 px-1 rounded-sm border border-emerald-400 shadow-xs animate-bounce select-none">
-              BOT
+          {isLatestPlay && playScheme && (
+            <span
+              className={`absolute -top-1 -right-1 text-[6px] font-black ${playScheme.badge} px-1 rounded-sm border border-white shadow-xs animate-bounce select-none`}
+            >
+              LAST
             </span>
           )}
         </div>
       );
     }
 
-    // 2. Newly placed tiles in current turn (vibrant purple/indigo with click to recall & draggable to adjust)
+    // 2. Newly placed tiles in current turn (vibrant purple/indigo; red-ring when conflicting)
     if (placedTile) {
       const letter = placedTile.letter.toUpperCase();
       const val = TILE_VALUES[letter] || 0;
@@ -76,6 +103,7 @@ export const BoardGrid = ({
           draggable
           onDragStart={(e) => {
             e.dataTransfer.setData('application/json', JSON.stringify({ fromX: x, fromY: y }));
+            e.dataTransfer.setData('source', 'board');
             e.dataTransfer.effectAllowed = 'move';
           }}
           onDragOver={(e) => {
@@ -106,11 +134,18 @@ export const BoardGrid = ({
             }
           }}
           onClick={() => onRecallTile(x, y)}
-          className="aspect-square bg-linear-to-br from-indigo-500 via-purple-600 to-indigo-700 border-2 border-white rounded-lg sm:rounded-xl flex flex-col items-center justify-center relative shadow-xl cursor-grab active:cursor-grabbing transform active:scale-95 transition-all hover:brightness-110 select-none"
+          className={`aspect-square bg-linear-to-br from-indigo-500 via-purple-600 to-indigo-700 border-2 border-white rounded-lg sm:rounded-xl flex flex-col items-center justify-center relative shadow-xl cursor-grab active:cursor-grabbing transform active:scale-95 transition-all hover:brightness-110 select-none ${
+            isConflict ? 'ring-4 ring-rose-500 shadow-rose-500/50 animate-pulse' : ''
+          }`}
         >
           <span className={`${textClass} text-white drop-shadow-md select-none leading-none`}>{letter}</span>
           {gridSize <= 11 && <span className="text-[9px] font-black text-amber-200 absolute bottom-0.5 right-1 select-none">{val}</span>}
           <span className="absolute top-0.5 left-0.5 text-[5px] sm:text-[6px] uppercase font-black text-emerald-300 tracking-wider select-none">NEW</span>
+          {isConflict && (
+            <span className="absolute -top-1.5 -right-1.5 text-[6px] font-black bg-rose-600 text-white px-1 rounded-sm border border-white shadow-xs animate-bounce select-none">
+              ⚠
+            </span>
+          )}
         </button>
       );
     }
@@ -186,16 +221,53 @@ export const BoardGrid = ({
   };
 
   return (
-    <div className="w-full max-w-[480px] p-3 bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl flex flex-col items-center justify-center select-none mx-auto animate-in fade-in duration-300">
-      <div className="w-full select-none" style={gridStyle}>
-        {Array.from({ length: gridSize }).map((_, y) =>
-          Array.from({ length: gridSize }).map((_, x) => renderCell(x, y))
-        )}
+    <div className="w-full max-w-[480px] p-3 bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl flex flex-col items-center justify-center select-none mx-auto animate-in fade-in duration-300 relative">
+      {/* Zoom controls */}
+      <div className="absolute top-2 right-2 z-20 flex items-center gap-1 bg-[#0c121e]/90 border border-slate-700 rounded-xl p-1 shadow-lg">
+        <button
+          type="button"
+          onClick={() => canZoomIn && setZoomIdx((i) => Math.min(i + 1, ZOOM_STEPS.length - 1))}
+          disabled={!canZoomIn}
+          title="Zoom in"
+          className={`w-7 h-7 rounded-lg text-sm font-black flex items-center justify-center transition-all ${canZoomIn ? 'bg-slate-800 hover:bg-slate-700 text-white cursor-pointer active:scale-90' : 'bg-slate-900 text-slate-600 cursor-not-allowed'}`}
+        >
+          +
+        </button>
+        <span className="text-[8px] font-black uppercase tracking-wider text-slate-400 w-7 text-center tabular-nums">
+          {Math.round(zoom * 100)}%
+        </span>
+        <button
+          type="button"
+          onClick={() => canZoomOut && setZoomIdx((i) => Math.max(i - 1, 0))}
+          disabled={!canZoomOut}
+          title="Zoom out"
+          className={`w-7 h-7 rounded-lg text-sm font-black flex items-center justify-center transition-all ${canZoomOut ? 'bg-slate-800 hover:bg-slate-700 text-white cursor-pointer active:scale-90' : 'bg-slate-900 text-slate-600 cursor-not-allowed'}`}
+        >
+          −
+        </button>
+        <button
+          type="button"
+          onClick={() => setZoomIdx(0)}
+          disabled={zoomIdx === 0}
+          title="Reset zoom"
+          className={`w-7 h-7 rounded-lg text-xs font-black flex items-center justify-center transition-all ${zoomIdx !== 0 ? 'bg-slate-800 hover:bg-slate-700 text-white cursor-pointer active:scale-90' : 'bg-slate-900 text-slate-600 cursor-not-allowed'}`}
+        >
+          ⟳
+        </button>
+      </div>
+
+      {/* Scrollable map-style viewport */}
+      <div className="w-full mt-7 overflow-auto scrollbar-hide">
+        <div style={{ width: `${zoom * 100}%` }} className="select-none">
+          <div style={gridStyle}>
+            {Array.from({ length: gridSize }).map((_, y) =>
+              Array.from({ length: gridSize }).map((_, x) => renderCell(x, y))
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
 export default BoardGrid;
-
-

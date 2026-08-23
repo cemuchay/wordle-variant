@@ -10,7 +10,6 @@ interface TileRackProps {
   onShuffle: () => void;
   onRecallAll: () => void;
   isMyTurn: boolean;
-  onTurnAlert?: () => void;
   onReorderRack?: (fromIdx: number, toIdx: number) => void;
 }
 
@@ -21,7 +20,6 @@ export const TileRack = ({
   onShuffle,
   onRecallAll,
   isMyTurn,
-  onTurnAlert,
   onReorderRack,
 }: TileRackProps) => {
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
@@ -36,12 +34,13 @@ export const TileRack = ({
 
     return () => clearTimeout(timer);
   }, [selectedIdx, onSelectTile]);
+
   return (
     <div className="w-full max-w-[480px] bg-[#0c121e] border border-slate-800 rounded-3xl p-4 shadow-2xl flex flex-col space-y-4 select-none mx-auto animate-in fade-in duration-300">
       {/* Title / Turn status indicator */}
       <div className="flex items-center justify-between">
         <span className={`text-[11px] font-black uppercase tracking-wider ${isMyTurn ? 'text-emerald-400' : 'text-slate-400'}`}>
-          {isMyTurn ? '🔥 Your Rack (Tap or Drag Tile)' : "⏳ Opponent's Turn"}
+          {isMyTurn ? '🔥 Your Rack (Tap or Drag Tile)' : "⏳ Opponent's Turn — Arrange Freely"}
         </span>
         <div className="flex gap-2">
           <button
@@ -69,15 +68,13 @@ export const TileRack = ({
           return (
             <div
               key={idx}
-              draggable={isMyTurn}
+              draggable
               onDragStart={(e) => {
-                if (isMyTurn) {
-                  e.dataTransfer.setData('application/x-wordgrid-rack-index', idx.toString());
-                  e.dataTransfer.setData('text/plain', idx.toString());
-                  e.dataTransfer.setData('source', 'rack');
-                  e.dataTransfer.effectAllowed = 'move';
-                  onSelectTile(idx);
-                }
+                e.dataTransfer.setData('application/x-wordgrid-rack-index', idx.toString());
+                e.dataTransfer.setData('text/plain', idx.toString());
+                e.dataTransfer.setData('source', 'rack');
+                e.dataTransfer.effectAllowed = 'move';
+                onSelectTile(idx);
               }}
               onDragEnd={() => {
                 setDragOverIdx(null);
@@ -85,27 +82,24 @@ export const TileRack = ({
                   onSelectTile(-1);
                 }
               }}
-              onDragEnter={() => {
-                if (isMyTurn) setDragOverIdx(idx);
-              }}
+              onDragEnter={() => setDragOverIdx(idx)}
               onDragLeave={() => {
                 setDragOverIdx((prev) => (prev === idx ? null : prev));
               }}
               onDragOver={(e) => {
-                if (isMyTurn) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  e.dataTransfer.dropEffect = 'move';
-                }
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = 'move';
               }}
               onDrop={(e) => {
-                if (!isMyTurn) return;
                 e.preventDefault();
                 e.stopPropagation();
                 setDragOverIdx(null);
                 const customIdx = e.dataTransfer.getData('application/x-wordgrid-rack-index');
                 const rawIdx = customIdx !== '' ? customIdx : e.dataTransfer.getData('text/plain');
-                if (rawIdx !== '') {
+                const source = e.dataTransfer.getData('source');
+                // Reordering only applies within the rack; board-to-rack drops are handled elsewhere
+                if (rawIdx !== '' && source !== 'board') {
                   const fromIdx = parseInt(rawIdx, 10);
                   if (!isNaN(fromIdx) && fromIdx !== idx && onReorderRack) {
                     onReorderRack(fromIdx, idx);
@@ -114,14 +108,10 @@ export const TileRack = ({
                 }
               }}
               onClick={() => {
-                if (isMyTurn) {
-                  if (isSelected) {
-                    onSelectTile(-1);
-                  } else {
-                    onSelectTile(idx);
-                  }
-                } else if (onTurnAlert) {
-                  onTurnAlert();
+                if (isSelected) {
+                  onSelectTile(-1);
+                } else {
+                  onSelectTile(idx);
                 }
               }}
               className={`w-11 h-12 sm:w-12 sm:h-13 rounded-2xl flex flex-col items-center justify-center relative transition-all duration-150 transform select-none ${isSelected
@@ -130,7 +120,7 @@ export const TileRack = ({
                     ? 'bg-indigo-500 text-white shadow-xl scale-105 ring-2 ring-indigo-400 border-2 border-indigo-300'
                     : isMyTurn
                       ? 'bg-amber-200 hover:bg-amber-100 text-slate-950 hover:shadow-xl cursor-grab active:cursor-grabbing border-2 border-amber-300 active:scale-95'
-                      : 'bg-amber-100/70 text-slate-900 border border-amber-300/60 opacity-70 cursor-not-allowed'
+                      : 'bg-amber-200/80 hover:bg-amber-100 text-slate-950 hover:shadow-xl cursor-grab active:cursor-grabbing border-2 border-amber-300/70 active:scale-95'
                 }`}
             >
               <span className={`text-base sm:text-lg font-black leading-none select-none ${isSelected ? 'text-white' : 'text-slate-950'
@@ -157,5 +147,3 @@ export const TileRack = ({
 };
 
 export default TileRack;
-
-
