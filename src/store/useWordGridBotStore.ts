@@ -22,6 +22,10 @@ import {
    clearWordGridDraft,
    loadWordGridDraft,
 } from "../utils/wordgrid/draftStorage";
+import {
+   findStaleMatchIds,
+   isStaleMatch,
+} from "../utils/wordgrid/staleMatches";
 import { safeLocalStorage } from "../utils/storage";
 
 export type WordGridBotViewType =
@@ -110,6 +114,22 @@ function startLastMoveTimer(set: (partial: any) => void) {
    lastMoveTimer = setTimeout(() => {
       set({ lastMove: null });
    }, LAST_MOVE_CLEAR_MS);
+}
+
+// Client-owned expiry: mark stale bot matches as abandoned.
+async function abandonBotMatchesByIds(ids: string[]): Promise<void> {
+   if (ids.length === 0) return;
+   try {
+      await supabase
+         .from("wordgrid_matches")
+         .update({
+            status: "abandoned",
+            completed_at: new Date().toISOString(),
+         })
+         .in("id", ids);
+   } catch (e) {
+      console.warn("[WordGridBot] Stale match sweep failed:", e);
+   }
 }
 
 interface WordGridBotState {
@@ -353,13 +373,19 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => {
       set({ loading: true, error: null });
       const local = loadBotSnapshot(matchId);
       if (local) {
+         // Expired while away: cancel instead of resuming
+         if (isStaleMatch(local)) {
+            await abandonBotMatchesByIds([matchId]);
+            clearBotSnapshot(matchId);
+         }
          const humanPlayer = local.players?.find(
             (p: any) => p.id === userId || p.id !== "bot",
          );
+         const expired = isStaleMatch(local);
          set({
             matchId: local.matchId,
             gridSize: local.gridSize || DEFAULT_GRID_SIZE,
-            status: local.status || "active",
+            status: expired ? "abandoned" : local.status || "active",
             board: local.board || [],
             tileBag: local.tileBag || [],
             players: local.players || [],
@@ -368,12 +394,15 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => {
             moves: local.moves || [],
             botDifficulty: local.botDifficulty || "normal",
             isBotMatch: true,
-            view: local.status === "completed" ? "completed" : "active",
+            view:
+               expired || local.status === "completed"
+                  ? "completed"
+                  : "active",
             placedTiles: [],
             rack: humanPlayer?.rack || local.rack || [],
             loading: false,
          });
-         get().hydrateLocalDraft();
+         if (!expired) get().hydrateLocalDraft();
          return;
       }
 
@@ -385,41 +414,51 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => {
             .single();
          if (error) throw error;
          if (data) {
-            const playersList: WordGridPlayer[] = data.players_data || [
+            let record = data;
+            // Expired while away: cancel instead of resuming
+            if (isStaleMatch(record)) {
+               await abandonBotMatchesByIds([record.id]);
+               record = {
+                  ...record,
+                  status: "abandoned",
+                  completed_at: new Date().toISOString(),
+               };
+            }
+            const playersList: WordGridPlayer[] = record.players_data || [
                {
                   id: userId,
                   username: "You",
-                  score: data.p1_score || 0,
-                  rack: data.p1_rack || [],
+                  score: record.p1_score || 0,
+                  rack: record.p1_rack || [],
                },
                {
                   id: "bot",
-                  username: `AI (${(data.bot_difficulty || "normal").toUpperCase()})`,
-                  score: data.p2_score || 0,
-                  rack: data.p2_rack || [],
+                  username: `AI (${(record.bot_difficulty || "normal").toUpperCase()})`,
+                  score: record.p2_score || 0,
+                  rack: record.p2_rack || [],
                },
             ];
             const human = playersList.find(
                (p) => p.id === userId || p.id !== "bot",
             );
             const loadedState = {
-               matchId: data.id,
-               gridSize: data.grid_size || DEFAULT_GRID_SIZE,
-               status: data.status,
-               board: data.board || [],
-               tileBag: data.tile_bag || [],
+               matchId: record.id,
+               gridSize: record.grid_size || DEFAULT_GRID_SIZE,
+               status: record.status,
+               board: record.board || [],
+               tileBag: record.tile_bag || [],
                players: playersList,
-               currentTurnIndex: data.current_turn_index || 0,
-               currentTurn: data.current_turn || userId,
-               moves: data.moves || [],
-               botDifficulty: data.bot_difficulty || "normal",
+               currentTurnIndex: record.current_turn_index || 0,
+               currentTurn: record.current_turn || userId,
+               moves: record.moves || [],
+               botDifficulty: record.bot_difficulty || "normal",
                isBotMatch: true,
                view:
-                  data.status === "completed"
+                  record.status === "completed" || record.status === "abandoned"
                      ? "completed"
                      : ("active" as WordGridBotViewType),
                placedTiles: [],
-               rack: human?.rack || data.p1_rack || [],
+               rack: human?.rack || record.p1_rack || [],
                loading: false,
             };
             set(loadedState);
@@ -480,7 +519,10 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => {
          moves: newMoves,
          botDifficulty: record.bot_difficulty || get().botDifficulty || "normal",
          isBotMatch: true,
-         view: record.status === "completed" ? "completed" : ("active" as WordGridBotViewType),
+         view:
+            record.status === "completed" || record.status === "abandoned"
+               ? "completed"
+               : ("active" as WordGridBotViewType),
          placedTiles: keepDraft ? prevPlacedTiles : [],
          rack: keepDraft ? get().rack : human?.rack || get().rack,
          loading: false,
@@ -837,7 +879,17 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => {
             .eq("is_bot_match", true)
             .eq("player1_id", userId)
             .order("created_at", { ascending: false });
-         set({ botMatchesList: data || [] });
+
+         let rows = data || [];
+         // Auto-cancel own stale matches (client-side sweep, no server schedule)
+         const staleIds = findStaleMatchIds(rows);
+         if (staleIds.length > 0) {
+            await abandonBotMatchesByIds(staleIds);
+            rows = rows.map((m) =>
+               staleIds.includes(m.id) ? { ...m, status: "abandoned" } : m,
+            );
+         }
+         set({ botMatchesList: rows });
       } catch (e) {
          console.warn("[WordGridBot] loadBotMatchesList error:", e);
       }

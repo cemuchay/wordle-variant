@@ -21,6 +21,11 @@ import {
    clearWordGridDraft,
    loadWordGridDraft,
 } from "../utils/wordgrid/draftStorage";
+import {
+   findStaleMatchIds,
+   isStaleMatch,
+} from "../utils/wordgrid/staleMatches";
+import formatUsername from "../utils/formatUsername";
 import { safeLocalStorage } from "../utils/storage";
 import {
    sendWordGridChallengeNotification,
@@ -117,6 +122,22 @@ function startLastMoveTimer(set: (partial: any) => void) {
    lastMoveTimer = setTimeout(() => {
       set({ lastMove: null });
    }, LAST_MOVE_CLEAR_MS);
+}
+
+// Client-owned expiry: mark this player's stale matches as abandoned.
+async function abandonMatchesByIds(ids: string[]): Promise<void> {
+   if (ids.length === 0) return;
+   try {
+      await supabase
+         .from("wordgrid_matches")
+         .update({
+            status: "abandoned",
+            completed_at: new Date().toISOString(),
+         })
+         .in("id", ids);
+   } catch (e) {
+      console.warn("[WordGridPvP] Stale match sweep failed:", e);
+   }
 }
 
 interface WordGridPvPState {
@@ -284,7 +305,17 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => {
             .single();
          if (error) throw error;
          if (data) {
-            get().updateFromMatchRecord(data, currentUserId, {
+            let record = data;
+            // Expired while away: cancel instead of resuming
+            if (isStaleMatch(record)) {
+               await abandonMatchesByIds([record.id]);
+               record = {
+                  ...record,
+                  status: "abandoned",
+                  completed_at: new Date().toISOString(),
+               };
+            }
+            get().updateFromMatchRecord(record, currentUserId, {
                suppressNewMoveFx: true,
             });
          }
@@ -371,6 +402,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => {
                   new CustomEvent("opponent-played-move", {
                      detail: {
                         playerName: oppName,
+                        playerId: lastMoveRecord.player_id,
                         word,
                         score: lastMoveRecord.score || 0,
                         isSwap,
@@ -398,7 +430,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => {
          currentTurnIndex: turnIndex,
          currentTurn,
          moves: newMoves,
-         view: (record.status === "completed"
+         view: (record.status === "completed" || record.status === "abandoned"
             ? "completed"
             : "active") as WordGridPvPViewType,
          placedTiles: keepDraft ? prevPlacedTiles : [],
@@ -459,7 +491,17 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => {
             .eq("is_bot_match", false)
             .order("created_at", { ascending: false });
          if (error) throw error;
-         set({ pvpMatchesList: data || [] });
+
+         let rows = data || [];
+         // Auto-cancel own stale matches (client-side sweep, no server schedule)
+         const staleIds = findStaleMatchIds(rows);
+         if (staleIds.length > 0) {
+            await abandonMatchesByIds(staleIds);
+            rows = rows.map((m) =>
+               staleIds.includes(m.id) ? { ...m, status: "abandoned" } : m,
+            );
+         }
+         set({ pvpMatchesList: rows });
       } catch (e) {
          console.warn("[WordGridPvP] loadMatchesList error:", e);
       }
@@ -622,7 +664,8 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => {
       const nextTurnUserId = updatedState.currentTurn;
       const isCompleted = updatedState.status === "completed";
       const currentPlayer = state.players.find((p) => p.id === userId);
-      const playerName = currentPlayer?.username || "Your opponent";
+      const playerName =
+         formatUsername(currentPlayer?.username) || "Your opponent";
 
       if (
          nextTurnUserId &&
@@ -703,7 +746,8 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => {
       // Notify opponent that it is their turn after exchange
       const nextTurnUserId = updatedState.currentTurn;
       const currentPlayer = state.players.find((p) => p.id === userId);
-      const playerName = currentPlayer?.username || "Your opponent";
+      const playerName =
+         formatUsername(currentPlayer?.username) || "Your opponent";
 
       if (
          nextTurnUserId &&

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWordGridStore } from '../store/useWordGridStore';
 import { MatchmakingLobby } from './components/MatchmakingLobby';
@@ -13,6 +13,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useTheme } from '../hooks/useTheme';
 import { TOAST_DURATION } from '../constants/ui';
 import { buildPlayerColorMap } from '../utils/wordgrid/playerColors';
+import formatUsername from '../utils/formatUsername';
 
 interface WordGridContainerProps {
   onBackToClassic: () => void;
@@ -81,6 +82,47 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
   const handleTutorialComplete = () => {
     localStorage.setItem('wordgrid_tutorial_completed', 'true');
     setShowTutorial(false);
+  };
+
+  // Active players list for scores header
+  const activePlayersList = players.length > 0
+    ? players
+    : [
+      { id: player1?.id || 'p1', username: player1?.username || 'Player 1', score: p1Score, rack: [] },
+      { id: player2?.id || 'p2', username: player2?.username || 'Player 2', score: p2Score, rack: [] },
+    ];
+
+  // Deterministic per-user color schemes shared across header, timeline & board
+  const colorMap = buildPlayerColorMap(activePlayersList.map((p: any) => p.id));
+
+  // Profile lookup (usernames/avatars) for the play timeline & notifications
+  const profileLookup: Record<string, { username?: string; avatar_url?: string | null }> = {};
+  allProfiles.forEach((p: any) => {
+    if (p?.id) profileLookup[p.id] = { username: p.username, avatar_url: p.avatar_url };
+  });
+  [player1, player2].forEach((p: any) => {
+    if (p?.id) profileLookup[p.id] = { username: p.username, avatar_url: p.avatar_url };
+  });
+
+  // Latest identity context for async event handlers (splash notifications)
+  const identityRef = useRef<{
+    players: any[];
+    lookup: Record<string, { username?: string; avatar_url?: string | null }>;
+  }>({ players: activePlayersList, lookup: profileLookup });
+  useEffect(() => {
+    identityRef.current = { players: activePlayersList, lookup: profileLookup };
+  });
+
+  // Resolve a player's display name from live state, formatted app-wide
+  const resolvePlayerDisplayName = (playerId?: string, fallback?: string): string => {
+    if (!playerId || playerId === 'bot') return fallback || 'Opponent';
+    const { players: ps, lookup } = identityRef.current;
+    const rawName =
+      ps.find((p: any) => p?.id === playerId)?.username ||
+      lookup[playerId]?.username;
+    if (rawName) return formatUsername(rawName);
+    if (fallback && fallback !== 'Opponent') return formatUsername(fallback);
+    return 'Opponent';
   };
 
 
@@ -178,7 +220,10 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     const handleOpponentMove = (e: Event) => {
       const detail = (e as CustomEvent)?.detail;
       if (detail && detail.word) {
-        setSplashMove(detail);
+        setSplashMove({
+          ...detail,
+          playerName: resolvePlayerDisplayName(detail.playerId, detail.playerName),
+        });
         if (timer) clearTimeout(timer);
         timer = setTimeout(() => {
           setSplashMove(null);
@@ -223,26 +268,6 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
       </div>
     );
   }
-
-  // Active players list for scores header
-  const activePlayersList = players.length > 0
-    ? players
-    : [
-      { id: player1?.id || 'p1', username: player1?.username || 'Player 1', score: p1Score, rack: [] },
-      { id: player2?.id || 'p2', username: player2?.username || 'Player 2', score: p2Score, rack: [] },
-    ];
-
-  // Deterministic per-user color schemes shared across header, timeline & board
-  const colorMap = buildPlayerColorMap(activePlayersList.map((p: any) => p.id));
-
-  // Profile lookup (usernames/avatars) for the play timeline
-  const profileLookup: Record<string, { username?: string; avatar_url?: string | null }> = {};
-  allProfiles.forEach((p: any) => {
-    if (p?.id) profileLookup[p.id] = { username: p.username, avatar_url: p.avatar_url };
-  });
-  [player1, player2].forEach((p: any) => {
-    if (p?.id) profileLookup[p.id] = { username: p.username, avatar_url: p.avatar_url };
-  });
 
   return (
     <div
