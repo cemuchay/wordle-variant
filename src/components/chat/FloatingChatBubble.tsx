@@ -21,6 +21,8 @@ import { ReactionModal } from "./ChatMessage/ReactionModal";
 import { ReactionBadge } from "./ChatMessage/ReactionBadge";
 import { safeLocalStorage } from "../../utils/storage";
 import { Z_INDEX } from "../../constants/ui";
+import { putOutbox, removeOutbox, type OutboxEntry } from "../../utils/outbox";
+import { uploadVoiceAsset, uploadImageAsset, insertMessageWithRetry } from "../../utils/messageDelivery";
 
 const CLOSE_DELAY = 10000;
 
@@ -354,8 +356,19 @@ export default function FloatingChatBubble() {
       });
    };
 
+   const queueAndDeliver = async (entry: OutboxEntry, deliver: () => Promise<void>) => {
+      try {
+         await putOutbox(entry);
+      } catch (e) {
+         console.warn("Failed to persist outbox entry:", e);
+      }
+      await deliver();
+   };
+
    const handleSendVoice = (blob: Blob) => {
       if (!user?.id || !selectedGroupId) return;
+      const uid = user.id;
+      const groupId = selectedGroupId;
 
       const tempId = crypto.randomUUID();
       const objectUrl = URL.createObjectURL(blob);
@@ -363,56 +376,48 @@ export default function FloatingChatBubble() {
       useAppStore.getState().addGlobalMessage({
          id: tempId,
          content: "[Voice Message]",
-         user_id: user.id,
+         user_id: uid,
          created_at: new Date().toISOString(),
          voice_url: objectUrl,
-         group_id: selectedGroupId,
+         group_id: groupId,
          is_read: false,
          status: "sending",
-         profiles: { id: user.id, username: profile?.username || "User", avatar_url: profile?.avatar_url || "" },
+         profiles: { id: uid, username: profile?.username || "User", avatar_url: profile?.avatar_url || "" },
       });
       pendingRetriesRef.current.set(tempId, { kind: "voice", blob, objectUrl });
       startInactivityTimer();
 
-      void deliverVoiceMessage(tempId, blob, selectedGroupId);
+      void queueAndDeliver(
+         {
+            id: tempId,
+            kind: "voice",
+            payload: { id: tempId, content: "[Voice Message]", user_id: uid, is_read: false, group_id: groupId },
+            blob,
+            groupId,
+            createdAt: new Date().toISOString(),
+         },
+         () => deliverVoiceMessage(tempId, blob, groupId),
+      );
    };
 
    const deliverVoiceMessage = async (messageId: string, blob: Blob, groupId: string) => {
       if (!user?.id) return;
       try {
-         const mimeType = blob.type || "audio/wav";
-         // eslint-disable-next-line react-hooks/purity
-         const fileName = `${user.id}/${Date.now()}.wav`;
-
-         // 1. Upload to storage
-         const { error: uploadErr } = await supabase.storage
-            .from("voice-notes")
-            .upload(fileName, blob, {
-               contentType: mimeType,
-               cacheControl: "3600",
-            });
-         if (uploadErr) throw uploadErr;
-
-         const {
-            data: { publicUrl },
-         } = supabase.storage.from("voice-notes").getPublicUrl(fileName);
-
-         // 2. Persist to database
-         const messagePayload = {
+         const publicUrl = await uploadVoiceAsset(user.id, blob);
+         await insertMessageWithRetry({
             id: messageId,
             content: "[Voice Message]",
             user_id: user.id,
             is_read: false,
             voice_url: publicUrl,
             group_id: groupId,
-         };
-         const { error } = await supabase.from("messages").insert([messagePayload]);
-         if (error) throw error;
+         });
 
          const entry = pendingRetriesRef.current.get(messageId);
          if (entry && entry.kind !== "text" && entry.objectUrl) URL.revokeObjectURL(entry.objectUrl);
          pendingRetriesRef.current.delete(messageId);
          useAppStore.getState().updateGlobalMessage({ id: messageId, status: "sent", voice_url: publicUrl });
+         removeOutbox(messageId).catch(() => {});
 
          markGroupAsRead(groupId);
       } catch (err) {
@@ -424,6 +429,8 @@ export default function FloatingChatBubble() {
 
    const handleSendImage = (file: File) => {
       if (!user?.id || !selectedGroupId) return;
+      const uid = user.id;
+      const groupId = selectedGroupId;
 
       const tempId = crypto.randomUUID();
       const objectUrl = URL.createObjectURL(file);
@@ -431,56 +438,49 @@ export default function FloatingChatBubble() {
       useAppStore.getState().addGlobalMessage({
          id: tempId,
          content: "[Image]",
-         user_id: user.id,
+         user_id: uid,
          created_at: new Date().toISOString(),
          image_url: objectUrl,
-         group_id: selectedGroupId,
+         group_id: groupId,
          is_read: false,
          status: "sending",
-         profiles: { id: user.id, username: profile?.username || "User", avatar_url: profile?.avatar_url || "" },
+         profiles: { id: uid, username: profile?.username || "User", avatar_url: profile?.avatar_url || "" },
       });
       pendingRetriesRef.current.set(tempId, { kind: "image", blob: file, objectUrl });
       startInactivityTimer();
 
-      void deliverImageMessage(tempId, file, selectedGroupId);
+      void queueAndDeliver(
+         {
+            id: tempId,
+            kind: "image",
+            payload: { id: tempId, content: "[Image]", user_id: uid, is_read: false, group_id: groupId },
+            blob: file,
+            groupId,
+            createdAt: new Date().toISOString(),
+         },
+         () => deliverImageMessage(tempId, file, groupId),
+      );
    };
 
    const deliverImageMessage = async (messageId: string, file: File, groupId: string) => {
       if (!user?.id) return;
       try {
          const compressedBlob = await compressImage(file);
-         // eslint-disable-next-line react-hooks/purity
-         const fileName = `${user.id}/${Date.now()}.jpg`;
-
-         // 1. Upload to storage
-         const { error: uploadErr } = await supabase.storage
-            .from("chat-images")
-            .upload(fileName, compressedBlob, {
-               contentType: "image/jpeg",
-               cacheControl: "3600",
-            });
-         if (uploadErr) throw uploadErr;
-
-         const {
-            data: { publicUrl },
-         } = supabase.storage.from("chat-images").getPublicUrl(fileName);
-
-         // 2. Persist to database
-         const messagePayload = {
+         const publicUrl = await uploadImageAsset(user.id, compressedBlob);
+         await insertMessageWithRetry({
             id: messageId,
             content: "[Image]",
             user_id: user.id,
             is_read: false,
             image_url: publicUrl,
             group_id: groupId,
-         };
-         const { error } = await supabase.from("messages").insert([messagePayload]);
-         if (error) throw error;
+         });
 
          const entry = pendingRetriesRef.current.get(messageId);
          if (entry && entry.kind !== "text" && entry.objectUrl) URL.revokeObjectURL(entry.objectUrl);
          pendingRetriesRef.current.delete(messageId);
          useAppStore.getState().updateGlobalMessage({ id: messageId, status: "sent", image_url: publicUrl });
+         removeOutbox(messageId).catch(() => {});
 
          markGroupAsRead(groupId);
       } catch (err) {
@@ -834,7 +834,17 @@ export default function FloatingChatBubble() {
       setReplyingToMsg(null);
       startInactivityTimer();
 
-      void deliverTextMessage(messagePayload, sentText);
+      void queueAndDeliver(
+         {
+            id: tempId,
+            kind: "text",
+            payload: messagePayload,
+            fallbackText: sentText,
+            groupId: selectedGroupId!,
+            createdAt: new Date().toISOString(),
+         },
+         () => deliverTextMessage(messagePayload, sentText),
+      );
    };
 
    const deliverTextMessage = async (payload: any, plainTextForRestore?: string) => {
@@ -845,6 +855,7 @@ export default function FloatingChatBubble() {
 
          pendingRetriesRef.current.delete(payload.id);
          useAppStore.getState().updateGlobalMessage({ id: payload.id, status: "sent" });
+         removeOutbox(payload.id).catch(() => {});
          markGroupAsRead(payload.group_id);
       } catch (err) {
          console.error("Failed to send message:", err);

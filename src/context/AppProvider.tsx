@@ -13,6 +13,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { syncWithRetry } from '../lib/game-logic';
 import { safeLocalStorage } from '../utils/storage';
 import { getAllMessages, saveMessages, addMessage, updateMessage, removeMessage, purgeMessagesOlderThan } from '../utils/indexedDBMessages';
+import { getOutbox, removeOutbox, purgeOldOutbox } from '../utils/outbox';
+import { deliverOutboxEntry } from '../utils/messageDelivery';
 import { logger } from '../lib/logger';
 import { TOAST_DURATION } from '../constants/ui';
 import { AppContext, type AppContextType } from './AppContext';
@@ -163,6 +165,68 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             await queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
         }
     }, [user?.id, queryClient]);
+
+    // Outbox drain: deliver messages persisted before a failure or app reload
+    const outboxDrainingRef = useRef(false);
+    const drainOutbox = useCallback(async () => {
+        if (outboxDrainingRef.current || !user?.id) return;
+        outboxDrainingRef.current = true;
+        try {
+            const entries = await getOutbox();
+            purgeOldOutbox().catch(() => {});
+            for (const entry of entries) {
+                const exists = useAppStore.getState().globalMessages.some((m) => m.id === entry.id);
+                if (!exists) {
+                    const restored: any = {
+                        id: entry.id,
+                        content: entry.payload?.content ?? "",
+                        user_id: user.id,
+                        created_at: entry.createdAt,
+                        group_id: entry.groupId,
+                        is_read: false,
+                        status: "sending",
+                        reply_to: entry.payload?.reply_to,
+                        mentions: entry.payload?.mentions,
+                        profiles: { id: user.id, username: profile?.username || "You", avatar_url: profile?.avatar_url || "" },
+                    };
+                    if (entry.blob && entry.kind === "voice") restored.voice_url = URL.createObjectURL(entry.blob);
+                    if (entry.blob && entry.kind === "image") restored.image_url = URL.createObjectURL(entry.blob);
+                    useAppStore.getState().addGlobalMessage(restored);
+                }
+                try {
+                    const { voiceUrl, imageUrl } = await deliverOutboxEntry(entry, user.id);
+                    await removeOutbox(entry.id).catch(() => {});
+                    useAppStore.getState().updateGlobalMessage({
+                        id: entry.id,
+                        status: "sent",
+                        ...(voiceUrl ? { voice_url: voiceUrl } : {}),
+                        ...(imageUrl ? { image_url: imageUrl } : {}),
+                    });
+                } catch (err) {
+                    console.warn("Outbox delivery failed, will retry:", err);
+                    useAppStore.getState().updateGlobalMessage({ id: entry.id, status: "failed" });
+                    useAppStore.getState().addFailedMessageId(entry.id);
+                }
+            }
+        } finally {
+            outboxDrainingRef.current = false;
+        }
+    }, [user?.id, profile?.username, profile?.avatar_url]);
+
+    useEffect(() => {
+        if (!user?.id || !hasHydrated) return;
+        drainOutbox();
+        const handleOnline = () => drainOutbox();
+        const handleVisible = () => {
+            if (document.visibilityState === "visible") drainOutbox();
+        };
+        window.addEventListener('online', handleOnline);
+        document.addEventListener('visibilitychange', handleVisible);
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            document.removeEventListener('visibilitychange', handleVisible);
+        };
+    }, [user?.id, hasHydrated, drainOutbox]);
 
     // 4. Presence
     const { onlineUsers, allProfiles, refreshProfiles } = useGlobalPresence(
