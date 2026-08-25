@@ -8,6 +8,7 @@ interface ChatImageProps {
 }
 
 function getThumbnailUrl(url: string): string {
+  if (url.startsWith("blob:")) return url;
   const separator = url.includes("?") ? "&" : "?";
   return `${url}${separator}width=200&height=200&resize=cover`;
 }

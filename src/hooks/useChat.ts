@@ -241,6 +241,9 @@ export const useChat = (userId: string) => {
    const typingTimeoutRef = useRef<number | null>(null);
    const isCurrentlyTypingLocally = useRef(false);
    const lastActiveRoomIdRef = useRef<string | null>(null);
+   // Retained blobs + object URLs for failed media sends (enables true retry)
+   const pendingMediaRef = useRef<Map<string, Blob>>(new Map());
+   const pendingObjectUrlsRef = useRef<Map<string, string>>(new Map());
 
    const activeRoom = groups.find((g) => g.id === activeRoomId) || null;
 
@@ -655,6 +658,102 @@ export const useChat = (userId: string) => {
       }
    };
 
+   const clearPendingMedia = (messageId: string) => {
+      const objectUrl = pendingObjectUrlsRef.current.get(messageId);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      pendingObjectUrlsRef.current.delete(messageId);
+      pendingMediaRef.current.delete(messageId);
+   };
+
+   // Upload voice note to storage and persist the message record
+   const uploadVoiceAndPersist = async (
+      messageId: string,
+      blob: Blob,
+      groupId: string,
+   ): Promise<string> => {
+      const mimeType = blob.type || "audio/wav";
+      let extension = "wav";
+      if (mimeType.includes("webm")) {
+         extension = "webm";
+      } else if (mimeType.includes("mp4")) {
+         extension = "mp4";
+      } else if (mimeType.includes("ogg")) {
+         extension = "ogg";
+      }
+      const fileName = `${userId}/${Date.now()}.${extension}`;
+
+      // 1. Upload to storage with retry
+      await retryOperation(async () => {
+         const { error: uploadErr } = await supabase.storage
+            .from("voice-notes")
+            .upload(fileName, blob, {
+               contentType: mimeType,
+               cacheControl: "3600",
+            });
+         if (uploadErr) throw uploadErr;
+      });
+
+      const {
+         data: { publicUrl },
+      } = supabase.storage.from("voice-notes").getPublicUrl(fileName);
+
+      // 2. Persist to database with retry
+      const messagePayload = {
+         id: messageId,
+         content: "[Voice Message]",
+         user_id: userId,
+         is_read: false,
+         voice_url: publicUrl,
+         group_id: groupId,
+      };
+      const success = await sendWithRetry(messageId, messagePayload);
+      if (!success)
+         throw new Error(
+            "Failed to persist voice message record after retries",
+         );
+      return publicUrl;
+   };
+
+   // Upload image to storage and persist the message record
+   const uploadImageAndPersist = async (
+      messageId: string,
+      file: File,
+      groupId: string,
+   ): Promise<string> => {
+      // 1. Compress Image
+      const compressedBlob = await compressImage(file);
+      const fileName = `${userId}/${Date.now()}.jpg`;
+
+      // 2. Upload to storage with retry
+      await retryOperation(async () => {
+         const { error: uploadErr } = await supabase.storage
+            .from("chat-images")
+            .upload(fileName, compressedBlob, {
+               contentType: "image/jpeg",
+               cacheControl: "3600",
+            });
+         if (uploadErr) throw uploadErr;
+      });
+
+      const {
+         data: { publicUrl },
+      } = supabase.storage.from("chat-images").getPublicUrl(fileName);
+
+      // 3. Persist to database with retry
+      const messagePayload = {
+         id: messageId,
+         content: "[Image]",
+         user_id: userId,
+         is_read: false,
+         image_url: publicUrl,
+         group_id: groupId,
+      };
+      const success = await sendWithRetry(messageId, messagePayload);
+      if (!success)
+         throw new Error("Failed to persist image record after retries");
+      return publicUrl;
+   };
+
    // Send Message
    const sendMessage = async (
       content: string,
@@ -724,10 +823,13 @@ export const useChat = (userId: string) => {
       const msg = globalMessages.find((m) => m.id === messageId);
       if (!msg) return;
 
-      // Prevent sending local blob URLs to the database
+      const pendingBlob = pendingMediaRef.current.get(messageId);
+
+      // Media messages require the retained local blob for re-upload
       if (
-         msg.voice_url?.startsWith("blob:") ||
-         msg.image_url?.startsWith("blob:")
+         (msg.voice_url?.startsWith("blob:") ||
+            msg.image_url?.startsWith("blob:")) &&
+         !pendingBlob
       ) {
          useAppStore
             .getState()
@@ -740,31 +842,70 @@ export const useChat = (userId: string) => {
          .updateGlobalMessage({ id: messageId, status: "sending" });
       removeFailedMessageId(messageId);
 
-      let finalContent = msg.content;
-      if (activeRoom && activeRoom.type === "dm" && activeRoom.dm_partner) {
-         const key = getDMRoomKey(userId, activeRoom.dm_partner.id);
-         finalContent = encryptDM(msg.content, key);
-      }
+      try {
+         if (msg.voice_url && pendingBlob) {
+            const publicUrl = await uploadVoiceAndPersist(
+               messageId,
+               pendingBlob,
+               msg.group_id,
+            );
+            clearPendingMedia(messageId);
+            useAppStore.getState().updateGlobalMessage({
+               id: messageId,
+               status: "sent",
+               voice_url: publicUrl,
+            });
+            return;
+         }
 
-      const messagePayload = {
-         id: messageId,
-         content: finalContent,
-         user_id: userId,
-         reply_to: msg.reply_to,
-         mentions: msg.mentions,
-         is_read: false,
-         voice_url: msg.voice_url,
-         image_url: msg.image_url,
-         group_id: msg.group_id,
-      };
+         if (msg.image_url && pendingBlob) {
+            const publicUrl = await uploadImageAndPersist(
+               messageId,
+               pendingBlob as File,
+               msg.group_id,
+            );
+            clearPendingMedia(messageId);
+            useAppStore.getState().updateGlobalMessage({
+               id: messageId,
+               status: "sent",
+               image_url: publicUrl,
+            });
+            return;
+         }
 
-      const success = await sendWithRetry(messageId, messagePayload);
+         let finalContent = msg.content;
+         if (activeRoom && activeRoom.type === "dm" && activeRoom.dm_partner) {
+            const key = getDMRoomKey(userId, activeRoom.dm_partner.id);
+            finalContent = encryptDM(msg.content, key);
+         }
 
-      if (success) {
+         const messagePayload = {
+            id: messageId,
+            content: finalContent,
+            user_id: userId,
+            reply_to: msg.reply_to,
+            mentions: msg.mentions,
+            is_read: false,
+            voice_url:
+               msg.voice_url && !msg.voice_url.startsWith("blob:")
+                  ? msg.voice_url
+                  : null,
+            image_url:
+               msg.image_url && !msg.image_url.startsWith("blob:")
+                  ? msg.image_url
+                  : null,
+            group_id: msg.group_id,
+         };
+
+         const success = await sendWithRetry(messageId, messagePayload);
+
+         if (!success) throw new Error("Resend failed after retries");
+
          useAppStore
             .getState()
             .updateGlobalMessage({ id: messageId, status: "sent" });
-      } else {
+      } catch (err) {
+         console.error("Failed to resend message:", err);
          useAppStore
             .getState()
             .updateGlobalMessage({ id: messageId, status: "failed" });
@@ -792,57 +933,18 @@ export const useChat = (userId: string) => {
       };
 
       useAppStore.getState().addGlobalMessage(optimisticMessage);
+      pendingMediaRef.current.set(tempId, blob);
+      pendingObjectUrlsRef.current.set(tempId, tempUrl);
 
       try {
-         const mimeType = blob.type || "audio/wav";
-         let extension = "wav";
-         if (mimeType.includes("webm")) {
-            extension = "webm";
-         } else if (mimeType.includes("mp4")) {
-            extension = "mp4";
-         } else if (mimeType.includes("ogg")) {
-            extension = "ogg";
-         }
-         const fileName = `${userId}/${Date.now()}.${extension}`;
+         const publicUrl = await uploadVoiceAndPersist(tempId, blob, activeRoomId);
 
-         // 1. Upload to storage with retry
-         await retryOperation(async () => {
-            const { error: uploadErr } = await supabase.storage
-               .from("voice-notes")
-               .upload(fileName, blob, {
-                  contentType: mimeType,
-                  cacheControl: "3600",
-               });
-            if (uploadErr) throw uploadErr;
-         });
-
-         const {
-            data: { publicUrl },
-         } = supabase.storage.from("voice-notes").getPublicUrl(fileName);
-
-         // 2. Persist to database with retry
-         const messagePayload = {
+         clearPendingMedia(tempId);
+         useAppStore.getState().updateGlobalMessage({
             id: tempId,
-            content: "[Voice Message]",
-            user_id: userId,
-            is_read: false,
+            status: "sent",
             voice_url: publicUrl,
-            group_id: activeRoomId,
-         };
-
-         const success = await sendWithRetry(tempId, messagePayload);
-
-         if (success) {
-            useAppStore.getState().updateGlobalMessage({
-               id: tempId,
-               status: "sent",
-               voice_url: publicUrl,
-            });
-         } else {
-            throw new Error(
-               "Failed to persist voice message record after retries",
-            );
-         }
+         });
       } catch (err) {
          console.error("Failed to upload/send voice message:", err);
          useAppStore
@@ -857,35 +959,44 @@ export const useChat = (userId: string) => {
 
    // Upload & send image
    const sendImageMessage = async (file: File) => {
+      const tempId = crypto.randomUUID();
+      const tempUrl = URL.createObjectURL(file); // Temporary local URL for optimistic UI
+
+      const optimisticMessage: Message = {
+         id: tempId,
+         content: "[Image]",
+         user_id: userId,
+         created_at: new Date().toISOString(),
+         image_url: tempUrl,
+         group_id: activeRoomId,
+         status: "sending",
+         is_read: false,
+         profiles: globalMessages.find((m) => m.user_id === userId)
+            ?.profiles || { username: "Me", avatar_url: "", id: userId },
+      };
+
+      useAppStore.getState().addGlobalMessage(optimisticMessage);
+      pendingMediaRef.current.set(tempId, file);
+      pendingObjectUrlsRef.current.set(tempId, tempUrl);
+
       try {
-         // 1. Compress Image
-         const compressedBlob = await compressImage(file);
-         const fileName = `${userId}/${Date.now()}.jpg`;
+         const publicUrl = await uploadImageAndPersist(tempId, file, activeRoomId);
 
-         // 2. Upload to storage
-         const { error: uploadErr } = await supabase.storage
-            .from("chat-images")
-            .upload(fileName, compressedBlob, {
-               contentType: "image/jpeg",
-               cacheControl: "3600",
-            });
-
-         if (uploadErr) throw uploadErr;
-
-         const {
-            data: { publicUrl },
-         } = supabase.storage.from("chat-images").getPublicUrl(fileName);
-
-         // 3. Send message
-         await sendMessage(
-            "[Image]",
-            undefined,
-            undefined,
-            undefined,
-            publicUrl,
-         );
+         clearPendingMedia(tempId);
+         useAppStore.getState().updateGlobalMessage({
+            id: tempId,
+            status: "sent",
+            image_url: publicUrl,
+         });
       } catch (err) {
          console.error("Failed to upload/send image:", err);
+         useAppStore
+            .getState()
+            .updateGlobalMessage({ id: tempId, status: "failed" });
+         addFailedMessageId(tempId);
+         useAppStore
+            .getState()
+            .triggerToast("Failed to send image.", TOAST_DURATION.LONG);
       }
    };
 
