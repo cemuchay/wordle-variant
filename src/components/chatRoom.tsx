@@ -108,6 +108,30 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         }
     }, []);
 
+    // Stable handlers — memoized ChatMessage rows skip re-renders caused by
+    // presence/typing churn when these identities never change
+    const handleReplyFocus = useCallback((m: Message) => {
+        setReplyingTo(m);
+        // Immediate focus for mobile swipe compatibility
+        const input = document.querySelector('[contenteditable="true"]') as HTMLElement;
+        if (input) {
+            input.focus();
+            // Move cursor to end
+            const range = document.createRange();
+            range.selectNodeContents(input);
+            range.collapse(false);
+            const sel = window.getSelection();
+            if (sel) {
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
+        }
+    }, []);
+
+    const handleMessageMarkRead = useCallback((id: string) => {
+        markAsRead(id);
+    }, [markAsRead]);
+
     // Search messages in current conversation
     useEffect(() => {
         if (!conversationSearchQuery.trim()) {
@@ -338,6 +362,33 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         });
         return counts;
     }, [globalMessages, readReceipts, user?.id, hasPlayedToday]);
+
+    // Windowed transcript — bounds render cost like FloatingChatBubble
+    const MESSAGE_WINDOW_SIZE = 60;
+    const [visibleCount, setVisibleCount] = useState(MESSAGE_WINDOW_SIZE);
+    useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setVisibleCount(MESSAGE_WINDOW_SIZE);
+    }, [activeRoomId]);
+
+    const messageIds = useMemo(() => messages.map((m: any) => m.id), [messages]);
+
+    const replyById = useMemo(() => {
+        const byId = new Map<string, any>();
+        messages.forEach((m: any) => byId.set(m.id, m));
+        const map = new Map<string, any>();
+        messages.forEach((m: any) => {
+            if (m.reply_to && byId.has(m.reply_to)) {
+                map.set(m.id, byId.get(m.reply_to));
+            }
+        });
+        return map;
+    }, [messages]);
+
+    const visibleMessages = useMemo(
+        () => messages.slice(-visibleCount),
+        [messages, visibleCount],
+    );
 
     const sortRooms = (rooms: any[]) => {
         return [...rooms].sort((a, b) => {
@@ -925,10 +976,18 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                     className="flex-1 overflow-y-auto p-6 space-y-2 scrollbar-hide z-10"
                                 >
                                     <VoiceControlBar />
+                                    {messages.length > visibleMessages.length && (
+                                        <button
+                                            onClick={() => setVisibleCount((c) => c + MESSAGE_WINDOW_SIZE)}
+                                            className="mx-auto mb-3 text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 px-4 py-1.5 rounded-full transition-colors cursor-pointer"
+                                        >
+                                            Load earlier messages
+                                        </button>
+                                    )}
                                     <AnimatePresence initial={false}>
-                                        {messages.map((msg: any) => {
+                                        {visibleMessages.map((msg: any) => {
                                             const isMe = msg.user_id === user.id;
-                                            const replyMsg = messages.find((m: any) => m.id === msg.reply_to);
+                                            const replyMsg = replyById.get(msg.id);
 
                                             return (
                                                 <div key={msg.id}>
@@ -951,24 +1010,8 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                         isMe={isMe}
                                                         replyMsg={replyMsg}
                                                         onScrollToMessage={scrollToMessage}
-                                                        onReply={(m) => {
-                                                            setReplyingTo(m);
-                                                            // Immediate focus for mobile swipe compatibility
-                                                            const input = document.querySelector('[contenteditable="true"]') as HTMLElement;
-                                                            if (input) {
-                                                                input.focus();
-                                                                // Move cursor to end
-                                                                const range = document.createRange();
-                                                                range.selectNodeContents(input);
-                                                                range.collapse(false);
-                                                                const sel = window.getSelection();
-                                                                if (sel) {
-                                                                    sel.removeAllRanges();
-                                                                    sel.addRange(range);
-                                                                }
-                                                            }
-                                                        }}
-                                                        onMarkAsRead={(id) => markAsRead(id)}
+                                                        onReply={handleReplyFocus}
+                                                        onMarkAsRead={handleMessageMarkRead}
                                                         users={users}
                                                         allProfiles={allProfiles}
                                                         onReact={(emoji) => reactToMessage(msg.id, emoji)}
@@ -988,7 +1031,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                         }}
                                                         dailyGuesses={dailyGuesses}
                                                         onResend={resendMessage}
-                                                        allMessageIds={messages.map((m: any) => m.id)}
+                                                        allMessageIds={messageIds}
                                                         allMessages={messages}
                                                     />
                                                 </div>

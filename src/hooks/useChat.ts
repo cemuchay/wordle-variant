@@ -546,7 +546,18 @@ export const useChat = (userId: string) => {
                }
             });
 
-            setTypingUsers(Array.from(typingNames));
+            // Skip identical snapshots — presence echoes from our own typing
+            // must not re-render the whole room on every keystroke
+            const next = Array.from(typingNames).sort();
+            setTypingUsers((prev) => {
+               if (
+                  prev.length === next.length &&
+                  prev.every((existingName, i) => existingName === next[i])
+               ) {
+                  return prev;
+               }
+               return next;
+            });
          })
          .subscribe();
 
@@ -985,7 +996,7 @@ export const useChat = (userId: string) => {
       deleteMessageAction(messageId, userId);
 
    // Mark room as read (hover-based; the active-room effect covers normal flow)
-   const markAsRead = async (messageId: string) => {
+   const markAsRead = useCallback(async (messageId: string) => {
       const msg = globalMessages.find((m) => m.id === messageId);
       markGroupsRead(userId, [msg?.group_id || activeRoomId]);
       setFirstUnreadId(null);
@@ -993,7 +1004,7 @@ export const useChat = (userId: string) => {
          .from("messages")
          .update({ is_read: true })
          .eq("id", messageId);
-   };
+   }, [userId, activeRoomId, globalMessages]);
 
    // Custom group creation
    const createCustomGroup = async (

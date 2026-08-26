@@ -144,6 +144,34 @@ export default function FloatingChatBubble() {
    const pendingRetriesRef = useRef<Map<string, { kind: "text"; payload: any; fallbackText: string } | { kind: "voice"; blob: Blob; objectUrl?: string } | { kind: "image"; blob: File; objectUrl?: string }>>(new Map());
    const replyTextRef = useRef("");
 
+   // Desktop gets a docked Messenger-style panel instead of a modal sheet
+   const [isDesktop, setIsDesktop] = useState(() =>
+      typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches,
+   );
+   const isDesktopRef = useRef(isDesktop);
+   useEffect(() => {
+      const mq = window.matchMedia("(min-width: 768px)");
+      const onChange = () => {
+         setIsDesktop(mq.matches);
+         isDesktopRef.current = mq.matches;
+      };
+      mq.addEventListener("change", onChange);
+      return () => mq.removeEventListener("change", onChange);
+   }, []);
+
+   // Desktop panels persist while multitasking — close via X or Escape
+   useEffect(() => {
+      if (!isDesktop || !isOverlayOpen) return;
+      const onKey = (e: KeyboardEvent) => {
+         if (e.key === "Escape") {
+            setIsOverlayOpen(false);
+            setSelectedGroupId(null);
+         }
+      };
+      document.addEventListener("keydown", onKey);
+      return () => document.removeEventListener("keydown", onKey);
+   }, [isDesktop, isOverlayOpen]);
+
    const [groups, setGroups] = useState<any[]>([]);
    const [hasPlayedToday, setHasPlayedToday] = useState(false);
 
@@ -227,6 +255,7 @@ export default function FloatingChatBubble() {
    const startInactivityTimer = () => {
       clearInactivityTimer();
       inactivityTimerRef.current = window.setTimeout(() => {
+         if (isDesktopRef.current) return;
          setIsOverlayOpen(false);
          setSelectedGroupId(null);
       }, CLOSE_DELAY);
@@ -1014,10 +1043,35 @@ export default function FloatingChatBubble() {
 
    // Filter messages context for the active room in popover
    const allRoomMessages = selectedGroupId
-      ? globalMessages.filter(m => m.group_id === selectedGroupId && !m.content?.startsWith("[reaction:"))
+      ? globalMessages.filter(m => m.group_id === selectedGroupId && !isReactionRow(m.content))
       : [];
-   const activeRoomMessages = allRoomMessages.slice(-20);
-   const hasMoreMessages = allRoomMessages.length > 20;
+
+   // Jump-to-reply widens the rendered window around targets older than 20
+   const [windowFloorId, setWindowFloorId] = useState<string | null>(null);
+   const activeRoomMessages = (() => {
+      if (!windowFloorId) return allRoomMessages.slice(-20);
+      const floorIdx = allRoomMessages.findIndex((m: any) => m.id === windowFloorId);
+      if (floorIdx === -1 || floorIdx >= allRoomMessages.length - 20) return allRoomMessages.slice(-20);
+      return allRoomMessages.slice(Math.max(0, floorIdx - 5));
+   })();
+   const hasMoreMessages = allRoomMessages.length > 20 && !windowFloorId;
+
+   const handleJumpToMessage = (messageId: string) => {
+      const el = document.querySelector(`[data-message-id="${messageId}"]`);
+      if (!el) {
+         const idx = allRoomMessages.findIndex((m: any) => m.id === messageId);
+         if (idx === -1) return;
+         setWindowFloorId(messageId);
+         // Retry after React paints the widened window
+         requestAnimationFrame(() => requestAnimationFrame(() => handleJumpToMessage(messageId)));
+         return;
+      }
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("ring-2", "ring-correct", "rounded-2xl");
+      setTimeout(() => {
+         el.classList.remove("ring-2", "ring-correct", "rounded-2xl");
+      }, 2000);
+   };
 
    // Find first unread message ID for the unread divider
    const lastSeen = selectedGroupId ? readReceipts[selectedGroupId] : null;
@@ -1058,6 +1112,7 @@ export default function FloatingChatBubble() {
       setVisibleUnreadId(null);
       setShowUnreadLine(true);
       setMentionState(null);
+      setWindowFloorId(null);
    }, [selectedGroupId]);
 
    // Divider visibility: auto-hide after 6s if in view, persist if scrolled below
@@ -1161,29 +1216,31 @@ export default function FloatingChatBubble() {
          </div>
 
          {/* Centered Modal Popover */}
-         <AnimatePresence>
-            {isOverlayOpen && isVisible && (
-               <>
-                  {/* Backdrop */}
-                  <motion.div
-                     initial={{ opacity: 0 }}
-                     animate={{ opacity: 1 }}
-                     exit={{ opacity: 0 }}
-                     onClick={() => {
-                        if (Date.now() - overlayOpenedAtRef.current < 400) return;
-                        setIsOverlayOpen(false);
-                        setSelectedGroupId(null);
-                     }}
-                     className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99990] pointer-events-auto"
-                  />
+          <AnimatePresence>
+             {isOverlayOpen && isVisible && (
+                <>
+                  {/* Backdrop — desktop panel stays non-blocking so the page remains usable */}
+                  {!isDesktop && (
+                     <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => {
+                           if (Date.now() - overlayOpenedAtRef.current < 400) return;
+                           setIsOverlayOpen(false);
+                           setSelectedGroupId(null);
+                        }}
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99990] pointer-events-auto"
+                     />
+                  )}
 
-                  {/* Bottom Sheet / Popover Modal Card */}
+                  {/* Bottom Sheet (mobile) / Docked Panel (desktop) */}
                   <motion.div
-                     initial={{ opacity: 0, y: "100%", x: "-50%" }}
-                     animate={{ opacity: 1, y: 0, x: "-50%" }}
-                     exit={{ opacity: 0, y: "100%", x: "-50%" }}
+                     initial={{ opacity: 0, y: isDesktop ? 48 : "100%", x: isDesktop ? 0 : "-50%" }}
+                     animate={{ opacity: 1, y: 0, x: 0 }}
+                     exit={{ opacity: 0, y: isDesktop ? 48 : "100%", x: isDesktop ? 0 : "-50%" }}
                      transition={{ type: "spring", damping: 25, stiffness: 280 }}
-                     className="fixed bottom-4 left-1/2 w-[92%] max-w-md h-[75vh] bg-slate-950/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col pointer-events-auto overflow-hidden z-[99991]"
+                     className={`fixed bg-slate-950/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col pointer-events-auto overflow-hidden z-[99991] ${isDesktop ? "right-4 bottom-[88px] w-[380px] max-w-[calc(100vw-32px)] h-[min(600px,72vh)]" : "bottom-4 left-1/2 w-[92%] max-w-md h-[75vh]"}`}
                   >
                      {/* Header */}
                      <div className="px-4 py-3 bg-white/5 border-b border-white/10 flex items-center justify-between shrink-0">
@@ -1328,6 +1385,7 @@ export default function FloatingChatBubble() {
                                      return (
                                         <div
                                            key={msg.id}
+                                           data-message-id={msg.id}
                                            onMouseEnter={() => !isMe && !msg.is_read && handleMarkAsRead(msg.id)}
                                            onClick={isMe && msg.status === "failed" ? () => handleRetryMessage(msg) : undefined}
                                            onTouchStart={() => { if (!(isMe && msg.status === "failed")) handleTouchStart(msg.id); }}
@@ -1461,14 +1519,20 @@ export default function FloatingChatBubble() {
                                                       {msg.reply_to && !msg.is_deleted && (() => {
                                                          const replyToMsg = allRoomMessages.find((m: any) => m.id === msg.reply_to);
                                                          if (!replyToMsg) return null;
-                                                         return (
-                                                            <div className={`flex items-center gap-2 mb-1.5 text-[10px] text-white/60 bg-white/5 border-l-2 border-correct/40 px-3 py-1.5 rounded-t-xl max-w-[85%] ${isMe ? 'flex-row-reverse ml-auto' : ''}`}>
-                                                               <Reply size={10} className="text-correct shrink-0" />
-                                                               <span className="truncate text-gray-400">
-                                                                  {replyToMsg.profiles?.username || 'User'}: {replyToMsg.voice_url ? '🎤 Voice note' : replyToMsg.image_url ? '📷 Image' : getDecryptedContent(replyToMsg)}
-                                                               </span>
-                                                            </div>
-                                                         );
+                                                          return (
+                                                             <div
+                                                                onClick={(e) => {
+                                                                   e.stopPropagation();
+                                                                   handleJumpToMessage(msg.reply_to);
+                                                                }}
+                                                                className={`flex items-center gap-2 mb-1.5 text-[10px] text-white/60 bg-white/5 hover:bg-white/10 border-l-2 border-correct/40 px-3 py-1.5 rounded-t-xl max-w-[85%] cursor-pointer transition-colors ${isMe ? 'flex-row-reverse ml-auto' : ''}`}
+                                                             >
+                                                                <Reply size={10} className="text-correct shrink-0" />
+                                                                <span className="truncate text-gray-400">
+                                                                   {replyToMsg.profiles?.username || 'User'}: {replyToMsg.voice_url ? '🎤 Voice note' : replyToMsg.image_url ? '📷 Image' : getDecryptedContent(replyToMsg)}
+                                                                </span>
+                                                             </div>
+                                                          );
                                                       })()}
                                                       {msg.voice_url ? (
                                                          <ConnectedAudioPlayer
@@ -1493,7 +1557,7 @@ export default function FloatingChatBubble() {
                                                                }
                                                             }}
                                                          >
-                                                            <p className={`text-xs text-left text-gray-200 mt-1 leading-relaxed whitespace-pre-wrap break-words px-3 py-2 rounded-2xl ${isMe ? 'bg-indigo-500/15 border-indigo-500/25' : 'bg-white/5 border border-white/5'}`}>
+                                                             <p className={`text-xs text-left mt-1 leading-relaxed whitespace-pre-wrap break-words px-3 py-2 rounded-2xl ${isMe ? 'bg-indigo-600 border border-indigo-500 text-white' : 'bg-white/5 border border-white/5 text-gray-200'}`}>
                                                                {getDecryptedContent(msg)}
                                                                {msg.is_edited && (
                                                                   <span className="text-[8px] text-gray-500 ml-1">(edited)</span>
