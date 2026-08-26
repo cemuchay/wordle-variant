@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/refs */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence, useMotionValue } from "framer-motion";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { motion, AnimatePresence, useMotionValue, useDragControls } from "framer-motion";
 import type { PanInfo } from "framer-motion";
 import { Search, MessageCircle, X, Send, ArrowLeft, ExternalLink, Edit2, Trash2, Check, CheckCheck, ShieldAlert, Mic, Image as ImageIcon, Smile, Reply, Users } from "lucide-react";
 import { useApp } from "../../context/AppContext";
@@ -31,6 +31,8 @@ import { usePeerReceipts } from "../../hooks/usePeerReceipts";
 import MessageInfoModal from "./ChatMessage/MessageInfoModal";
 
 const CLOSE_DELAY = 10000;
+// Desktop docked panel width (anchored beside the bubble)
+const PANEL_WIDTH = 380;
 
 // --- Bubble drag boundary configuration ---
 // Vertical no-go zones: status bar / dynamic island row at the top,
@@ -163,6 +165,29 @@ export default function FloatingChatBubble() {
       return () => mq.removeEventListener("change", onChange);
    }, []);
 
+   const [panelPos, setPanelPos] = useState<{ left: number; top: number } | null>(null);
+
+   // Desktop panel drag (header handle) — offsets live on motion values and
+   // are normalized back into panelPos on release
+   const panelDragControls = useDragControls();
+   const panelX = useMotionValue(0);
+   const panelY = useMotionValue(0);
+   const panelDragStartRef = useRef<{ left: number; top: number } | null>(null);
+
+   // Same reachable region the bubble respects: 8px side margins, below the
+   // dynamic-island row, above the bottom navigation bar.
+   const clampPanelPosition = useCallback((rawLeft: number, rawTop: number) => {
+      const insetTop = readSafeAreaInset("top");
+      const panelH = Math.min(600, window.innerHeight * 0.72);
+      const minX = EDGE_MARGIN_X;
+      const maxX = Math.max(minX, window.innerWidth - PANEL_WIDTH - EDGE_MARGIN_X);
+      const minY = insetTop + 8;
+      const maxY = window.innerHeight - BOTTOM_NAV_CLEARANCE - panelH - 8;
+      const left = Math.round(Math.min(Math.max(rawLeft, minX), Math.max(minX, maxX)));
+      const top = Math.round(Math.min(Math.max(rawTop, minY), Math.max(minY, maxY)));
+      return { left, top };
+   }, []);
+
    // Desktop panels persist while multitasking — close via X or Escape
    useEffect(() => {
       if (!isDesktop || !isOverlayOpen) return;
@@ -175,6 +200,33 @@ export default function FloatingChatBubble() {
       document.addEventListener("keydown", onKey);
       return () => document.removeEventListener("keydown", onKey);
    }, [isDesktop, isOverlayOpen]);
+
+   // Desktop panel anchors next to wherever the bubble currently sits
+   const computePanelPosition = useCallback(() => {
+      const bx = bubbleX.get();
+      const by = bubbleY.get();
+      // Prefer the side with room, flipping across the bubble if needed
+      let left = bx + BUBBLE_SIZE + 12;
+      if (left + PANEL_WIDTH + 8 > window.innerWidth) {
+         left = bx - PANEL_WIDTH - 12;
+      }
+      const top = by - 8;
+      return clampPanelPosition(left, top);
+   }, [bubbleX, bubbleY, clampPanelPosition]);
+
+   useEffect(() => {
+      if (!isOverlayOpen || !isDesktop) return;
+      const onResize = () => setPanelPos((p) => (p ? clampPanelPosition(p.left, p.top) : p));
+      // Initial anchor on next frame — no synchronous setState in effect body
+      const raf = requestAnimationFrame(() => setPanelPos(computePanelPosition()));
+      window.addEventListener('resize', onResize);
+      window.visualViewport?.addEventListener('resize', onResize);
+      return () => {
+         cancelAnimationFrame(raf);
+         window.removeEventListener('resize', onResize);
+         window.visualViewport?.removeEventListener('resize', onResize);
+      };
+   }, [isOverlayOpen, isDesktop, computePanelPosition, clampPanelPosition]);
 
    const [groups, setGroups] = useState<any[]>([]);
    const [hasPlayedToday, setHasPlayedToday] = useState(false);
@@ -716,7 +768,7 @@ export default function FloatingChatBubble() {
       }
    }
 
-   const isVisible = !isChatOpen && !dismissed;
+   const isVisible = !isChatOpen && !dismissed && !isOverlayOpen;
 
    // Filter out unread messages globally
    const joinedSet = new Set(joinedGroupIds);
@@ -782,6 +834,7 @@ export default function FloatingChatBubble() {
 
    // Resolve DM partner and room key for a message
    const getDecryptedContent = (m: any) => {
+      if (!m) return "";
       if (!user?.id) return m.content;
       if (m.content && m.content.startsWith("e2ee:")) {
          if (m.user_id === user.id) {
@@ -1113,12 +1166,19 @@ export default function FloatingChatBubble() {
 
    // Snapshot firstUnreadId for the unread divider
    useEffect(() => {
-      if (firstUnreadId && selectedGroupId && !hasCapturedDividerRef.current) {
-         hasCapturedDividerRef.current = true;
+      if (!firstUnreadId || !selectedGroupId || hasCapturedDividerRef.current) return;
+      hasCapturedDividerRef.current = true;
+      // A large unread backlog can push the divider outside the default
+      // 20-message window — widen it so the line is actually rendered.
+      const idx = allRoomMessages.findIndex((m: any) => m.id === firstUnreadId);
+      const needsWiden = idx !== -1 && idx < allRoomMessages.length - 20 && !windowFloorId;
+      const raf = requestAnimationFrame(() => {
          setVisibleUnreadId(firstUnreadId);
          setShowUnreadLine(true);
-      }
-   }, [firstUnreadId, selectedGroupId]);
+         if (needsWiden) setWindowFloorId(firstUnreadId);
+      });
+      return () => cancelAnimationFrame(raf);
+   }, [firstUnreadId, selectedGroupId, allRoomMessages, windowFloorId]);
 
    // Reset snapshot on room change
    useEffect(() => {
@@ -1231,8 +1291,8 @@ export default function FloatingChatBubble() {
          </div>
 
          {/* Centered Modal Popover */}
-          <AnimatePresence>
-             {isOverlayOpen && isVisible && (
+             <AnimatePresence>
+             {isOverlayOpen && !isChatOpen && (!isDesktop || panelPos) && (
                 <>
                   {/* Backdrop — desktop panel stays non-blocking so the page remains usable */}
                   {!isDesktop && (
@@ -1249,16 +1309,40 @@ export default function FloatingChatBubble() {
                      />
                   )}
 
-                  {/* Bottom Sheet (mobile) / Docked Panel (desktop) */}
+                  {/* Bottom Sheet (mobile) / Bubble-anchored Docked Panel (desktop) */}
                   <motion.div
-                     initial={{ opacity: 0, y: isDesktop ? 48 : "100%", x: isDesktop ? 0 : "-50%" }}
-                     animate={{ opacity: 1, y: 0, x: 0 }}
-                     exit={{ opacity: 0, y: isDesktop ? 48 : "100%", x: isDesktop ? 0 : "-50%" }}
+                     key="fb-panel-pos"
+                     initial={{ opacity: 0, y: isDesktop ? 24 : "100%", x: isDesktop ? 0 : "-50%" }}
+                     animate={{ opacity: 1, y: 0, x: isDesktop ? 0 : "-50%" }}
+                     exit={{ opacity: 0, y: isDesktop ? 24 : "100%", x: isDesktop ? 0 : "-50%" }}
                      transition={{ type: "spring", damping: 25, stiffness: 280 }}
-                     className={`fixed bg-slate-950/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col pointer-events-auto overflow-hidden z-[99991] ${isDesktop ? "right-4 bottom-[88px] w-[380px] max-w-[calc(100vw-32px)] h-[min(600px,72vh)]" : "bottom-4 left-1/2 w-[92%] max-w-md h-[75vh]"}`}
+                     style={isDesktop && panelPos ? { left: panelPos.left, top: panelPos.top, width: PANEL_WIDTH, height: "min(600px,72vh)" } : undefined}
+                     className={`fixed z-[99991] pointer-events-auto ${isDesktop ? "" : "bottom-4 left-1/2 w-[92%] max-w-md h-[75vh]"}`}
                   >
-                     {/* Header */}
-                     <div className="px-4 py-3 bg-white/5 border-b border-white/10 flex items-center justify-between shrink-0">
+                     <motion.div
+                        drag={isDesktop}
+                        dragListener={false}
+                        dragControls={panelDragControls}
+                        dragMomentum={false}
+                        dragElastic={0}
+                        onDragStart={() => { panelDragStartRef.current = panelPos; }}
+                        onDragEnd={(_e, info) => {
+                           const base = panelDragStartRef.current ?? panelPos;
+                           if (!base) return;
+                           const next = clampPanelPosition(base.left + info.offset.x, base.top + info.offset.y);
+                           setPanelPos(next);
+                           panelX.set(0);
+                           panelY.set(0);
+                        }}
+                        style={{ x: panelX, y: panelY }}
+                        className="w-full h-full bg-slate-950/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col pointer-events-auto overflow-hidden"
+                     >
+                      {/* Header */}
+                      <div
+                         onPointerDown={(e) => { if (isDesktop) panelDragControls.start(e); }}
+                         className={`px-4 py-3 bg-white/5 border-b border-white/10 flex items-center justify-between shrink-0 ${isDesktop ? "cursor-grab active:cursor-grabbing select-none" : ""}`}
+                         title={isDesktop ? "Drag to move" : undefined}
+                      >
                         <div className="flex items-center gap-2">
                            {selectedGroupId && (
                               <button
@@ -1798,11 +1882,12 @@ export default function FloatingChatBubble() {
                         </div>
                      )}
                   </motion.div>
-               </>
-            )}
-         </AnimatePresence>
+                  </motion.div>
+                </>
+             )}
+          </AnimatePresence>
 
-         {/* Reaction Modal (mobile long-press) */}
+          {/* Reaction Modal (mobile long-press) */}
          <AnimatePresence>
             {reactingModalMessageId && (() => {
                const modalMsg = activeRoomMessages.find((m: any) => m.id === reactingModalMessageId);
@@ -1832,7 +1917,9 @@ export default function FloatingChatBubble() {
              kindLabel={
                 infoMsg?.voice_url ? "🎤 Voice note"
                 : infoMsg?.image_url ? "📷 Image"
-                : (getDecryptedContent(infoMsg) || "Message").slice(0, 60)
+                : infoMsg
+                   ? (getDecryptedContent(infoMsg) || "Message").slice(0, 60)
+                   : "Message"
              }
              peerReceipts={peerReceipts}
              resolveName={(uid) => getUserName(uid)}
