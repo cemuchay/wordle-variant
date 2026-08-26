@@ -30,7 +30,7 @@ import { useTypingPresence } from "../../hooks/useTypingPresence";
 import { usePeerReceipts } from "../../hooks/usePeerReceipts";
 import MessageInfoModal from "./ChatMessage/MessageInfoModal";
 
-const CLOSE_DELAY = 10000;
+const CLOSE_DELAY = 15000;
 // Desktop docked panel width (anchored beside the bubble)
 const PANEL_WIDTH = 380;
 
@@ -235,6 +235,7 @@ export default function FloatingChatBubble() {
 
    const constraintsRef = useRef<HTMLDivElement>(null);
    const scrollRef = useRef<HTMLDivElement>(null);
+   const messagesEndRef = useRef<HTMLDivElement>(null);
    const fileInputRef = useRef<HTMLInputElement>(null);
    const replyInputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -753,10 +754,40 @@ export default function FloatingChatBubble() {
       }
    }, [isOverlayOpen, user?.id]);
 
-   // Auto-scroll detailed message view to bottom
+   // Auto-scroll detailed message view to bottom on initial group open or when new messages arrive
+   const prevGroupIdRef = useRef<string | null>(null);
+   const prevMessagesLengthRef = useRef<number>(0);
+
    useEffect(() => {
+      if (!selectedGroupId) {
+         prevGroupIdRef.current = null;
+         prevMessagesLengthRef.current = 0;
+         return;
+      }
+
+      const roomMessages = globalMessages.filter(m => m.group_id === selectedGroupId && !isReactionRow(m.content));
+      const isGroupChange = prevGroupIdRef.current !== selectedGroupId;
+      const isNewMessageAdded = roomMessages.length > prevMessagesLengthRef.current;
+
+      prevGroupIdRef.current = selectedGroupId;
+      prevMessagesLengthRef.current = roomMessages.length;
+
       if (scrollRef.current) {
-         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+         const el = scrollRef.current;
+         const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 150;
+
+         if (isGroupChange || (isNewMessageAdded && isNearBottom)) {
+            // Use double-rAF to ensure DOM and layout changes have completely painted
+            requestAnimationFrame(() => {
+               requestAnimationFrame(() => {
+                  if (messagesEndRef.current) {
+                     messagesEndRef.current.scrollIntoView({ behavior: isGroupChange ? "auto" : "smooth", block: "end" });
+                  } else if (scrollRef.current) {
+                     scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+                  }
+               });
+            });
+         }
       }
    }, [selectedGroupId, globalMessages]);
 
@@ -1724,6 +1755,8 @@ export default function FloatingChatBubble() {
                                   {typingNames.length > 0 && (
                                      <TypingBubble name={typingNames.length === 1 ? typingNames[0] : typingNames.join(", ")} />
                                   )}
+                                  {/* Bottom scroll anchor sentinel */}
+                                  <div ref={messagesEndRef} className="h-1 shrink-0 pointer-events-none" />
                                </div>
                             ))}
                       </div>
