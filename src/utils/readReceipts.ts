@@ -5,6 +5,45 @@ import { useAppStore } from "../store/useAppStore";
 export const isReactionRow = (content?: string | null): boolean =>
    !!content?.startsWith("[reaction:");
 
+export type TickState = "sending" | "failed" | "sent" | "read";
+
+/**
+ * WhatsApp-style tick resolution for own messages:
+ *   status wins first (⌛/⚠️), then peer receipts vs created_at (blue),
+ *   falling back to the legacy is_read flag when receipt reads are blocked.
+ */
+export function resolveTickState(
+   msg: { user_id?: string; created_at: string; status?: string; is_read?: boolean },
+   viewerId: string | undefined,
+   peerReceipts?: Record<string, string>,
+): TickState {
+   if (msg.status === "sending") return "sending";
+   if (msg.status === "failed") return "failed";
+   if (viewerId && msg.user_id !== viewerId) return "sent";
+   if (msg.is_read) return "read";
+   if (peerReceipts) {
+      const sentAt = new Date(msg.created_at).getTime();
+      for (const lastSeen of Object.values(peerReceipts)) {
+         if (new Date(lastSeen).getTime() >= sentAt) return "read";
+      }
+   }
+   return "sent";
+}
+
+export interface SeenEntry {
+   userId: string;
+   at: string;
+}
+
+/** Peer receipts that cover a given message, earliest reader first. */
+export function getSeenBy(msgCreatedAt: string, peerReceipts: Record<string, string>): SeenEntry[] {
+   const sentAt = new Date(msgCreatedAt).getTime();
+   return Object.entries(peerReceipts)
+      .filter(([, at]) => new Date(at).getTime() >= sentAt)
+      .map(([userId, at]) => ({ userId, at }))
+      .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+}
+
 /**
  * Marks groups as read with a server-anchored timestamp (the newest known
  * non-reaction message per group) so device-clock skew can never make read

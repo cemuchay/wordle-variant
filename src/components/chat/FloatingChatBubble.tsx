@@ -24,7 +24,11 @@ import { Z_INDEX } from "../../constants/ui";
 import { putOutbox, removeOutbox, type OutboxEntry } from "../../utils/outbox";
 import { uploadVoiceAsset, uploadImageAsset, insertMessageWithRetry } from "../../utils/messageDelivery";
 import { VoiceRecorder } from "../../utils/voiceRecorder";
-import { isReactionRow, markGroupsRead } from "../../utils/readReceipts";
+import { isReactionRow, markGroupsRead, resolveTickState } from "../../utils/readReceipts";
+import TypingBubble from "./TypingBubble";
+import { useTypingPresence } from "../../hooks/useTypingPresence";
+import { usePeerReceipts } from "../../hooks/usePeerReceipts";
+import MessageInfoModal from "./ChatMessage/MessageInfoModal";
 
 const CLOSE_DELAY = 10000;
 
@@ -668,6 +672,16 @@ export default function FloatingChatBubble() {
    // Mark only conversations actually visited inside the bubble when it closes
    const visitedGroupsRef = useRef<Set<string>>(new Set());
 
+   // Typing presence — subscribed only while a conversation is open
+   const { typingNames, setSelfTyping } = useTypingPresence(
+      selectedGroupId,
+      user?.id,
+      isOverlayOpen && !!selectedGroupId && !isChatOpen,
+      profile?.username || null,
+   );
+   const peerReceipts = usePeerReceipts(selectedGroupId, user?.id, isOverlayOpen && !!selectedGroupId);
+   const [infoMsg, setInfoMsg] = useState<any>(null);
+
    // Mark all unread messages as read when the bubble overlay closes
    useEffect(() => {
       if (isOverlayOpen || !user?.id) {
@@ -832,6 +846,7 @@ export default function FloatingChatBubble() {
       const sentText = replyText;
       setReplyText("");
       replyTextRef.current = "";
+      setSelfTyping(false);
       setReplyingToMsg(null);
       startInactivityTimer();
 
@@ -1481,10 +1496,10 @@ export default function FloatingChatBubble() {
                                                             <span className="animate-spin text-white/50 text-[8px]">⌛</span>
                                                          ) : msg.status === "failed" ? (
                                                             <span className="text-red-400 text-[8px] font-black cursor-pointer">⚠️ retry</span>
-                                                         ) : (
-                                                            <CheckCheck size={10} className={msg.is_read ? "text-blue-400" : "text-white/30"} />
-                                                         )
-                                                      )}
+                                                          ) : (
+                                                             <CheckCheck size={10} className={resolveTickState(msg, user?.id, peerReceipts) === "read" ? "text-blue-400" : "text-white/30"} />
+                                                          )
+                                                       )}
                                                    </span>
                                                 </div>
 
@@ -1620,13 +1635,16 @@ export default function FloatingChatBubble() {
                                              </div>
                                           </div>
                                        </div>
-                                    );
-                                 })}
-                              </div>
-                           ))}
-                     </div>
+                                     );
+                                  })}
+                                  {typingNames.length > 0 && (
+                                     <TypingBubble name={typingNames.length === 1 ? typingNames[0] : typingNames.join(", ")} />
+                                  )}
+                               </div>
+                            ))}
+                      </div>
 
-                     {/* Reply footer for detailed chat screen */}
+                      {/* Reply footer for detailed chat screen */}
                      {selectedGroupId && !(selectedGroupId === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday) && (
                         <div className="p-3 bg-white/5 border-t border-white/10 flex flex-col gap-2 shrink-0 relative">
                            {selectedGroupObject?.type !== "dm" && (
@@ -1711,6 +1729,7 @@ export default function FloatingChatBubble() {
                                         const value = e.target.value;
                                         replyTextRef.current = value;
                                         setReplyText(value);
+                                        setSelfTyping(value.length > 0);
                                        resetInactivityTimer();
                                        if (selectedGroupObject?.type !== "dm") {
                                           const cursorPos = e.target.selectionStart;
@@ -1791,18 +1810,33 @@ export default function FloatingChatBubble() {
                const isMe = modalMsg.user_id === user?.id;
                const content = getDecryptedContent(modalMsg);
                return (
-                  <ReactionModal
-                     isMe={isMe}
-                     onReact={(emoji) => { handleReact(modalMsg.id, emoji); setReactingModalMessageId(null); }}
-                     currentReaction={user?.id ? modalMsg.reactions?.[user.id] : undefined}
-                     onCopy={() => { copyToClipboard(content); setReactingModalMessageId(null); }}
-                     onEdit={isMe && !modalMsg.voice_url && !modalMsg.image_url ? () => { setEditingMessageId(modalMsg.id); setEditText(content); setReactingModalMessageId(null); } : undefined}
-                     onDelete={isMe ? () => { handleDeleteMessage(modalMsg.id); setReactingModalMessageId(null); } : undefined}
-                     onClose={() => setReactingModalMessageId(null)}
-                  />
-               );
-            })()}
-         </AnimatePresence>
+                   <ReactionModal
+                      isMe={isMe}
+                      onReact={(emoji) => { handleReact(modalMsg.id, emoji); setReactingModalMessageId(null); }}
+                      currentReaction={user?.id ? modalMsg.reactions?.[user.id] : undefined}
+                      onCopy={() => { copyToClipboard(content); setReactingModalMessageId(null); }}
+                      onEdit={isMe && !modalMsg.voice_url && !modalMsg.image_url ? () => { setEditingMessageId(modalMsg.id); setEditText(content); setReactingModalMessageId(null); } : undefined}
+                      onDelete={isMe ? () => { handleDeleteMessage(modalMsg.id); setReactingModalMessageId(null); } : undefined}
+                      onInfo={isMe ? () => { setInfoMsg(modalMsg); setReactingModalMessageId(null); } : undefined}
+                      onClose={() => setReactingModalMessageId(null)}
+                   />
+                );
+             })()}
+          </AnimatePresence>
+
+          {/* Message Info */}
+          <MessageInfoModal
+             open={!!infoMsg}
+             onClose={() => setInfoMsg(null)}
+             createdAt={infoMsg?.created_at || new Date().toISOString()}
+             kindLabel={
+                infoMsg?.voice_url ? "🎤 Voice note"
+                : infoMsg?.image_url ? "📷 Image"
+                : (getDecryptedContent(infoMsg) || "Message").slice(0, 60)
+             }
+             peerReceipts={peerReceipts}
+             resolveName={(uid) => getUserName(uid)}
+          />
 
          {/* Dismiss Zone overlay at the bottom center */}
          <AnimatePresence>

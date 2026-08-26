@@ -18,6 +18,9 @@ import MessageInput from "./chat/MessageInput";
 import formatLastSeen from "../utils/formatLastSeen";
 import { ProtectedAvatar } from "./chat/ProtectedAvatar";
 import { isReactionRow } from "../utils/readReceipts";
+import TypingBubble from "./chat/TypingBubble";
+import { usePeerReceipts } from "../hooks/usePeerReceipts";
+import MessageInfoModal from "./chat/ChatMessage/MessageInfoModal";
 
 const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) => {
     const { setIsChallengeOpen, allProfiles, isDynamicIslandVisible, } = useApp();
@@ -79,6 +82,18 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     const [showUnreadLine, setShowUnreadLine] = useState(true);
     const [visibleUnreadId, setVisibleUnreadId] = useState<string | null>(null);
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+    const [infoMsg, setInfoMsg] = useState<any>(null);
+
+    // Other members' read receipts for the open conversation (blue ticks / seen times)
+    const activePeerReceipts = usePeerReceipts(
+        activeRoomId,
+        user?.id,
+        !!activeRoomId && !showSidebar,
+    );
+
+    const resolveReaderName = useCallback((uid: string) => {
+        return allProfiles?.find((p: any) => p.id === uid)?.username || uid.slice(0, 8);
+    }, [allProfiles]);
     const [scrollNode, setScrollNode] = useState<HTMLDivElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -1033,11 +1048,16 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                         onResend={resendMessage}
                                                         allMessageIds={messageIds}
                                                         allMessages={messages}
+                                                        peerReceipts={activePeerReceipts}
+                                                        onInfo={isMe ? () => setInfoMsg(msg) : undefined}
                                                     />
                                                 </div>
                                             );
                                         })}
                                     </AnimatePresence>
+                                    {typingUsers.filter((n) => n !== nameOfUser).length > 0 && (
+                                        <TypingBubble name={typingUsers.filter((n) => n !== nameOfUser).join(", ")} />
+                                    )}
                                     <div ref={messagesEndRef} />
                                 </div>
 
@@ -1076,6 +1096,27 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {infoMsg && (
+                <MessageInfoModal
+                    open
+                    onClose={() => setInfoMsg(null)}
+                    createdAt={infoMsg.created_at}
+                    kindLabel={
+                        infoMsg.voice_url ? "🎤 Voice note"
+                        : infoMsg.image_url ? "📷 Image"
+                        : (() => {
+                            let t: string = infoMsg.content || "";
+                            if (activeRoom?.type === "dm" && activeRoom.dm_partner && t.startsWith("e2ee:")) {
+                                t = decryptDM(t, getDMRoomKey(user.id, activeRoom.dm_partner.id));
+                            }
+                            return t.slice(0, 60) || "Message";
+                        })()
+                    }
+                    peerReceipts={activePeerReceipts}
+                    resolveName={resolveReaderName}
+                />
+            )}
         </div>
     );
 };

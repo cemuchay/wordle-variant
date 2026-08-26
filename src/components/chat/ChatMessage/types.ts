@@ -18,4 +18,7 @@ export interface ChatMessageProps {
     onResend?: (id: string) => void;
     allMessageIds?: string[];
     allMessages?: Message[];
+    /** Other members' last-seen timestamps for this conversation (blue ticks / info panel) */
+    peerReceipts?: Record<string, string>;
+    onInfo?: () => void;
 }
