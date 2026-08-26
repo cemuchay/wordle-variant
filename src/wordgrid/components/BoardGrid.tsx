@@ -21,8 +21,10 @@ interface BoardGridProps {
   conflictCoords?: string[];
   lastMove?: BoardLastMove | null;
   colorMap?: Record<string, PlayerColorScheme>;
+  rackLetters?: string[];
   onMoveTileInGrid?: (fromX: number, fromY: number, toX: number, toY: number) => void;
   onPlaceTile: (x: number, y: number, rackIdx: number) => void;
+  onPickLetterForCell?: (x: number, y: number) => void;
   onRecallTile: (x: number, y: number) => void;
 }
 
@@ -34,8 +36,10 @@ export const BoardGrid = ({
   conflictCoords = [],
   lastMove = null,
   colorMap = {},
+  rackLetters,
   onMoveTileInGrid,
   onPlaceTile,
+  onPickLetterForCell,
   onRecallTile,
 }: BoardGridProps) => {
   const [zoomIdx, setZoomIdx] = useState(0);
@@ -62,8 +66,10 @@ export const BoardGrid = ({
 
     // 1. Permanently locked board tiles (bright wood/amber style or glowing latest-play highlight)
     if (boardCell) {
+      // Assigned blanks are stored lowercase — render underlined, worth 0
+      const isBlank = /[a-z]/.test(boardCell.letter);
       const letter = boardCell.letter.toUpperCase();
-      const val = TILE_VALUES[letter] || 0;
+      const val = isBlank ? 0 : TILE_VALUES[letter] || 0;
       const textClass = gridSize > 11 ? 'text-xs sm:text-sm font-black' : 'text-sm sm:text-base md:text-lg font-black';
       const playScheme = isLatestPlay ? schemeOf(lastMove?.playerId) : null;
 
@@ -76,7 +82,7 @@ export const BoardGrid = ({
               : 'bg-linear-to-br from-amber-200 via-amber-300 to-amber-400 border border-amber-200 hover:scale-[1.02]'
           }`}
         >
-          <span className={`${textClass} text-slate-950 select-none leading-none`}>{letter}</span>
+          <span className={`${textClass} text-slate-950 select-none leading-none ${isBlank ? 'underline decoration-2 underline-offset-2' : ''}`}>{letter}</span>
           {gridSize <= 11 && (
             <span className={`text-[9px] font-black absolute bottom-0.5 right-1 select-none text-slate-900`}>{val}</span>
           )}
@@ -93,8 +99,10 @@ export const BoardGrid = ({
 
     // 2. Newly placed tiles in current turn (vibrant purple/indigo; red-ring when conflicting)
     if (placedTile) {
+      // Assigned blanks are stored lowercase — render underlined, worth 0
+      const isBlank = /[a-z]/.test(placedTile.letter);
       const letter = placedTile.letter.toUpperCase();
-      const val = TILE_VALUES[letter] || 0;
+      const val = isBlank ? 0 : TILE_VALUES[letter] || 0;
       const textClass = gridSize > 11 ? 'text-xs sm:text-sm font-black' : 'text-sm sm:text-base md:text-lg font-black';
       return (
         <button
@@ -138,7 +146,7 @@ export const BoardGrid = ({
             isConflict ? 'ring-4 ring-rose-500 shadow-rose-500/50 animate-pulse' : ''
           }`}
         >
-          <span className={`${textClass} text-white drop-shadow-md select-none leading-none`}>{letter}</span>
+          <span className={`${textClass} text-white drop-shadow-md select-none leading-none ${isBlank ? 'underline decoration-2 underline-offset-2' : ''}`}>{letter}</span>
           {gridSize <= 11 && <span className="text-[9px] font-black text-amber-200 absolute bottom-0.5 right-1 select-none">{val}</span>}
           <span className="absolute top-0.5 left-0.5 text-[5px] sm:text-[6px] uppercase font-black text-emerald-300 tracking-wider select-none">NEW</span>
           {isConflict && (
@@ -198,11 +206,24 @@ export const BoardGrid = ({
           if (rackIdxStr !== '') {
             const rackIdx = parseInt(rackIdxStr, 10);
             if (!isNaN(rackIdx)) {
+              // Dragging a blank tile opens the letter picker instead
+              if (rackLetters?.[rackIdx] === '_') {
+                onPickLetterForCell?.(x, y);
+                return;
+              }
               onPlaceTile(x, y, rackIdx);
             }
           }
         }}
-        onClick={() => selectedIdx !== null && onPlaceTile(x, y, selectedIdx)}
+        onClick={() => {
+          // Non-blank rack tile selected → place it directly (existing flow)
+          if (selectedIdx !== null && rackLetters?.[selectedIdx] && rackLetters[selectedIdx] !== '_') {
+            onPlaceTile(x, y, selectedIdx);
+            return;
+          }
+          // Nothing selected, or a blank selected → open the letter picker
+          onPickLetterForCell?.(x, y);
+        }}
         className={`aspect-square border rounded-xl flex items-center justify-center transition-all ${cellBg} cursor-pointer relative shadow-sm select-none`}
       >
         <span className={textStyle}>{text}</span>

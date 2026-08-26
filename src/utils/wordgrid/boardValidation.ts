@@ -26,8 +26,12 @@ export function validateBoardPlacement(
 
   // Create a fast-lookup map for existing tiles
   const boardMap = new Map<string, string>();
+  // Raw-letter twin — preserves case so blank tiles (stored lowercase) are
+  // extracted verbatim and scored 0. Dictionary lookups normalize internally.
+  const rawBoardMap = new Map<string, string>();
   existingBoard.forEach((cell) => {
     boardMap.set(`${cell.x},${cell.y}`, cell.letter.toUpperCase());
+    rawBoardMap.set(`${cell.x},${cell.y}`, cell.letter);
   });
 
   // Check if target cells are already occupied
@@ -81,8 +85,10 @@ export function validateBoardPlacement(
 
   // 4. Contiguous check: the placed tiles (plus any existing tiles in between them) must form a solid line
   const tempBoard = new Map(boardMap);
+  const rawTempBoard = new Map(rawBoardMap);
   placedTiles.forEach((tile) => {
     tempBoard.set(`${tile.x},${tile.y}`, tile.letter.toUpperCase());
+    rawTempBoard.set(`${tile.x},${tile.y}`, tile.letter);
   });
 
   if (placedTiles.length > 1) {
@@ -141,7 +147,7 @@ export function validateBoardPlacement(
 
     for (let x = 0; x <= gridSize; x++) {
       const key = `${x},${y}`;
-      const letter = tempBoard.get(key);
+      const letter = rawTempBoard.get(key);
 
       if (letter && x < gridSize) {
         if (currentWord === '') startX = x;
@@ -168,7 +174,7 @@ export function validateBoardPlacement(
 
     for (let y = 0; y <= gridSize; y++) {
       const key = `${x},${y}`;
-      const letter = tempBoard.get(key);
+      const letter = rawTempBoard.get(key);
 
       if (letter && y < gridSize) {
         if (currentWord === '') startY = y;
@@ -195,7 +201,7 @@ export function validateBoardPlacement(
   // First move edge case: single tile word
   if (isFirstMove && placedTiles.length === 1 && newlyCreatedOrModifiedWords.length === 0) {
     newlyCreatedOrModifiedWords.push({
-      word: placedTiles[0].letter.toUpperCase(),
+      word: placedTiles[0].letter,
       tiles: [placedTiles[0]],
     });
   }
