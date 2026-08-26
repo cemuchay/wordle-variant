@@ -7,116 +7,7 @@ import UserSuggestions from "./UserSuggestions";
 import { useApp } from "../../context/AppContext";
 import { useAppStore } from "../../store/useAppStore";
 import { TOAST_DURATION } from "../../constants/ui";
-
-export class WAVRecorder {
-    private audioContext: AudioContext | null = null;
-    private stream: MediaStream | null = null;
-    private input: MediaStreamAudioSourceNode | null = null;
-    private processor: ScriptProcessorNode | null = null;
-    private leftchannel: Float32Array[] = [];
-    private recordingLength = 0;
-    private sampleRate = 44100;
-
-    constructor() {}
-
-    async start() {
-        this.stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true
-            }
-        });
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        this.audioContext = new AudioCtx();
-        this.sampleRate = this.audioContext.sampleRate;
-        this.input = this.audioContext.createMediaStreamSource(this.stream);
-        
-        // 4096 buffer size, 1 input channel, 1 output channel
-        this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
-        
-        this.leftchannel = [];
-        this.recordingLength = 0;
-
-        this.processor.onaudioprocess = (e) => {
-            const left = e.inputBuffer.getChannelData(0);
-            this.leftchannel.push(new Float32Array(left));
-            this.recordingLength += left.length;
-        };
-
-        this.input.connect(this.processor);
-        this.processor.connect(this.audioContext.destination);
-    }
-
-    stop(): Blob {
-        if (this.processor && this.input && this.audioContext) {
-            this.processor.disconnect();
-            this.input.disconnect();
-            if (this.audioContext.state !== 'closed') {
-                this.audioContext.close();
-            }
-        }
-        if (this.stream) {
-            this.stream.getTracks().forEach(track => track.stop());
-        }
-
-        // Flatten the left channel buffers
-        const result = new Float32Array(this.recordingLength);
-        let offset = 0;
-        for (let i = 0; i < this.leftchannel.length; i++) {
-            const buffer = this.leftchannel[i];
-            result.set(buffer, offset);
-            offset += buffer.length;
-        }
-        
-        // Create WAV file buffer
-        const buffer = new ArrayBuffer(44 + this.recordingLength * 2);
-        const view = new DataView(buffer);
-
-        // write string helper
-        const writeString = (view: DataView, offset: number, string: string) => {
-            for (let i = 0; i < string.length; i++) {
-                view.setUint8(offset + i, string.charCodeAt(i));
-            }
-        };
-
-        /* RIFF identifier */
-        writeString(view, 0, 'RIFF');
-        /* file length */
-        view.setUint32(4, 36 + this.recordingLength * 2, true);
-        /* RIFF type */
-        writeString(view, 8, 'WAVE');
-        /* format chunk identifier */
-        writeString(view, 12, 'fmt ');
-        /* format chunk length */
-        view.setUint32(16, 16, true);
-        /* sample format (raw PCM = 1) */
-        view.setUint16(20, 1, true);
-        /* channel count */
-        view.setUint16(22, 1, true);
-        /* sample rate */
-        view.setUint32(24, this.sampleRate, true);
-        /* byte rate (sample rate * block align) */
-        view.setUint32(28, this.sampleRate * 2, true);
-        /* block align (channel count * bytes per sample) */
-        view.setUint16(32, 2, true);
-        /* bits per sample */
-        view.setUint16(34, 16, true);
-        /* data chunk identifier */
-        writeString(view, 36, 'data');
-        /* data chunk length */
-        view.setUint32(40, this.recordingLength * 2, true);
-
-        // Float to 16-bit PCM
-        let writeOffset = 44;
-        for (let i = 0; i < result.length; i++, writeOffset += 2) {
-            const s = Math.max(-1, Math.min(1, result[i]));
-            view.setInt16(writeOffset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-        }
-
-        return new Blob([view], { type: 'audio/wav' });
-    }
-}
+import { VoiceRecorder } from "../../utils/voiceRecorder";
 
 interface MessageInputProps {
     onSend: (content: string, replyToId?: string, mentions?: string[]) => void;
@@ -163,7 +54,7 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
     // Voice recording states
     const [isRecording, setIsRecording] = useState(false);
     const [recordingTime, setRecordingTime] = useState(0);
-    const wavRecorderRef = useRef<WAVRecorder | null>(null);
+    const wavRecorderRef = useRef<VoiceRecorder | null>(null);
     const timerRef = useRef<number | null>(null);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -244,7 +135,7 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
 
         onSend(input, replyingTo?.id, mentions);
         setInput("");
-        try { localStorage.removeItem(DRAFT_KEY); } catch {}
+        try { localStorage.removeItem(DRAFT_KEY); } catch { /* noop */ }
         onTyping(false);
         onCancelReply();
         setMentionState(null);
@@ -264,8 +155,10 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
     // Voice note recording helpers
     const startRecording = async () => {
         try {
-            const recorder = new WAVRecorder();
-            await recorder.start();
+            const recorder = new VoiceRecorder();
+            await recorder.start({
+                onMaxDuration: () => stopRecording(),
+            });
             wavRecorderRef.current = recorder;
 
             setIsRecording(true);
@@ -299,7 +192,7 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
 
     const cancelRecording = () => {
         if (!wavRecorderRef.current) return;
-        wavRecorderRef.current.stop();
+        wavRecorderRef.current.cancel();
         wavRecorderRef.current = null;
         setIsRecording(false);
         if (timerRef.current) {

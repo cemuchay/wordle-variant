@@ -3,15 +3,12 @@ import { useVoicePlaybackStore } from "../../store/useVoicePlaybackStore";
 
 export const VoiceControlBar = () => {
   const currentlyPlaying = useVoicePlaybackStore((s) => s.currentlyPlaying);
-  const audioRefs = useVoicePlaybackStore((s) => s.audioRefs);
+  const isPaused = useVoicePlaybackStore((s) => s.isPaused);
   const play = useVoicePlaybackStore((s) => s.play);
   const pause = useVoicePlaybackStore((s) => s.pause);
   const stop = useVoicePlaybackStore((s) => s.stop);
 
   if (!currentlyPlaying) return null;
-
-  const ref = audioRefs[currentlyPlaying.messageId];
-  const isPaused = ref ? ref.paused : false;
 
   const handleToggle = () => {
     if (isPaused) {

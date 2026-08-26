@@ -16,6 +16,7 @@ import { ConnectedAudioPlayer } from './ConnectedAudioPlayer';
 import { TOAST_DURATION } from '../../../constants/ui';
 import { ChatImage } from './ChatImage';
 import { MessageContent } from './MessageContent';
+import { resolveTickState } from '../../../utils/readReceipts';
 
 const ChatMessage = memo(({
     msg,
@@ -33,7 +34,9 @@ const ChatMessage = memo(({
     dailyGuesses,
     onResend,
     allMessageIds,
-    allMessages
+    allMessages,
+    peerReceipts,
+    onInfo
 }: ChatMessageProps) => {
     const triggerToast = useAppStore(s => s.triggerToast);
     const time = useMemo(() => new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }), [msg.created_at]);
@@ -165,6 +168,7 @@ const ChatMessage = memo(({
                         }}
                         onEdit={isEditable ? () => { setEditText(msg.content); setIsEditing(true); setShowReactionsModal(false); } : undefined}
                         onDelete={isEditable ? () => { onDelete(); setShowReactionsModal(false); } : undefined}
+                        onInfo={isMe ? () => { onInfo?.(); setShowReactionsModal(false); } : undefined}
                         onClose={() => setShowReactionsModal(false)}
                     />
                 )}
@@ -198,6 +202,7 @@ const ChatMessage = memo(({
                         }}
                         onEdit={isEditable ? () => { setEditText(msg.content); setIsEditing(true); setShowReactionsMenu(false); } : undefined}
                         onDelete={isEditable ? () => { onDelete(); setShowReactionsMenu(false); } : undefined}
+                        onInfo={isMe ? () => { onInfo?.(); setShowReactionsMenu(false); } : undefined}
                     />
                 )}
             </AnimatePresence>
@@ -417,7 +422,7 @@ const ChatMessage = memo(({
                             ) : (
                                 <CheckCheck
                                     size={14}
-                                    className={msg.is_read ? "text-blue-400" : "text-white/40"}
+                                    className={resolveTickState(msg, currentUserId, peerReceipts) === "read" ? "text-blue-400" : "text-white/40"}
                                 />
                             )
                         )}

@@ -1,9 +1,10 @@
 import { openDB, type IDBPDatabase } from 'idb';
 
 const DB_NAME = 'variant-app-db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE_NAME = 'keyvalue';
 const MESSAGES_STORE = 'messages';
+const OUTBOX_STORE = 'outbox';
 
 let dbInstance: IDBPDatabase | null = null;
 
@@ -18,6 +19,9 @@ async function getDB(): Promise<IDBPDatabase> {
         const store = db.createObjectStore(MESSAGES_STORE, { keyPath: 'id' });
         store.createIndex('group_id', 'group_id', { unique: false });
         store.createIndex('created_at', 'created_at', { unique: false });
+      }
+      if (!db.objectStoreNames.contains(OUTBOX_STORE)) {
+        db.createObjectStore(OUTBOX_STORE, { keyPath: 'id' });
       }
     },
   });
@@ -40,7 +44,7 @@ export async function asyncRemoveItem(key: string): Promise<void> {
   await db.delete(STORE_NAME, key);
 }
 
-export { getDB, MESSAGES_STORE };
+export { getDB, MESSAGES_STORE, OUTBOX_STORE };
 
 export async function asyncClear(): Promise<void> {
   const db = await getDB();

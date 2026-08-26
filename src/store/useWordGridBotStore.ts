@@ -187,6 +187,7 @@ interface WordGridBotState {
       toY: number,
    ) => void;
    placeTile: (x: number, y: number, letter: string) => void;
+   placeBlankAs: (x: number, y: number, letter: string) => boolean;
    recallTile: (x: number, y: number) => void;
    recallAllTiles: () => void;
    shuffleRack: () => void;
@@ -600,6 +601,25 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => {
       syncDraftFx();
    },
 
+   // Scrabble blank: consumes one '_' and stores the assigned letter in
+   // lowercase — the raw-letter pipeline scores lowercase tiles as 0.
+   placeBlankAs: (x, y, letter) => {
+      const chosen = letter.trim().toUpperCase();
+      if (!/^[A-Z]$/.test(chosen)) return false;
+      const { rack, placedTiles } = get();
+      const blankIdx = rack.indexOf('_');
+      if (blankIdx === -1) return false;
+
+      const newRack = [...rack];
+      newRack.splice(blankIdx, 1);
+      set({
+         placedTiles: [...placedTiles, { x, y, letter: chosen.toLowerCase() }],
+         rack: newRack,
+      });
+      syncDraftFx();
+      return true;
+   },
+
    recallTile: (x, y) => {
       const { rack, placedTiles } = get();
       const tileIdx = placedTiles.findIndex((t) => t.x === x && t.y === y);
@@ -608,9 +628,11 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => {
       const tile = placedTiles[tileIdx];
       const newPlaced = [...placedTiles];
       newPlaced.splice(tileIdx, 1);
+      // Assigned blanks (stored lowercase) go back to the rack as '_'
+      const backToRack = /[a-z]/.test(tile.letter) ? '_' : tile.letter;
       set({
          placedTiles: newPlaced,
-         rack: [...rack, tile.letter],
+         rack: [...rack, backToRack],
       });
       syncDraftFx();
    },
@@ -619,7 +641,10 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => {
       const { rack, placedTiles } = get();
       set({
          placedTiles: [],
-         rack: [...rack, ...placedTiles.map((t) => t.letter)],
+         rack: [
+            ...rack,
+            ...placedTiles.map((t) => (/^[a-z]$/.test(t.letter) ? '_' : t.letter)),
+         ],
       });
       syncDraftFx();
    },

@@ -25,6 +25,7 @@ import { useAuth } from "./hooks/useAuth";
 import { useGameEngine } from "./hooks/useGameEngine";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useWordleStats } from "./hooks/useStats";
+import { usePageTitleBadge } from "./hooks/usePageTitleBadge";
 import { supabase } from "./lib/supabaseClient";
 import { MAX_ATTEMPTS, DEFAULT_WORD_LENGTH } from "./constants/game";
 import { TOAST_DURATION } from "./constants/ui";
@@ -139,6 +140,8 @@ function MainApp() {
 
   // WordUp Async Unread Count
   const [wordupUnreadCount, setWordupUnreadCount] = useState(0);
+
+  usePageTitleBadge(wordupUnreadCount);
 
   const fetchWordupUnreadCount = useCallback(async (userId: string) => {
     try {

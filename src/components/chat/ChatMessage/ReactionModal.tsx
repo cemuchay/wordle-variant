@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Copy, Edit2, Trash2 } from "lucide-react";
+import { Copy, Edit2, Info, Trash2 } from "lucide-react";
 import { EMOJIS } from './constants';
 
 interface ReactionModalProps {
@@ -9,10 +9,11 @@ interface ReactionModalProps {
     onCopy: () => void;
     onEdit?: () => void;
     onDelete?: () => void;
+    onInfo?: () => void;
     onClose: () => void;
 }
 
-export function ReactionModal({ currentReaction, onReact, onCopy, onEdit, onDelete, onClose }: ReactionModalProps) {
+export function ReactionModal({ currentReaction, onReact, onCopy, onEdit, onDelete, onInfo, onClose }: ReactionModalProps) {
     return (
         <motion.div
             initial={{ opacity: 0 }}
@@ -71,6 +72,19 @@ export function ReactionModal({ currentReaction, onReact, onCopy, onEdit, onDele
                         >
                             <Trash2 size={16} />
                             <span className="text-xs font-black uppercase tracking-wider">Delete</span>
+                        </button>
+                    )}
+                    {onInfo && (
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onInfo();
+                            }}
+                            className="flex items-center justify-center gap-2 w-full py-2.5 px-4 hover:bg-white/10 text-white/80 rounded-xl transition-all cursor-pointer"
+                        >
+                            <Info size={16} />
+                            <span className="text-xs font-black uppercase tracking-wider">Info</span>
                         </button>
                     )}
                     <button

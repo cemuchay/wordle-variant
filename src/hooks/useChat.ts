@@ -12,6 +12,9 @@ import {
    deleteMessage as deleteMessageAction,
    reactToMessage as reactToMessageAction,
 } from "./chatActions";
+import { getOutbox, putOutbox, removeOutbox } from "../utils/outbox";
+import { uploadVoiceAsset, uploadImageAsset, insertMessageWithRetry } from "../utils/messageDelivery";
+import { isReactionRow, markGroupsRead } from "../utils/readReceipts";
 
 export interface Message {
    id: string;
@@ -200,7 +203,6 @@ const defaultCores: ChatGroup[] = [
 export const useChat = (userId: string) => {
    const globalMessages = useAppStore((state) => state.globalMessages);
    const readReceipts = useAppStore((state) => state.readReceipts);
-   const updateReadReceipt = useAppStore((state) => state.updateReadReceipt);
    const failedMessageIds = useAppStore((state) => state.failedMessageIds);
    const addFailedMessageId = useAppStore((state) => state.addFailedMessageId);
    const removeFailedMessageId = useAppStore(
@@ -208,9 +210,6 @@ export const useChat = (userId: string) => {
    );
    const pendingReadReceipts = useAppStore(
       (state) => state.pendingReadReceipts,
-   );
-   const updatePendingReadReceipt = useAppStore(
-      (state) => state.updatePendingReadReceipt,
    );
    const removePendingReadReceipt = useAppStore(
       (state) => state.removePendingReadReceipt,
@@ -241,6 +240,9 @@ export const useChat = (userId: string) => {
    const typingTimeoutRef = useRef<number | null>(null);
    const isCurrentlyTypingLocally = useRef(false);
    const lastActiveRoomIdRef = useRef<string | null>(null);
+   // Retained blobs + object URLs for failed media sends (enables true retry)
+   const pendingMediaRef = useRef<Map<string, Blob>>(new Map());
+   const pendingObjectUrlsRef = useRef<Map<string, string>>(new Map());
 
    const activeRoom = groups.find((g) => g.id === activeRoomId) || null;
 
@@ -454,6 +456,7 @@ export const useChat = (userId: string) => {
       const unreads = activeMessages.filter(
          (m: any) =>
             m.user_id !== userId &&
+            !isReactionRow(m.content) &&
             new Date(m.created_at).getTime() > new Date(lastSeen).getTime(),
       );
       if (unreads.length > 0) {
@@ -472,34 +475,12 @@ export const useChat = (userId: string) => {
       const hasUnread = activeMessages.some(
          (m: any) =>
             m.user_id !== userId &&
+            !isReactionRow(m.content) &&
             new Date(m.created_at).getTime() > new Date(lastSeen).getTime(),
       );
       if (!hasUnread) return;
 
-      const newLastSeen = new Date().toISOString();
-
-      // Optimistically update store
-      updateReadReceipt(activeRoomId, newLastSeen);
-
-      // Perform background database update
-      supabase
-         .from("chat_read_receipts")
-         .upsert(
-            {
-               user_id: userId,
-               group_id: activeRoomId,
-               last_seen_at: newLastSeen,
-            },
-            { onConflict: "user_id,group_id" },
-         )
-         .then(({ error }) => {
-            if (error) {
-               updatePendingReadReceipt(activeRoomId, newLastSeen);
-            } else {
-               removePendingReadReceipt(activeRoomId);
-            }
-         });
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      markGroupsRead(userId, [activeRoomId]);
    }, [userId, activeRoomId, activeMessages, readReceipts]);
 
    // Flush pending read receipts on load or network restore
@@ -565,7 +546,18 @@ export const useChat = (userId: string) => {
                }
             });
 
-            setTypingUsers(Array.from(typingNames));
+            // Skip identical snapshots — presence echoes from our own typing
+            // must not re-render the whole room on every keystroke
+            const next = Array.from(typingNames).sort();
+            setTypingUsers((prev) => {
+               if (
+                  prev.length === next.length &&
+                  prev.every((existingName, i) => existingName === next[i])
+               ) {
+                  return prev;
+               }
+               return next;
+            });
          })
          .subscribe();
 
@@ -655,6 +647,51 @@ export const useChat = (userId: string) => {
       }
    };
 
+   const clearPendingMedia = (messageId: string) => {
+      const objectUrl = pendingObjectUrlsRef.current.get(messageId);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      pendingObjectUrlsRef.current.delete(messageId);
+      pendingMediaRef.current.delete(messageId);
+   };
+
+   // Upload voice note to storage and persist the message record
+   const uploadVoiceAndPersist = async (
+      messageId: string,
+      blob: Blob,
+      groupId: string,
+   ): Promise<string> => {
+      const publicUrl = await uploadVoiceAsset(userId, blob);
+      await insertMessageWithRetry({
+         id: messageId,
+         content: "[Voice Message]",
+         user_id: userId,
+         is_read: false,
+         voice_url: publicUrl,
+         group_id: groupId,
+      });
+      return publicUrl;
+   };
+
+   // Upload image to storage and persist the message record
+   const uploadImageAndPersist = async (
+      messageId: string,
+      file: File,
+      groupId: string,
+   ): Promise<string> => {
+      // 1. Compress Image
+      const compressedBlob = await compressImage(file);
+      const publicUrl = await uploadImageAsset(userId, compressedBlob);
+      await insertMessageWithRetry({
+         id: messageId,
+         content: "[Image]",
+         user_id: userId,
+         is_read: false,
+         image_url: publicUrl,
+         group_id: groupId,
+      });
+      return publicUrl;
+   };
+
    // Send Message
    const sendMessage = async (
       content: string,
@@ -702,12 +739,25 @@ export const useChat = (userId: string) => {
          group_id: activeRoomId,
       };
 
+      try {
+         await putOutbox({
+            id: tempId,
+            kind: "text",
+            payload: messagePayload,
+            groupId: activeRoomId,
+            createdAt: optimisticMessage.created_at,
+         });
+      } catch (e) {
+         console.warn("Failed to persist outbox entry:", e);
+      }
+
       const success = await sendWithRetry(tempId, messagePayload);
 
       if (success) {
          useAppStore
             .getState()
             .updateGlobalMessage({ id: tempId, status: "sent" });
+         removeOutbox(tempId).catch(() => {});
       } else {
          useAppStore
             .getState()
@@ -724,10 +774,22 @@ export const useChat = (userId: string) => {
       const msg = globalMessages.find((m) => m.id === messageId);
       if (!msg) return;
 
-      // Prevent sending local blob URLs to the database
+      let pendingBlob = pendingMediaRef.current.get(messageId);
+
+      // Fall back to the persisted outbox entry (e.g. after an app reload)
       if (
-         msg.voice_url?.startsWith("blob:") ||
-         msg.image_url?.startsWith("blob:")
+         !pendingBlob &&
+         (msg.voice_url?.startsWith("blob:") || msg.image_url?.startsWith("blob:"))
+      ) {
+         const queued = await getOutbox();
+         pendingBlob = queued.find((e) => e.id === messageId)?.blob;
+      }
+
+      // Media messages require the retained local blob for re-upload
+      if (
+         (msg.voice_url?.startsWith("blob:") ||
+            msg.image_url?.startsWith("blob:")) &&
+         !pendingBlob
       ) {
          useAppStore
             .getState()
@@ -740,31 +802,73 @@ export const useChat = (userId: string) => {
          .updateGlobalMessage({ id: messageId, status: "sending" });
       removeFailedMessageId(messageId);
 
-      let finalContent = msg.content;
-      if (activeRoom && activeRoom.type === "dm" && activeRoom.dm_partner) {
-         const key = getDMRoomKey(userId, activeRoom.dm_partner.id);
-         finalContent = encryptDM(msg.content, key);
-      }
+      try {
+         if (msg.voice_url && pendingBlob) {
+            const publicUrl = await uploadVoiceAndPersist(
+               messageId,
+               pendingBlob,
+               msg.group_id,
+            );
+            clearPendingMedia(messageId);
+            useAppStore.getState().updateGlobalMessage({
+               id: messageId,
+               status: "sent",
+               voice_url: publicUrl,
+            });
+            removeOutbox(messageId).catch(() => {});
+            return;
+         }
 
-      const messagePayload = {
-         id: messageId,
-         content: finalContent,
-         user_id: userId,
-         reply_to: msg.reply_to,
-         mentions: msg.mentions,
-         is_read: false,
-         voice_url: msg.voice_url,
-         image_url: msg.image_url,
-         group_id: msg.group_id,
-      };
+         if (msg.image_url && pendingBlob) {
+            const publicUrl = await uploadImageAndPersist(
+               messageId,
+               pendingBlob as File,
+               msg.group_id,
+            );
+            clearPendingMedia(messageId);
+            useAppStore.getState().updateGlobalMessage({
+               id: messageId,
+               status: "sent",
+               image_url: publicUrl,
+            });
+            removeOutbox(messageId).catch(() => {});
+            return;
+         }
 
-      const success = await sendWithRetry(messageId, messagePayload);
+         let finalContent = msg.content;
+         if (activeRoom && activeRoom.type === "dm" && activeRoom.dm_partner) {
+            const key = getDMRoomKey(userId, activeRoom.dm_partner.id);
+            finalContent = encryptDM(msg.content, key);
+         }
 
-      if (success) {
+         const messagePayload = {
+            id: messageId,
+            content: finalContent,
+            user_id: userId,
+            reply_to: msg.reply_to,
+            mentions: msg.mentions,
+            is_read: false,
+            voice_url:
+               msg.voice_url && !msg.voice_url.startsWith("blob:")
+                  ? msg.voice_url
+                  : null,
+            image_url:
+               msg.image_url && !msg.image_url.startsWith("blob:")
+                  ? msg.image_url
+                  : null,
+            group_id: msg.group_id,
+         };
+
+         const success = await sendWithRetry(messageId, messagePayload);
+
+         if (!success) throw new Error("Resend failed after retries");
+
          useAppStore
             .getState()
             .updateGlobalMessage({ id: messageId, status: "sent" });
-      } else {
+         removeOutbox(messageId).catch(() => {});
+      } catch (err) {
+         console.error("Failed to resend message:", err);
          useAppStore
             .getState()
             .updateGlobalMessage({ id: messageId, status: "failed" });
@@ -792,57 +896,28 @@ export const useChat = (userId: string) => {
       };
 
       useAppStore.getState().addGlobalMessage(optimisticMessage);
+      pendingMediaRef.current.set(tempId, blob);
+      pendingObjectUrlsRef.current.set(tempId, tempUrl);
 
       try {
-         const mimeType = blob.type || "audio/wav";
-         let extension = "wav";
-         if (mimeType.includes("webm")) {
-            extension = "webm";
-         } else if (mimeType.includes("mp4")) {
-            extension = "mp4";
-         } else if (mimeType.includes("ogg")) {
-            extension = "ogg";
-         }
-         const fileName = `${userId}/${Date.now()}.${extension}`;
-
-         // 1. Upload to storage with retry
-         await retryOperation(async () => {
-            const { error: uploadErr } = await supabase.storage
-               .from("voice-notes")
-               .upload(fileName, blob, {
-                  contentType: mimeType,
-                  cacheControl: "3600",
-               });
-            if (uploadErr) throw uploadErr;
-         });
-
-         const {
-            data: { publicUrl },
-         } = supabase.storage.from("voice-notes").getPublicUrl(fileName);
-
-         // 2. Persist to database with retry
-         const messagePayload = {
+         await putOutbox({
             id: tempId,
-            content: "[Voice Message]",
-            user_id: userId,
-            is_read: false,
+            kind: "voice",
+            payload: { id: tempId, content: "[Voice Message]", user_id: userId, is_read: false, group_id: activeRoomId },
+            blob,
+            groupId: activeRoomId,
+            createdAt: optimisticMessage.created_at,
+         }).catch((e) => console.warn("Failed to persist outbox entry:", e));
+
+         const publicUrl = await uploadVoiceAndPersist(tempId, blob, activeRoomId);
+
+         clearPendingMedia(tempId);
+         useAppStore.getState().updateGlobalMessage({
+            id: tempId,
+            status: "sent",
             voice_url: publicUrl,
-            group_id: activeRoomId,
-         };
-
-         const success = await sendWithRetry(tempId, messagePayload);
-
-         if (success) {
-            useAppStore.getState().updateGlobalMessage({
-               id: tempId,
-               status: "sent",
-               voice_url: publicUrl,
-            });
-         } else {
-            throw new Error(
-               "Failed to persist voice message record after retries",
-            );
-         }
+         });
+         removeOutbox(tempId).catch(() => {});
       } catch (err) {
          console.error("Failed to upload/send voice message:", err);
          useAppStore
@@ -857,35 +932,54 @@ export const useChat = (userId: string) => {
 
    // Upload & send image
    const sendImageMessage = async (file: File) => {
+      const tempId = crypto.randomUUID();
+      const tempUrl = URL.createObjectURL(file); // Temporary local URL for optimistic UI
+
+      const optimisticMessage: Message = {
+         id: tempId,
+         content: "[Image]",
+         user_id: userId,
+         created_at: new Date().toISOString(),
+         image_url: tempUrl,
+         group_id: activeRoomId,
+         status: "sending",
+         is_read: false,
+         profiles: globalMessages.find((m) => m.user_id === userId)
+            ?.profiles || { username: "Me", avatar_url: "", id: userId },
+      };
+
+      useAppStore.getState().addGlobalMessage(optimisticMessage);
+      pendingMediaRef.current.set(tempId, file);
+      pendingObjectUrlsRef.current.set(tempId, tempUrl);
+
       try {
-         // 1. Compress Image
-         const compressedBlob = await compressImage(file);
-         const fileName = `${userId}/${Date.now()}.jpg`;
+         await putOutbox({
+            id: tempId,
+            kind: "image",
+            payload: { id: tempId, content: "[Image]", user_id: userId, is_read: false, group_id: activeRoomId },
+            blob: file,
+            groupId: activeRoomId,
+            createdAt: optimisticMessage.created_at,
+         }).catch((e) => console.warn("Failed to persist outbox entry:", e));
 
-         // 2. Upload to storage
-         const { error: uploadErr } = await supabase.storage
-            .from("chat-images")
-            .upload(fileName, compressedBlob, {
-               contentType: "image/jpeg",
-               cacheControl: "3600",
-            });
+         const publicUrl = await uploadImageAndPersist(tempId, file, activeRoomId);
 
-         if (uploadErr) throw uploadErr;
-
-         const {
-            data: { publicUrl },
-         } = supabase.storage.from("chat-images").getPublicUrl(fileName);
-
-         // 3. Send message
-         await sendMessage(
-            "[Image]",
-            undefined,
-            undefined,
-            undefined,
-            publicUrl,
-         );
+         clearPendingMedia(tempId);
+         useAppStore.getState().updateGlobalMessage({
+            id: tempId,
+            status: "sent",
+            image_url: publicUrl,
+         });
+         removeOutbox(tempId).catch(() => {});
       } catch (err) {
          console.error("Failed to upload/send image:", err);
+         useAppStore
+            .getState()
+            .updateGlobalMessage({ id: tempId, status: "failed" });
+         addFailedMessageId(tempId);
+         useAppStore
+            .getState()
+            .triggerToast("Failed to send image.", TOAST_DURATION.LONG);
       }
    };
 
@@ -901,36 +995,16 @@ export const useChat = (userId: string) => {
    const deleteMessage = (messageId: string) =>
       deleteMessageAction(messageId, userId);
 
-   // Mark room as read
-   const markAsRead = async (messageId: string) => {
-      const newLastSeen = new Date().toISOString();
-
-      // Optimistically update store
-      updateReadReceipt(activeRoomId, newLastSeen);
-
-      // Perform background database update
-      supabase
-         .from("chat_read_receipts")
-         .upsert(
-            {
-               user_id: userId,
-               group_id: activeRoomId,
-               last_seen_at: newLastSeen,
-            },
-            { onConflict: "user_id,group_id" },
-         )
-         .then(({ error }) => {
-            if (error) {
-               // Fail silently
-            }
-         });
-
+   // Mark room as read (hover-based; the active-room effect covers normal flow)
+   const markAsRead = useCallback(async (messageId: string) => {
+      const msg = globalMessages.find((m) => m.id === messageId);
+      markGroupsRead(userId, [msg?.group_id || activeRoomId]);
       setFirstUnreadId(null);
       await supabase
          .from("messages")
          .update({ is_read: true })
          .eq("id", messageId);
-   };
+   }, [userId, activeRoomId, globalMessages]);
 
    // Custom group creation
    const createCustomGroup = async (

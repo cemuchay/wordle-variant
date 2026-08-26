@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/refs */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence, useMotionValue } from "framer-motion";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { motion, AnimatePresence, useMotionValue, useDragControls } from "framer-motion";
 import type { PanInfo } from "framer-motion";
 import { Search, MessageCircle, X, Send, ArrowLeft, ExternalLink, Edit2, Trash2, Check, CheckCheck, ShieldAlert, Mic, Image as ImageIcon, Smile, Reply, Users } from "lucide-react";
 import { useApp } from "../../context/AppContext";
@@ -21,8 +21,18 @@ import { ReactionModal } from "./ChatMessage/ReactionModal";
 import { ReactionBadge } from "./ChatMessage/ReactionBadge";
 import { safeLocalStorage } from "../../utils/storage";
 import { Z_INDEX } from "../../constants/ui";
+import { putOutbox, removeOutbox, type OutboxEntry } from "../../utils/outbox";
+import { uploadVoiceAsset, uploadImageAsset, insertMessageWithRetry } from "../../utils/messageDelivery";
+import { VoiceRecorder } from "../../utils/voiceRecorder";
+import { isReactionRow, markGroupsRead, resolveTickState } from "../../utils/readReceipts";
+import TypingBubble from "./TypingBubble";
+import { useTypingPresence } from "../../hooks/useTypingPresence";
+import { usePeerReceipts } from "../../hooks/usePeerReceipts";
+import MessageInfoModal from "./ChatMessage/MessageInfoModal";
 
 const CLOSE_DELAY = 10000;
+// Desktop docked panel width (anchored beside the bubble)
+const PANEL_WIDTH = 380;
 
 // --- Bubble drag boundary configuration ---
 // Vertical no-go zones: status bar / dynamic island row at the top,
@@ -69,7 +79,7 @@ const clampToBounds = (pos: { x: number; y: number }) => {
 };
 
 export default function FloatingChatBubble() {
-   const { unreadCount, isChatOpen, date } = useApp();
+   const { unreadCount, isChatOpen, date, profile } = useApp();
    const [dismissed, setDismissed] = useState(false);
    const [conversationSearchQuery, setConversationSearchQuery] = useState("");
    const [isDragging, setIsDragging] = useState(false);
@@ -135,7 +145,88 @@ export default function FloatingChatBubble() {
    const [replyText, setReplyText] = useState("");
    const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
    const [editText, setEditText] = useState("");
-   const [isSending, setIsSending] = useState(false);
+
+   // Retry fuel for failed optimistic sends: exact payloads/blobs per message id
+   const pendingRetriesRef = useRef<Map<string, { kind: "text"; payload: any; fallbackText: string } | { kind: "voice"; blob: Blob; objectUrl?: string } | { kind: "image"; blob: File; objectUrl?: string }>>(new Map());
+   const replyTextRef = useRef("");
+
+   // Desktop gets a docked Messenger-style panel instead of a modal sheet
+   const [isDesktop, setIsDesktop] = useState(() =>
+      typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches,
+   );
+   const isDesktopRef = useRef(isDesktop);
+   useEffect(() => {
+      const mq = window.matchMedia("(min-width: 768px)");
+      const onChange = () => {
+         setIsDesktop(mq.matches);
+         isDesktopRef.current = mq.matches;
+      };
+      mq.addEventListener("change", onChange);
+      return () => mq.removeEventListener("change", onChange);
+   }, []);
+
+   const [panelPos, setPanelPos] = useState<{ left: number; top: number } | null>(null);
+
+   // Desktop panel drag (header handle) — offsets live on motion values and
+   // are normalized back into panelPos on release
+   const panelDragControls = useDragControls();
+   const panelX = useMotionValue(0);
+   const panelY = useMotionValue(0);
+   const panelDragStartRef = useRef<{ left: number; top: number } | null>(null);
+
+   // Same reachable region the bubble respects: 8px side margins, below the
+   // dynamic-island row, above the bottom navigation bar.
+   const clampPanelPosition = useCallback((rawLeft: number, rawTop: number) => {
+      const insetTop = readSafeAreaInset("top");
+      const panelH = Math.min(600, window.innerHeight * 0.72);
+      const minX = EDGE_MARGIN_X;
+      const maxX = Math.max(minX, window.innerWidth - PANEL_WIDTH - EDGE_MARGIN_X);
+      const minY = insetTop + 8;
+      const maxY = window.innerHeight - BOTTOM_NAV_CLEARANCE - panelH - 8;
+      const left = Math.round(Math.min(Math.max(rawLeft, minX), Math.max(minX, maxX)));
+      const top = Math.round(Math.min(Math.max(rawTop, minY), Math.max(minY, maxY)));
+      return { left, top };
+   }, []);
+
+   // Desktop panels persist while multitasking — close via X or Escape
+   useEffect(() => {
+      if (!isDesktop || !isOverlayOpen) return;
+      const onKey = (e: KeyboardEvent) => {
+         if (e.key === "Escape") {
+            setIsOverlayOpen(false);
+            setSelectedGroupId(null);
+         }
+      };
+      document.addEventListener("keydown", onKey);
+      return () => document.removeEventListener("keydown", onKey);
+   }, [isDesktop, isOverlayOpen]);
+
+   // Desktop panel anchors next to wherever the bubble currently sits
+   const computePanelPosition = useCallback(() => {
+      const bx = bubbleX.get();
+      const by = bubbleY.get();
+      // Prefer the side with room, flipping across the bubble if needed
+      let left = bx + BUBBLE_SIZE + 12;
+      if (left + PANEL_WIDTH + 8 > window.innerWidth) {
+         left = bx - PANEL_WIDTH - 12;
+      }
+      const top = by - 8;
+      return clampPanelPosition(left, top);
+   }, [bubbleX, bubbleY, clampPanelPosition]);
+
+   useEffect(() => {
+      if (!isOverlayOpen || !isDesktop) return;
+      const onResize = () => setPanelPos((p) => (p ? clampPanelPosition(p.left, p.top) : p));
+      // Initial anchor on next frame — no synchronous setState in effect body
+      const raf = requestAnimationFrame(() => setPanelPos(computePanelPosition()));
+      window.addEventListener('resize', onResize);
+      window.visualViewport?.addEventListener('resize', onResize);
+      return () => {
+         cancelAnimationFrame(raf);
+         window.removeEventListener('resize', onResize);
+         window.visualViewport?.removeEventListener('resize', onResize);
+      };
+   }, [isOverlayOpen, isDesktop, computePanelPosition, clampPanelPosition]);
 
    const [groups, setGroups] = useState<any[]>([]);
    const [hasPlayedToday, setHasPlayedToday] = useState(false);
@@ -151,7 +242,7 @@ export default function FloatingChatBubble() {
    const [isRecording, setIsRecording] = useState(false);
    const [recordingTime, setRecordingTime] = useState(0);
    const timerRef = useRef<number | null>(null);
-   const wavRecorderRef = useRef<any>(null);
+   const wavRecorderRef = useRef<VoiceRecorder | null>(null);
 
    // Reaction states
    const [reactingMessageId, setReactingMessageId] = useState<string | null>(null);
@@ -220,6 +311,7 @@ export default function FloatingChatBubble() {
    const startInactivityTimer = () => {
       clearInactivityTimer();
       inactivityTimerRef.current = window.setTimeout(() => {
+         if (isDesktopRef.current) return;
          setIsOverlayOpen(false);
          setSelectedGroupId(null);
       }, CLOSE_DELAY);
@@ -244,9 +336,10 @@ export default function FloatingChatBubble() {
 
    const startRecording = async () => {
       try {
-         const { WAVRecorder } = await import("../chat/MessageInput");
-         const recorder = new WAVRecorder();
-         await recorder.start();
+         const recorder = new VoiceRecorder();
+         await recorder.start({
+            onMaxDuration: () => { void stopRecording(); },
+         });
          wavRecorderRef.current = recorder;
 
          setIsRecording(true);
@@ -279,7 +372,7 @@ export default function FloatingChatBubble() {
 
    const cancelRecording = () => {
       if (!wavRecorderRef.current) return;
-      wavRecorderRef.current.stop();
+      wavRecorderRef.current.cancel();
       wavRecorderRef.current = null;
       setIsRecording(false);
       if (timerRef.current) {
@@ -335,124 +428,148 @@ export default function FloatingChatBubble() {
       }
    }, [replyText]);
 
-   const handleSendVoice = async (blob: Blob) => {
-      if (!user?.id || !selectedGroupId) return;
-      setIsSending(true);
+   const markGroupAsRead = (groupId: string) => {
+      if (!user?.id) return;
+      markGroupsRead(user.id, [groupId]);
+   };
+
+   const queueAndDeliver = async (entry: OutboxEntry, deliver: () => Promise<void>) => {
       try {
-         const mimeType = blob.type || "audio/wav";
-         // eslint-disable-next-line react-hooks/purity
-         const fileName = `${user.id}/${Date.now()}.wav`;
+         await putOutbox(entry);
+      } catch (e) {
+         console.warn("Failed to persist outbox entry:", e);
+      }
+      await deliver();
+   };
 
-         // 1. Upload to storage
-         const { error: uploadErr } = await supabase.storage
-            .from("voice-notes")
-            .upload(fileName, blob, {
-               contentType: mimeType,
-               cacheControl: "3600",
-            });
+   const handleSendVoice = (blob: Blob) => {
+      if (!user?.id || !selectedGroupId) return;
+      const uid = user.id;
+      const groupId = selectedGroupId;
 
-         if (uploadErr) throw uploadErr;
+      const tempId = crypto.randomUUID();
+      const objectUrl = URL.createObjectURL(blob);
 
-         const {
-            data: { publicUrl },
-         } = supabase.storage.from("voice-notes").getPublicUrl(fileName);
+      useAppStore.getState().addGlobalMessage({
+         id: tempId,
+         content: "[Voice Message]",
+         user_id: uid,
+         created_at: new Date().toISOString(),
+         voice_url: objectUrl,
+         group_id: groupId,
+         is_read: false,
+         status: "sending",
+         profiles: { id: uid, username: profile?.username || "User", avatar_url: profile?.avatar_url || "" },
+      });
+      pendingRetriesRef.current.set(tempId, { kind: "voice", blob, objectUrl });
+      startInactivityTimer();
 
-         // 2. Persist to database
-         const messagePayload = {
-            id: crypto.randomUUID(),
+      void queueAndDeliver(
+         {
+            id: tempId,
+            kind: "voice",
+            payload: { id: tempId, content: "[Voice Message]", user_id: uid, is_read: false, group_id: groupId },
+            blob,
+            groupId,
+            createdAt: new Date().toISOString(),
+         },
+         () => deliverVoiceMessage(tempId, blob, groupId),
+      );
+   };
+
+   const deliverVoiceMessage = async (messageId: string, blob: Blob, groupId: string) => {
+      if (!user?.id) return;
+      try {
+         const publicUrl = await uploadVoiceAsset(user.id, blob);
+         await insertMessageWithRetry({
+            id: messageId,
             content: "[Voice Message]",
             user_id: user.id,
             is_read: false,
             voice_url: publicUrl,
-            group_id: selectedGroupId,
-         };
+            group_id: groupId,
+         });
 
-         const { error } = await supabase.from("messages").insert([messagePayload]);
-         if (error) throw error;
+         const entry = pendingRetriesRef.current.get(messageId);
+         if (entry && entry.kind !== "text" && entry.objectUrl) URL.revokeObjectURL(entry.objectUrl);
+         pendingRetriesRef.current.delete(messageId);
+         useAppStore.getState().updateGlobalMessage({ id: messageId, status: "sent", voice_url: publicUrl });
+         removeOutbox(messageId).catch(() => {});
 
-         // Mark group as read immediately
-         const timestamp = new Date().toISOString();
-         updateReadReceipt(selectedGroupId, timestamp);
-         await supabase.from("chat_read_receipts").upsert(
-            {
-               user_id: user.id,
-               group_id: selectedGroupId,
-               last_seen_at: timestamp,
-            },
-            { onConflict: "user_id,group_id" }
-         );
-
-         setReplyText("");
-         startInactivityTimer();
+         markGroupAsRead(groupId);
       } catch (err) {
          console.error("Failed to send voice note:", err);
-         useAppStore.getState().triggerToast("Failed to send voice note.", TOAST_DURATION.LONG);
-      } finally {
-         setIsSending(false);
+         useAppStore.getState().updateGlobalMessage({ id: messageId, status: "failed" });
+         useAppStore.getState().triggerToast("Failed to send voice note. Tap to retry.", TOAST_DURATION.LONG);
       }
    };
 
-   const handleSendImage = async (file: File) => {
+   const handleSendImage = (file: File) => {
       if (!user?.id || !selectedGroupId) return;
-      setIsSending(true);
+      const uid = user.id;
+      const groupId = selectedGroupId;
+
+      const tempId = crypto.randomUUID();
+      const objectUrl = URL.createObjectURL(file);
+
+      useAppStore.getState().addGlobalMessage({
+         id: tempId,
+         content: "[Image]",
+         user_id: uid,
+         created_at: new Date().toISOString(),
+         image_url: objectUrl,
+         group_id: groupId,
+         is_read: false,
+         status: "sending",
+         profiles: { id: uid, username: profile?.username || "User", avatar_url: profile?.avatar_url || "" },
+      });
+      pendingRetriesRef.current.set(tempId, { kind: "image", blob: file, objectUrl });
+      startInactivityTimer();
+
+      void queueAndDeliver(
+         {
+            id: tempId,
+            kind: "image",
+            payload: { id: tempId, content: "[Image]", user_id: uid, is_read: false, group_id: groupId },
+            blob: file,
+            groupId,
+            createdAt: new Date().toISOString(),
+         },
+         () => deliverImageMessage(tempId, file, groupId),
+      );
+   };
+
+   const deliverImageMessage = async (messageId: string, file: File, groupId: string) => {
+      if (!user?.id) return;
       try {
          const compressedBlob = await compressImage(file);
-         // eslint-disable-next-line react-hooks/purity
-         const fileName = `${user.id}/${Date.now()}.jpg`;
-
-         // 1. Upload to storage
-         const { error: uploadErr } = await supabase.storage
-            .from("chat-images")
-            .upload(fileName, compressedBlob, {
-               contentType: "image/jpeg",
-               cacheControl: "3600",
-            });
-
-         if (uploadErr) throw uploadErr;
-
-         const {
-            data: { publicUrl },
-         } = supabase.storage.from("chat-images").getPublicUrl(fileName);
-
-         // 2. Persist to database
-         const messagePayload = {
-            id: crypto.randomUUID(),
+         const publicUrl = await uploadImageAsset(user.id, compressedBlob);
+         await insertMessageWithRetry({
+            id: messageId,
             content: "[Image]",
             user_id: user.id,
             is_read: false,
             image_url: publicUrl,
-            group_id: selectedGroupId,
-         };
+            group_id: groupId,
+         });
 
-         const { error } = await supabase.from("messages").insert([messagePayload]);
-         if (error) throw error;
+         const entry = pendingRetriesRef.current.get(messageId);
+         if (entry && entry.kind !== "text" && entry.objectUrl) URL.revokeObjectURL(entry.objectUrl);
+         pendingRetriesRef.current.delete(messageId);
+         useAppStore.getState().updateGlobalMessage({ id: messageId, status: "sent", image_url: publicUrl });
+         removeOutbox(messageId).catch(() => {});
 
-         // Mark group as read immediately
-         const timestamp = new Date().toISOString();
-         updateReadReceipt(selectedGroupId, timestamp);
-         await supabase.from("chat_read_receipts").upsert(
-            {
-               user_id: user.id,
-               group_id: selectedGroupId,
-               last_seen_at: timestamp,
-            },
-            { onConflict: "user_id,group_id" }
-         );
-
-         setReplyText("");
-         startInactivityTimer();
+         markGroupAsRead(groupId);
       } catch (err) {
          console.error("Failed to send image:", err);
-         useAppStore.getState().triggerToast("Failed to send image.", TOAST_DURATION.LONG);
-      } finally {
-         setIsSending(false);
+         useAppStore.getState().updateGlobalMessage({ id: messageId, status: "failed" });
+         useAppStore.getState().triggerToast("Failed to send image. Tap to retry.", TOAST_DURATION.LONG);
       }
    };
 
    const globalMessages = useAppStore((s) => s.globalMessages);
    const readReceipts = useAppStore((s) => s.readReceipts);
    const joinedGroupIds = useAppStore((s) => s.joinedGroupIds);
-   const updateReadReceipt = useAppStore((s) => s.updateReadReceipt);
    const { user } = useAuth();
 
    // Profiles cache for reactor names
@@ -604,6 +721,19 @@ export default function FloatingChatBubble() {
          });
    }, [user?.id]);
 
+   // Mark only conversations actually visited inside the bubble when it closes
+   const visitedGroupsRef = useRef<Set<string>>(new Set());
+
+   // Typing presence — subscribed only while a conversation is open
+   const { typingNames, setSelfTyping } = useTypingPresence(
+      selectedGroupId,
+      user?.id,
+      isOverlayOpen && !!selectedGroupId && !isChatOpen,
+      profile?.username || null,
+   );
+   const peerReceipts = usePeerReceipts(selectedGroupId, user?.id, isOverlayOpen && !!selectedGroupId);
+   const [infoMsg, setInfoMsg] = useState<any>(null);
+
    // Mark all unread messages as read when the bubble overlay closes
    useEffect(() => {
       if (isOverlayOpen || !user?.id) {
@@ -616,34 +746,12 @@ export default function FloatingChatBubble() {
       }
       prevOverlayOpenRef.current = false;
 
-      const state = useAppStore.getState();
-      const receipts = state.readReceipts;
-      const joined = new Set(state.joinedGroupIds);
-      const timestamp = new Date().toISOString();
-      const marked = new Set<string>();
-
-      state.globalMessages.forEach((m: any) => {
-         if (m.user_id === user.id) return;
-         if (!joined.has(m.group_id)) return;
-         if (!hasPlayedToday && m.group_id === "00000000-0000-0000-0000-000000000002") return;
-         const lastSeen = receipts[m.group_id] || new Date(0).toISOString();
-         if (new Date(m.created_at).getTime() > new Date(lastSeen).getTime()) {
-            if (!marked.has(m.group_id)) {
-               marked.add(m.group_id);
-               updateReadReceipt(m.group_id, timestamp);
-               supabase
-                  .from("chat_read_receipts")
-                  .upsert(
-                     { user_id: user.id, group_id: m.group_id, last_seen_at: timestamp },
-                     { onConflict: "user_id,group_id" }
-                  )
-                  .then(({ error }) => {
-                     if (error) console.error("Failed to mark as read:", error);
-                  });
-            }
-         }
-      });
-   }, [isOverlayOpen, user?.id, hasPlayedToday, updateReadReceipt]);
+      const visited = Array.from(visitedGroupsRef.current);
+      visitedGroupsRef.current.clear();
+      if (visited.length > 0) {
+         markGroupsRead(user.id, visited);
+      }
+   }, [isOverlayOpen, user?.id]);
 
    // Auto-scroll detailed message view to bottom
    useEffect(() => {
@@ -660,7 +768,7 @@ export default function FloatingChatBubble() {
       }
    }
 
-   const isVisible = !isChatOpen && !dismissed;
+   const isVisible = !isChatOpen && !dismissed && !isOverlayOpen;
 
    // Filter out unread messages globally
    const joinedSet = new Set(joinedGroupIds);
@@ -684,6 +792,7 @@ export default function FloatingChatBubble() {
       groups.forEach(g => groupMap.set(g.id, { group: g, lastMessage: null, unreadCount: 0 }));
       globalMessages.forEach((m: any) => {
          if (!user?.id) return;
+         if (isReactionRow(m.content)) return;
          if (!joinedSet.has(m.group_id)) return;
          if (!hasPlayedToday && m.group_id === "00000000-0000-0000-0000-000000000002") return;
          const entry = groupMap.get(m.group_id);
@@ -694,7 +803,6 @@ export default function FloatingChatBubble() {
                entry.unreadCount++;
             }
          }
-         if (m.content?.startsWith("[reaction:")) return;
          if (!entry.lastMessage || new Date(m.created_at) > new Date(entry.lastMessage.created_at)) {
             entry.lastMessage = m;
          }
@@ -726,6 +834,7 @@ export default function FloatingChatBubble() {
 
    // Resolve DM partner and room key for a message
    const getDecryptedContent = (m: any) => {
+      if (!m) return "";
       if (!user?.id) return m.content;
       if (m.content && m.content.startsWith("e2ee:")) {
          if (m.user_id === user.id) {
@@ -743,66 +852,102 @@ export default function FloatingChatBubble() {
    };
 
    // Send Message
-   const handleSendReply = async () => {
+   const handleSendReply = () => {
       if (!replyText.trim() || !user?.id || !selectedGroupId) return;
       // Don't allow replies to locked Game Analysis
       if (selectedGroupId === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday) return;
 
-      setIsSending(true);
-      try {
-         const group = groups.find(g => g.id === selectedGroupId);
-         const isDM = group?.type === "dm";
-         let finalContent = replyText;
+      const group = groups.find(g => g.id === selectedGroupId);
+      const isDM = group?.type === "dm";
+      let finalContent = replyText;
 
-         if (isDM && group?.dm_partner) {
-            const key = getDMRoomKey(user.id, group.dm_partner.id);
-            finalContent = encryptDM(replyText, key);
+      if (isDM && group?.dm_partner) {
+         const key = getDMRoomKey(user.id, group.dm_partner.id);
+         finalContent = encryptDM(replyText, key);
+      }
+
+      const tempId = crypto.randomUUID();
+      const mentions: string[] = [];
+      profilesList.forEach(u => {
+         if (replyText.includes(`@${u.username}`)) {
+            mentions.push(u.id);
          }
+      });
+      const messagePayload: any = {
+         id: tempId,
+         content: finalContent,
+         user_id: user.id,
+         group_id: selectedGroupId,
+         is_read: false,
+      };
+      if (mentions.length > 0) {
+         messagePayload.mentions = mentions;
+      }
+      if (replyingToMsg) {
+         messagePayload.reply_to = replyingToMsg.id;
+      }
 
-         const tempId = crypto.randomUUID();
-         const mentions: string[] = [];
-         profilesList.forEach(u => {
-            if (replyText.includes(`@${u.username}`)) {
-               mentions.push(u.id);
-            }
-         });
-         const messagePayload: any = {
+      useAppStore.getState().addGlobalMessage({
+         ...messagePayload,
+         content: replyText,
+         created_at: new Date().toISOString(),
+         status: "sending",
+         profiles: { id: user.id, username: profile?.username || "User", avatar_url: profile?.avatar_url || "" },
+      });
+      pendingRetriesRef.current.set(tempId, { kind: "text", payload: messagePayload, fallbackText: replyText });
+
+      const sentText = replyText;
+      setReplyText("");
+      replyTextRef.current = "";
+      setSelfTyping(false);
+      setReplyingToMsg(null);
+      startInactivityTimer();
+
+      void queueAndDeliver(
+         {
             id: tempId,
-            content: finalContent,
-            user_id: user.id,
-            group_id: selectedGroupId,
-            is_read: false,
-         };
-         if (mentions.length > 0) {
-            messagePayload.mentions = mentions;
-         }
-         if (replyingToMsg) {
-            messagePayload.reply_to = replyingToMsg.id;
-         }
+            kind: "text",
+            payload: messagePayload,
+            fallbackText: sentText,
+            groupId: selectedGroupId!,
+            createdAt: new Date().toISOString(),
+         },
+         () => deliverTextMessage(messagePayload, sentText),
+      );
+   };
 
-         // Insert reply message
-         const { error } = await supabase.from("messages").insert([messagePayload]);
+   const deliverTextMessage = async (payload: any, plainTextForRestore?: string) => {
+      if (!user?.id) return;
+      try {
+         const { error } = await supabase.from("messages").insert([payload]);
          if (error) throw error;
 
-         // Mark group as read immediately
-         const timestamp = new Date().toISOString();
-         updateReadReceipt(selectedGroupId, timestamp);
-         await supabase.from("chat_read_receipts").upsert(
-            {
-               user_id: user.id,
-               group_id: selectedGroupId,
-               last_seen_at: timestamp,
-            },
-            { onConflict: "user_id,group_id" }
-         );
-
-         setReplyText("");
-         setReplyingToMsg(null);
-         startInactivityTimer();
+         pendingRetriesRef.current.delete(payload.id);
+         useAppStore.getState().updateGlobalMessage({ id: payload.id, status: "sent" });
+         removeOutbox(payload.id).catch(() => {});
+         markGroupAsRead(payload.group_id);
       } catch (err) {
-         console.error("Failed to send reply:", err);
-      } finally {
-         setIsSending(false);
+         console.error("Failed to send message:", err);
+         useAppStore.getState().updateGlobalMessage({ id: payload.id, status: "failed" });
+         useAppStore.getState().triggerToast("Failed to send message. Tap to retry.", TOAST_DURATION.LONG);
+         if (plainTextForRestore && !replyTextRef.current.trim()) {
+            replyTextRef.current = plainTextForRestore;
+            setReplyText(plainTextForRestore);
+         }
+      }
+   };
+
+   const handleRetryMessage = (msg: any) => {
+      if (!user?.id) return;
+      const entry = pendingRetriesRef.current.get(msg.id);
+      if (!entry) return;
+      useAppStore.getState().updateGlobalMessage({ id: msg.id, status: "sending" });
+      if (entry.kind === "text") {
+         void deliverTextMessage(entry.payload, entry.fallbackText);
+      } else if (entry.kind === "voice") {
+         void deliverVoiceMessage(msg.id, entry.blob, msg.group_id);
+      } else {
+         void deliverImageMessage(msg.id, entry.blob, msg.group_id);
       }
    };
 
@@ -908,7 +1053,9 @@ export default function FloatingChatBubble() {
    const handleBubbleClick = () => {
       if (isDragging) return;
       if (unreadMessages.length > 0) {
-         setSelectedGroupId(unreadMessages[unreadMessages.length - 1].group_id);
+         const autoOpenGroupId = unreadMessages[unreadMessages.length - 1].group_id;
+         visitedGroupsRef.current.add(autoOpenGroupId);
+         setSelectedGroupId(autoOpenGroupId);
       } else {
          setSelectedGroupId(null);
       }
@@ -964,10 +1111,35 @@ export default function FloatingChatBubble() {
 
    // Filter messages context for the active room in popover
    const allRoomMessages = selectedGroupId
-      ? globalMessages.filter(m => m.group_id === selectedGroupId && !m.content?.startsWith("[reaction:"))
+      ? globalMessages.filter(m => m.group_id === selectedGroupId && !isReactionRow(m.content))
       : [];
-   const activeRoomMessages = allRoomMessages.slice(-20);
-   const hasMoreMessages = allRoomMessages.length > 20;
+
+   // Jump-to-reply widens the rendered window around targets older than 20
+   const [windowFloorId, setWindowFloorId] = useState<string | null>(null);
+   const activeRoomMessages = (() => {
+      if (!windowFloorId) return allRoomMessages.slice(-20);
+      const floorIdx = allRoomMessages.findIndex((m: any) => m.id === windowFloorId);
+      if (floorIdx === -1 || floorIdx >= allRoomMessages.length - 20) return allRoomMessages.slice(-20);
+      return allRoomMessages.slice(Math.max(0, floorIdx - 5));
+   })();
+   const hasMoreMessages = allRoomMessages.length > 20 && !windowFloorId;
+
+   const handleJumpToMessage = (messageId: string) => {
+      const el = document.querySelector(`[data-message-id="${messageId}"]`);
+      if (!el) {
+         const idx = allRoomMessages.findIndex((m: any) => m.id === messageId);
+         if (idx === -1) return;
+         setWindowFloorId(messageId);
+         // Retry after React paints the widened window
+         requestAnimationFrame(() => requestAnimationFrame(() => handleJumpToMessage(messageId)));
+         return;
+      }
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("ring-2", "ring-correct", "rounded-2xl");
+      setTimeout(() => {
+         el.classList.remove("ring-2", "ring-correct", "rounded-2xl");
+      }, 2000);
+   };
 
    // Find first unread message ID for the unread divider
    const lastSeen = selectedGroupId ? readReceipts[selectedGroupId] : null;
@@ -980,17 +1152,7 @@ export default function FloatingChatBubble() {
    // Mark a message as read (hover-based)
    const handleMarkAsRead = (messageId: string) => {
       if (!user?.id || !selectedGroupId) return;
-      const timestamp = new Date().toISOString();
-      updateReadReceipt(selectedGroupId, timestamp);
-      supabase
-         .from("chat_read_receipts")
-         .upsert(
-            { user_id: user.id, group_id: selectedGroupId, last_seen_at: timestamp },
-            { onConflict: "user_id,group_id" },
-         )
-         .then(({ error }) => {
-            if (error) console.error("Failed to mark as read:", error);
-         });
+      markGroupsRead(user.id, [selectedGroupId]);
       supabase
          .from("messages")
          .update({ is_read: true })
@@ -1004,12 +1166,19 @@ export default function FloatingChatBubble() {
 
    // Snapshot firstUnreadId for the unread divider
    useEffect(() => {
-      if (firstUnreadId && selectedGroupId && !hasCapturedDividerRef.current) {
-         hasCapturedDividerRef.current = true;
+      if (!firstUnreadId || !selectedGroupId || hasCapturedDividerRef.current) return;
+      hasCapturedDividerRef.current = true;
+      // A large unread backlog can push the divider outside the default
+      // 20-message window — widen it so the line is actually rendered.
+      const idx = allRoomMessages.findIndex((m: any) => m.id === firstUnreadId);
+      const needsWiden = idx !== -1 && idx < allRoomMessages.length - 20 && !windowFloorId;
+      const raf = requestAnimationFrame(() => {
          setVisibleUnreadId(firstUnreadId);
          setShowUnreadLine(true);
-      }
-   }, [firstUnreadId, selectedGroupId]);
+         if (needsWiden) setWindowFloorId(firstUnreadId);
+      });
+      return () => cancelAnimationFrame(raf);
+   }, [firstUnreadId, selectedGroupId, allRoomMessages, windowFloorId]);
 
    // Reset snapshot on room change
    useEffect(() => {
@@ -1018,6 +1187,7 @@ export default function FloatingChatBubble() {
       setVisibleUnreadId(null);
       setShowUnreadLine(true);
       setMentionState(null);
+      setWindowFloorId(null);
    }, [selectedGroupId]);
 
    // Divider visibility: auto-hide after 6s if in view, persist if scrolled below
@@ -1121,32 +1291,58 @@ export default function FloatingChatBubble() {
          </div>
 
          {/* Centered Modal Popover */}
-         <AnimatePresence>
-            {isOverlayOpen && isVisible && (
-               <>
-                  {/* Backdrop */}
-                  <motion.div
-                     initial={{ opacity: 0 }}
-                     animate={{ opacity: 1 }}
-                     exit={{ opacity: 0 }}
-                     onClick={() => {
-                        if (Date.now() - overlayOpenedAtRef.current < 400) return;
-                        setIsOverlayOpen(false);
-                        setSelectedGroupId(null);
-                     }}
-                     className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99990] pointer-events-auto"
-                  />
+             <AnimatePresence>
+             {isOverlayOpen && !isChatOpen && (!isDesktop || panelPos) && (
+                <>
+                  {/* Backdrop — desktop panel stays non-blocking so the page remains usable */}
+                  {!isDesktop && (
+                     <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => {
+                           if (Date.now() - overlayOpenedAtRef.current < 400) return;
+                           setIsOverlayOpen(false);
+                           setSelectedGroupId(null);
+                        }}
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99990] pointer-events-auto"
+                     />
+                  )}
 
-                  {/* Bottom Sheet / Popover Modal Card */}
+                  {/* Bottom Sheet (mobile) / Bubble-anchored Docked Panel (desktop) */}
                   <motion.div
-                     initial={{ opacity: 0, y: "100%", x: "-50%" }}
-                     animate={{ opacity: 1, y: 0, x: "-50%" }}
-                     exit={{ opacity: 0, y: "100%", x: "-50%" }}
+                     key="fb-panel-pos"
+                     initial={{ opacity: 0, y: isDesktop ? 24 : "100%", x: isDesktop ? 0 : "-50%" }}
+                     animate={{ opacity: 1, y: 0, x: isDesktop ? 0 : "-50%" }}
+                     exit={{ opacity: 0, y: isDesktop ? 24 : "100%", x: isDesktop ? 0 : "-50%" }}
                      transition={{ type: "spring", damping: 25, stiffness: 280 }}
-                     className="fixed bottom-4 left-1/2 w-[92%] max-w-md h-[75vh] bg-slate-950/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col pointer-events-auto overflow-hidden z-[99991]"
+                     style={isDesktop && panelPos ? { left: panelPos.left, top: panelPos.top, width: PANEL_WIDTH, height: "min(600px,72vh)" } : undefined}
+                     className={`fixed z-[99991] pointer-events-auto ${isDesktop ? "" : "bottom-4 left-1/2 w-[92%] max-w-md h-[75vh]"}`}
                   >
-                     {/* Header */}
-                     <div className="px-4 py-3 bg-white/5 border-b border-white/10 flex items-center justify-between shrink-0">
+                     <motion.div
+                        drag={isDesktop}
+                        dragListener={false}
+                        dragControls={panelDragControls}
+                        dragMomentum={false}
+                        dragElastic={0}
+                        onDragStart={() => { panelDragStartRef.current = panelPos; }}
+                        onDragEnd={(_e, info) => {
+                           const base = panelDragStartRef.current ?? panelPos;
+                           if (!base) return;
+                           const next = clampPanelPosition(base.left + info.offset.x, base.top + info.offset.y);
+                           setPanelPos(next);
+                           panelX.set(0);
+                           panelY.set(0);
+                        }}
+                        style={{ x: panelX, y: panelY }}
+                        className="w-full h-full bg-slate-950/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col pointer-events-auto overflow-hidden"
+                     >
+                      {/* Header */}
+                      <div
+                         onPointerDown={(e) => { if (isDesktop) panelDragControls.start(e); }}
+                         className={`px-4 py-3 bg-white/5 border-b border-white/10 flex items-center justify-between shrink-0 ${isDesktop ? "cursor-grab active:cursor-grabbing select-none" : ""}`}
+                         title={isDesktop ? "Drag to move" : undefined}
+                      >
                         <div className="flex items-center gap-2">
                            {selectedGroupId && (
                               <button
@@ -1213,7 +1409,7 @@ export default function FloatingChatBubble() {
                                     return (
                                        <button
                                           key={group.id}
-                                          onClick={() => { setSelectedGroupId(group.id); }}
+                                           onClick={() => { visitedGroupsRef.current.add(group.id); setSelectedGroupId(group.id); }}
                                           className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer text-left border border-transparent hover:border-white/5"
                                        >
                                           {isDM ? (
@@ -1285,16 +1481,19 @@ export default function FloatingChatBubble() {
                                     const isEditing = editingMessageId === msg.id;
                                     const content = getDecryptedContent(msg);
 
-                                    return (
-                                       <div
-                                          key={msg.id}
-                                          onMouseEnter={() => !isMe && !msg.is_read && handleMarkAsRead(msg.id)}
-                                          onTouchStart={() => handleTouchStart(msg.id)}
-                                          onTouchEnd={handleTouchEnd}
-                                          onTouchMove={handleTouchMove}
-                                          onTouchCancel={handleTouchEnd}
-                                          className={`relative ${reactingMessageId === msg.id || reactingModalMessageId === msg.id ? 'z-50' : 'z-auto'} overflow-visible`}
-                                       >
+                                     return (
+                                        <div
+                                           key={msg.id}
+                                           data-message-id={msg.id}
+                                           onMouseEnter={() => !isMe && !msg.is_read && handleMarkAsRead(msg.id)}
+                                           onClick={isMe && msg.status === "failed" ? () => handleRetryMessage(msg) : undefined}
+                                           onTouchStart={() => { if (!(isMe && msg.status === "failed")) handleTouchStart(msg.id); }}
+                                           onTouchEnd={handleTouchEnd}
+                                           onTouchMove={handleTouchMove}
+                                           onTouchCancel={handleTouchEnd}
+                                           className={`relative ${reactingMessageId === msg.id || reactingModalMessageId === msg.id ? 'z-50' : 'z-auto'} overflow-visible ${isMe && msg.status === "failed" ? "cursor-pointer" : ""}`}
+                                           title={isMe && msg.status === "failed" ? "Tap to retry" : undefined}
+                                        >
                                           {/* Unread divider */}
                                           {msg.id === visibleUnreadId && showUnreadLine && (
                                              <motion.div
@@ -1380,11 +1579,11 @@ export default function FloatingChatBubble() {
                                                          msg.status === "sending" ? (
                                                             <span className="animate-spin text-white/50 text-[8px]">⌛</span>
                                                          ) : msg.status === "failed" ? (
-                                                            <span className="text-red-400 text-[8px] font-black">⚠️</span>
-                                                         ) : (
-                                                            <CheckCheck size={10} className={msg.is_read ? "text-blue-400" : "text-white/30"} />
-                                                         )
-                                                      )}
+                                                            <span className="text-red-400 text-[8px] font-black cursor-pointer">⚠️ retry</span>
+                                                          ) : (
+                                                             <CheckCheck size={10} className={resolveTickState(msg, user?.id, peerReceipts) === "read" ? "text-blue-400" : "text-white/30"} />
+                                                          )
+                                                       )}
                                                    </span>
                                                 </div>
 
@@ -1419,14 +1618,20 @@ export default function FloatingChatBubble() {
                                                       {msg.reply_to && !msg.is_deleted && (() => {
                                                          const replyToMsg = allRoomMessages.find((m: any) => m.id === msg.reply_to);
                                                          if (!replyToMsg) return null;
-                                                         return (
-                                                            <div className={`flex items-center gap-2 mb-1.5 text-[10px] text-white/60 bg-white/5 border-l-2 border-correct/40 px-3 py-1.5 rounded-t-xl max-w-[85%] ${isMe ? 'flex-row-reverse ml-auto' : ''}`}>
-                                                               <Reply size={10} className="text-correct shrink-0" />
-                                                               <span className="truncate text-gray-400">
-                                                                  {replyToMsg.profiles?.username || 'User'}: {replyToMsg.voice_url ? '🎤 Voice note' : replyToMsg.image_url ? '📷 Image' : getDecryptedContent(replyToMsg)}
-                                                               </span>
-                                                            </div>
-                                                         );
+                                                          return (
+                                                             <div
+                                                                onClick={(e) => {
+                                                                   e.stopPropagation();
+                                                                   handleJumpToMessage(msg.reply_to);
+                                                                }}
+                                                                className={`flex items-center gap-2 mb-1.5 text-[10px] text-white/60 bg-white/5 hover:bg-white/10 border-l-2 border-correct/40 px-3 py-1.5 rounded-t-xl max-w-[85%] cursor-pointer transition-colors ${isMe ? 'flex-row-reverse ml-auto' : ''}`}
+                                                             >
+                                                                <Reply size={10} className="text-correct shrink-0" />
+                                                                <span className="truncate text-gray-400">
+                                                                   {replyToMsg.profiles?.username || 'User'}: {replyToMsg.voice_url ? '🎤 Voice note' : replyToMsg.image_url ? '📷 Image' : getDecryptedContent(replyToMsg)}
+                                                                </span>
+                                                             </div>
+                                                          );
                                                       })()}
                                                       {msg.voice_url ? (
                                                          <ConnectedAudioPlayer
@@ -1451,7 +1656,7 @@ export default function FloatingChatBubble() {
                                                                }
                                                             }}
                                                          >
-                                                            <p className={`text-xs text-left text-gray-200 mt-1 leading-relaxed whitespace-pre-wrap break-words px-3 py-2 rounded-2xl ${isMe ? 'bg-indigo-500/15 border-indigo-500/25' : 'bg-white/5 border border-white/5'}`}>
+                                                             <p className={`text-xs text-left mt-1 leading-relaxed whitespace-pre-wrap break-words px-3 py-2 rounded-2xl ${isMe ? 'bg-indigo-600 border border-indigo-500 text-white' : 'bg-white/5 border border-white/5 text-gray-200'}`}>
                                                                {getDecryptedContent(msg)}
                                                                {msg.is_edited && (
                                                                   <span className="text-[8px] text-gray-500 ml-1">(edited)</span>
@@ -1461,7 +1666,7 @@ export default function FloatingChatBubble() {
                                                       )}
 
                                                       {/* Action buttons (Reply, React, Edit, Delete) */}
-                                                      {!msg.is_deleted && !isEditing && (
+                                                      {!msg.is_deleted && !isEditing && msg.status !== "failed" && (
                                                          <div className="absolute right-0 top-0 -translate-y-full hidden group-hover/msg:flex items-center gap-1 bg-slate-900 border border-white/10 px-1 py-0.5 rounded-lg shadow-lg">
                                                             <button
                                                                onClick={() => handleReply(msg)}
@@ -1514,13 +1719,16 @@ export default function FloatingChatBubble() {
                                              </div>
                                           </div>
                                        </div>
-                                    );
-                                 })}
-                              </div>
-                           ))}
-                     </div>
+                                     );
+                                  })}
+                                  {typingNames.length > 0 && (
+                                     <TypingBubble name={typingNames.length === 1 ? typingNames[0] : typingNames.join(", ")} />
+                                  )}
+                               </div>
+                            ))}
+                      </div>
 
-                     {/* Reply footer for detailed chat screen */}
+                      {/* Reply footer for detailed chat screen */}
                      {selectedGroupId && !(selectedGroupId === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday) && (
                         <div className="p-3 bg-white/5 border-t border-white/10 flex flex-col gap-2 shrink-0 relative">
                            {selectedGroupObject?.type !== "dm" && (
@@ -1601,9 +1809,11 @@ export default function FloatingChatBubble() {
                                     rows={1}
                                     placeholder={replyingToMsg ? "Write a reply..." : "Write a message..."}
                                     value={replyText}
-                                    onChange={(e) => {
-                                       const value = e.target.value;
-                                       setReplyText(value);
+                                     onChange={(e) => {
+                                        const value = e.target.value;
+                                        replyTextRef.current = value;
+                                        setReplyText(value);
+                                        setSelfTyping(value.length > 0);
                                        resetInactivityTimer();
                                        if (selectedGroupObject?.type !== "dm") {
                                           const cursorPos = e.target.selectionStart;
@@ -1660,11 +1870,11 @@ export default function FloatingChatBubble() {
                                     </button>
                                  )
                               ) : (
-                                 <button
-                                    onClick={handleSendReply}
-                                    disabled={!replyText.trim() || isSending}
-                                    className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 disabled:hover:bg-indigo-600 text-white p-2.5 rounded-xl transition-colors cursor-pointer"
-                                 >
+                                  <button
+                                     onClick={handleSendReply}
+                                     disabled={!replyText.trim()}
+                                     className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 disabled:hover:bg-indigo-600 text-white p-2.5 rounded-xl transition-colors cursor-pointer"
+                                  >
                                     <Send className="w-4 h-4" />
                                  </button>
                               )}
@@ -1672,11 +1882,12 @@ export default function FloatingChatBubble() {
                         </div>
                      )}
                   </motion.div>
-               </>
-            )}
-         </AnimatePresence>
+                  </motion.div>
+                </>
+             )}
+          </AnimatePresence>
 
-         {/* Reaction Modal (mobile long-press) */}
+          {/* Reaction Modal (mobile long-press) */}
          <AnimatePresence>
             {reactingModalMessageId && (() => {
                const modalMsg = activeRoomMessages.find((m: any) => m.id === reactingModalMessageId);
@@ -1684,18 +1895,35 @@ export default function FloatingChatBubble() {
                const isMe = modalMsg.user_id === user?.id;
                const content = getDecryptedContent(modalMsg);
                return (
-                  <ReactionModal
-                     isMe={isMe}
-                     onReact={(emoji) => { handleReact(modalMsg.id, emoji); setReactingModalMessageId(null); }}
-                     currentReaction={user?.id ? modalMsg.reactions?.[user.id] : undefined}
-                     onCopy={() => { copyToClipboard(content); setReactingModalMessageId(null); }}
-                     onEdit={isMe && !modalMsg.voice_url && !modalMsg.image_url ? () => { setEditingMessageId(modalMsg.id); setEditText(content); setReactingModalMessageId(null); } : undefined}
-                     onDelete={isMe ? () => { handleDeleteMessage(modalMsg.id); setReactingModalMessageId(null); } : undefined}
-                     onClose={() => setReactingModalMessageId(null)}
-                  />
-               );
-            })()}
-         </AnimatePresence>
+                   <ReactionModal
+                      isMe={isMe}
+                      onReact={(emoji) => { handleReact(modalMsg.id, emoji); setReactingModalMessageId(null); }}
+                      currentReaction={user?.id ? modalMsg.reactions?.[user.id] : undefined}
+                      onCopy={() => { copyToClipboard(content); setReactingModalMessageId(null); }}
+                      onEdit={isMe && !modalMsg.voice_url && !modalMsg.image_url ? () => { setEditingMessageId(modalMsg.id); setEditText(content); setReactingModalMessageId(null); } : undefined}
+                      onDelete={isMe ? () => { handleDeleteMessage(modalMsg.id); setReactingModalMessageId(null); } : undefined}
+                      onInfo={isMe ? () => { setInfoMsg(modalMsg); setReactingModalMessageId(null); } : undefined}
+                      onClose={() => setReactingModalMessageId(null)}
+                   />
+                );
+             })()}
+          </AnimatePresence>
+
+          {/* Message Info */}
+          <MessageInfoModal
+             open={!!infoMsg}
+             onClose={() => setInfoMsg(null)}
+             createdAt={infoMsg?.created_at || new Date().toISOString()}
+             kindLabel={
+                infoMsg?.voice_url ? "🎤 Voice note"
+                : infoMsg?.image_url ? "📷 Image"
+                : infoMsg
+                   ? (getDecryptedContent(infoMsg) || "Message").slice(0, 60)
+                   : "Message"
+             }
+             peerReceipts={peerReceipts}
+             resolveName={(uid) => getUserName(uid)}
+          />
 
          {/* Dismiss Zone overlay at the bottom center */}
          <AnimatePresence>

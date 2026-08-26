@@ -125,7 +125,16 @@ export const NotificationModal = memo(() => {
             markAsRead(n.id);
         }
 
-        if (['CHALLENGE_INVITE', 'CHALLENGE_COMPLETED', 'MARATHON_GAME_COMPLETED', 'BOT_MARATHON_NEW', 'BOT_MARATHON_OVERTAKEN', 'BOT_MARATHON_FINALE'].includes(n.type)) {
+        // WordGrid notifications carry their routing payload as
+        // data: { mode: 'wordgrid', matchId } — the server-side type string
+        // is not part of this repo, so detect by payload (and defensive type prefix).
+        if (n.data?.mode === 'wordgrid' || n.type?.startsWith('WORDGRID')) {
+            const matchId = n.data?.matchId;
+            if (matchId) {
+                window.dispatchEvent(new CustomEvent('open-wordgrid-match', { detail: { matchId } }));
+                setIsNotificationsOpen(false);
+            }
+        } else if (['CHALLENGE_INVITE', 'CHALLENGE_COMPLETED', 'MARATHON_GAME_COMPLETED', 'BOT_MARATHON_NEW', 'BOT_MARATHON_OVERTAKEN', 'BOT_MARATHON_FINALE'].includes(n.type)) {
             if (n.data?.mode === 'wordup_async') {
                 const matchId = n.data?.matchId;
                 if (matchId) {
@@ -133,12 +142,6 @@ export const NotificationModal = memo(() => {
                     setWordupMode('async');
                     setWordUpOpen(true);
                     setPendingAsyncMatchId(matchId);
-                    setIsNotificationsOpen(false);
-                }
-            } else if (n.data?.mode === 'wordgrid') {
-                const matchId = n.data?.matchId;
-                if (matchId) {
-                    window.dispatchEvent(new CustomEvent('open-wordgrid-match', { detail: { matchId } }));
                     setIsNotificationsOpen(false);
                 }
             } else {
@@ -264,12 +267,14 @@ export const NotificationModal = memo(() => {
                     ) : (
                         <div className="space-y-3">
                             {sortedNotifications.map(n => {
-                                const isInteractive = n.type === 'CHALLENGE_INVITE' ||
+                                                const isInteractive = n.type === 'CHALLENGE_INVITE' ||
                                     n.type === 'CHALLENGE_COMPLETED' ||
                                     n.type === 'MARATHON_GAME_COMPLETED' ||
                                     n.type === 'BOT_MARATHON_NEW' ||
                                     n.type === 'BOT_MARATHON_OVERTAKEN' ||
                                     n.type === 'BOT_MARATHON_FINALE' ||
+                                    n.data?.mode === 'wordgrid' ||
+                                    n.type?.startsWith('WORDGRID') ||
                                     n.type === 'ADMIN_BROADCAST' ||
                                     n.type === 'LEADERBOARD_OVERTAKEN' ||
                                     n.type === 'DM_MESSAGE' ||

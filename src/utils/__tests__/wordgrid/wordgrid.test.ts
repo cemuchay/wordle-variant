@@ -160,3 +160,100 @@ describe('WordGrid Scoring', () => {
   });
 });
 
+describe('WordGrid Blank Tiles', () => {
+  // Premium layout reference for 7x7 (getPremiumCellsForGrid):
+  //   TW ×3: corners (0,0) (0,6) (6,0) (6,6)
+  //   DW ×2: diagonals (1,1)(2,2)(4,4)(5,5)(1,5)(2,4)(4,2)(5,1) + center (3,3)
+  //   TL ×3: (2,3) (4,3) (3,2) (3,4)
+  //   DL ×2: remaining cells where (x+y)%4===0 within Manhattan radius 3
+  // Row y=6, x=2..4 is entirely plain (no premiums).
+
+  test('Extraction preserves lowercase blank assignment in the word', () => {
+    // "C_T" where the blank was assigned as A (stored lowercase 'a')
+    const placed: PlacedTile[] = [
+      { x: 3, y: 3, letter: 'C' },
+      { x: 4, y: 3, letter: 'a' }, // blank assigned as A
+      { x: 5, y: 3, letter: 'T' }
+    ];
+    const res = validateBoardPlacement(placed, [], 7);
+    expect(res.isValid).toBe(true);
+    expect(res.wordsFormed![0].word).toBe('CaT');
+  });
+
+  test('Blank scores 0 points (C=3 + blank 0 + T=1 = 4)', () => {
+    const words = [{
+      word: 'CaT',
+      tiles: [
+        { x: 2, y: 6, letter: 'C' },
+        { x: 3, y: 6, letter: 'a' },
+        { x: 4, y: 6, letter: 'T' }
+      ]
+    }];
+    const res = calculateTurnScore(words, 7, []);
+    expect(res.totalScore).toBe(4);
+    expect(res.bingoApplied).toBe(false);
+  });
+
+  test('Word multipliers still apply to words containing blanks (TW ×3)', () => {
+    // "CaT" starting at the TW corner (0,0)
+    const words = [{
+      word: 'CaT',
+      tiles: [
+        { x: 0, y: 0, letter: 'C' }, // TW
+        { x: 1, y: 0, letter: 'a' },
+        { x: 2, y: 0, letter: 'T' }
+      ]
+    }];
+    const res = calculateTurnScore(words, 7, []);
+    // C=3 + blank 0 + T=1 = 4, tripled by TW → 12
+    expect(res.totalScore).toBe(12);
+  });
+
+  test('Letter multiplier under a blank contributes 0 (TL × blank = 0)', () => {
+    // Blank sits on the TL at (4,3); C lands on the DL at (1,3); T on center DW
+    const words = [{
+      word: 'CaT',
+      tiles: [
+        { x: 1, y: 3, letter: 'C' }, // DL → 6
+        { x: 2, y: 3, letter: 'a' }, // TL → 0 × 3 = 0
+        { x: 3, y: 3, letter: 'T' }  // center DW → letter 1
+      ]
+    }];
+    const res = calculateTurnScore(words, 7, []);
+    // Letters: 6 + 0 + 1 = 7, word multiplied ×2 by center DW → 14
+    expect(res.totalScore).toBe(14);
+  });
+
+  test('Committed blanks from earlier turns keep scoring 0 in later cross-words', () => {
+    // Existing board already contains an old blank committed as 'a' (lowercase)
+    const existingBoard: GridCell[] = [
+      { x: 4, y: 3, letter: 'a' }
+    ];
+    // New play crosses through it vertically: T above the old blank → "Ta"
+    const placed: PlacedTile[] = [{ x: 4, y: 2, letter: 'T' }];
+    const res = validateBoardPlacement(placed, existingBoard, 7);
+    expect(res.isValid).toBe(true);
+
+    const scored = calculateTurnScore(res.wordsFormed!, 7, existingBoard, 7);
+    // T=1 on DW (4,2), blank-a=0 on TL (4,3) → letters 1, ×2 word = 2
+    expect(scored.totalScore).toBe(2);
+  });
+
+  test('Bingo counts blank tiles toward the all-tiles bonus', () => {
+    const words = [{
+      word: 'AMaZING', // second A is a blank
+      tiles: [
+        { x: 5, y: 5, letter: 'A' },
+        { x: 6, y: 5, letter: 'M' },
+        { x: 7, y: 5, letter: 'a' },
+        { x: 8, y: 5, letter: 'Z' },
+        { x: 9, y: 5, letter: 'I' },
+        { x: 10, y: 5, letter: 'N' },
+        { x: 11, y: 5, letter: 'G' }
+      ]
+    }];
+    const res = calculateTurnScore(words, 7, []);
+    expect(res.bingoApplied).toBe(true);
+  });
+});
+

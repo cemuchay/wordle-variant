@@ -7,6 +7,7 @@ import { BoardGrid } from './components/BoardGrid';
 import { TileRack } from './components/TileRack';
 import { MoveHistory } from './components/MoveHistory';
 import { WordGridTutorialModal } from './components/WordGridTutorialModal';
+import LetterPickerModal from './components/LetterPickerModal';
 import { useAuth } from '../hooks/useAuth';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabaseClient';
@@ -43,6 +44,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     resetGame,
     moveTileInGrid,
     placeTile,
+    placeBlankAs,
     recallTile,
     recallAllTiles,
     shuffleRack,
@@ -63,6 +65,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
   const lastBotMove = useWordGridStore((s: any) => s.lastBotMove);
 
   const [selectedRackIdx, setSelectedRackIdx] = useState<number | null>(null);
+  const [pickerCell, setPickerCell] = useState<{ x: number; y: number } | null>(null);
   const [showExchangeModal, setShowExchangeModal] = useState(false);
   const [exchangeSelections, setExchangeSelections] = useState<boolean[]>([]);
   const [showTutorial, setShowTutorial] = useState(() => {
@@ -174,6 +177,28 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
       placeTile(x, y, letter);
       setSelectedRackIdx(null);
     }
+  };
+
+  // Empty-cell tap with no (or a blank) tile selected → Scrabble letter picker
+  const handlePickLetterForCell = (x: number, y: number) => {
+    setPickerCell({ x, y });
+  };
+
+  const handlePickerChoose = (chosen: string) => {
+    if (!pickerCell) return;
+    const letter = chosen.toUpperCase();
+    const blankPreSelected = selectedRackIdx !== null && rack[selectedRackIdx] === '_';
+    if (blankPreSelected || !rack.includes(letter)) {
+      const ok = placeBlankAs(pickerCell.x, pickerCell.y, letter);
+      if (!ok) {
+        triggerToast('No blank tile available.', TOAST_DURATION.SHORT);
+        return;
+      }
+    } else {
+      placeTile(pickerCell.x, pickerCell.y, letter);
+    }
+    setPickerCell(null);
+    setSelectedRackIdx(null);
   };
 
   const handleRecallTile = (x: number, y: number) => {
@@ -306,7 +331,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
                   </span>
                   {!splashMove.isSwap && (
                     <span className="text-base font-black tracking-wide text-white truncate drop-shadow-md">
-                      "{splashMove.word}"
+                      "{splashMove.word.toUpperCase()}"
                     </span>
                   )}
                 </div>
@@ -333,7 +358,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
               <div className="flex flex-col">
                 <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300">Bot Played</span>
                 <span className="text-base font-black tracking-wide text-white drop-shadow-md">
-                  {lastBotMove.word}
+                  {lastBotMove.word.toUpperCase()}
                 </span>
               </div>
             </div>
@@ -473,8 +498,10 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
             conflictCoords={conflictCoords}
             lastMove={lastMove}
             colorMap={colorMap}
+            rackLetters={rack}
             onMoveTileInGrid={moveTileInGrid}
             onPlaceTile={handlePlaceTile}
+            onPickLetterForCell={handlePickLetterForCell}
             onRecallTile={handleRecallTile}
           />
         </div>
@@ -492,6 +519,15 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
         </div>
 
       </div>
+
+      {/* Scrabble Letter Picker for empty cells / blanks */}
+      <LetterPickerModal
+         open={!!pickerCell}
+         rack={rack}
+         blankPreSelected={selectedRackIdx !== null && rack[selectedRackIdx] === '_'}
+         onClose={() => setPickerCell(null)}
+         onChoose={handlePickerChoose}
+      />
 
       {/* Exchange Selection Modal */}
       {showExchangeModal && (
