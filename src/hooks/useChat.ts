@@ -14,6 +14,7 @@ import {
 } from "./chatActions";
 import { getOutbox, putOutbox, removeOutbox } from "../utils/outbox";
 import { uploadVoiceAsset, uploadImageAsset, insertMessageWithRetry } from "../utils/messageDelivery";
+import { isReactionRow, markGroupsRead } from "../utils/readReceipts";
 
 export interface Message {
    id: string;
@@ -202,7 +203,6 @@ const defaultCores: ChatGroup[] = [
 export const useChat = (userId: string) => {
    const globalMessages = useAppStore((state) => state.globalMessages);
    const readReceipts = useAppStore((state) => state.readReceipts);
-   const updateReadReceipt = useAppStore((state) => state.updateReadReceipt);
    const failedMessageIds = useAppStore((state) => state.failedMessageIds);
    const addFailedMessageId = useAppStore((state) => state.addFailedMessageId);
    const removeFailedMessageId = useAppStore(
@@ -210,9 +210,6 @@ export const useChat = (userId: string) => {
    );
    const pendingReadReceipts = useAppStore(
       (state) => state.pendingReadReceipts,
-   );
-   const updatePendingReadReceipt = useAppStore(
-      (state) => state.updatePendingReadReceipt,
    );
    const removePendingReadReceipt = useAppStore(
       (state) => state.removePendingReadReceipt,
@@ -459,6 +456,7 @@ export const useChat = (userId: string) => {
       const unreads = activeMessages.filter(
          (m: any) =>
             m.user_id !== userId &&
+            !isReactionRow(m.content) &&
             new Date(m.created_at).getTime() > new Date(lastSeen).getTime(),
       );
       if (unreads.length > 0) {
@@ -477,34 +475,12 @@ export const useChat = (userId: string) => {
       const hasUnread = activeMessages.some(
          (m: any) =>
             m.user_id !== userId &&
+            !isReactionRow(m.content) &&
             new Date(m.created_at).getTime() > new Date(lastSeen).getTime(),
       );
       if (!hasUnread) return;
 
-      const newLastSeen = new Date().toISOString();
-
-      // Optimistically update store
-      updateReadReceipt(activeRoomId, newLastSeen);
-
-      // Perform background database update
-      supabase
-         .from("chat_read_receipts")
-         .upsert(
-            {
-               user_id: userId,
-               group_id: activeRoomId,
-               last_seen_at: newLastSeen,
-            },
-            { onConflict: "user_id,group_id" },
-         )
-         .then(({ error }) => {
-            if (error) {
-               updatePendingReadReceipt(activeRoomId, newLastSeen);
-            } else {
-               removePendingReadReceipt(activeRoomId);
-            }
-         });
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      markGroupsRead(userId, [activeRoomId]);
    }, [userId, activeRoomId, activeMessages, readReceipts]);
 
    // Flush pending read receipts on load or network restore
@@ -1008,30 +984,10 @@ export const useChat = (userId: string) => {
    const deleteMessage = (messageId: string) =>
       deleteMessageAction(messageId, userId);
 
-   // Mark room as read
+   // Mark room as read (hover-based; the active-room effect covers normal flow)
    const markAsRead = async (messageId: string) => {
-      const newLastSeen = new Date().toISOString();
-
-      // Optimistically update store
-      updateReadReceipt(activeRoomId, newLastSeen);
-
-      // Perform background database update
-      supabase
-         .from("chat_read_receipts")
-         .upsert(
-            {
-               user_id: userId,
-               group_id: activeRoomId,
-               last_seen_at: newLastSeen,
-            },
-            { onConflict: "user_id,group_id" },
-         )
-         .then(({ error }) => {
-            if (error) {
-               // Fail silently
-            }
-         });
-
+      const msg = globalMessages.find((m) => m.id === messageId);
+      markGroupsRead(userId, [msg?.group_id || activeRoomId]);
       setFirstUnreadId(null);
       await supabase
          .from("messages")

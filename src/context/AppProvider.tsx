@@ -15,6 +15,7 @@ import { safeLocalStorage } from '../utils/storage';
 import { getAllMessages, saveMessages, addMessage, updateMessage, removeMessage, purgeMessagesOlderThan } from '../utils/indexedDBMessages';
 import { getOutbox, removeOutbox, purgeOldOutbox } from '../utils/outbox';
 import { deliverOutboxEntry } from '../utils/messageDelivery';
+import { isReactionRow } from '../utils/readReceipts';
 import { logger } from '../lib/logger';
 import { TOAST_DURATION } from '../constants/ui';
 import { AppContext, type AppContextType } from './AppContext';
@@ -116,6 +117,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             const joinedSet = new Set(joinedGroupIds);
             const count = globalMessages.filter((m) => {
                 if (m.user_id === user.id) return false;
+                if (isReactionRow(m.content)) return false;
                 if (!joinedSet.has(m.group_id)) return false;
                 if (!hasPlayed && m.group_id === "00000000-0000-0000-0000-000000000002") return false;
                 const lastSeen = readReceipts[m.group_id] || new Date(0).toISOString();
@@ -580,9 +582,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             useAppStore.getState().setJoinedGroupIds(joinedArray);
 
             // 1. Read cached messages from IndexedDB for instant render
+            // (reaction-sync rows are signals, not messages — never ingested)
             let cachedMessages: any[] = [];
             try {
-                cachedMessages = await getAllMessages();
+                cachedMessages = (await getAllMessages()).filter((m: any) => !isReactionRow(m.content));
                 if (cachedMessages.length > 0) {
                     cachedMessages.sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
                     useAppStore.getState().setGlobalMessages(cachedMessages);
@@ -604,10 +607,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     .order('created_at', { ascending: true });
 
                 if (!error && data && data.length > 0) {
-                    data.forEach(msg => {
+                    const fresh = data.filter((m: any) => !isReactionRow(m.content));
+                    fresh.forEach(msg => {
                         useAppStore.getState().addGlobalMessage(msg);
                     });
-                    saveMessages(data).catch(e => console.warn('Failed to cache delta messages:', e));
+                    if (fresh.length > 0) {
+                        saveMessages(fresh).catch(e => console.warn('Failed to cache delta messages:', e));
+                    }
                 }
             } else {
                 // No cache — fetch full 300
@@ -618,7 +624,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     .limit(LIMITS.MESSAGES);
 
                 if (data) {
-                    const chronData = data.reverse();
+                    const chronData = data.reverse().filter((m: any) => !isReactionRow(m.content));
                     useAppStore.getState().setGlobalMessages(chronData);
                     saveMessages(chronData).catch(e => console.warn('Failed to cache messages:', e));
                 }

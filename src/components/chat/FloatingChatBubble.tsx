@@ -24,6 +24,7 @@ import { Z_INDEX } from "../../constants/ui";
 import { putOutbox, removeOutbox, type OutboxEntry } from "../../utils/outbox";
 import { uploadVoiceAsset, uploadImageAsset, insertMessageWithRetry } from "../../utils/messageDelivery";
 import { VoiceRecorder } from "../../utils/voiceRecorder";
+import { isReactionRow, markGroupsRead } from "../../utils/readReceipts";
 
 const CLOSE_DELAY = 10000;
 
@@ -344,18 +345,7 @@ export default function FloatingChatBubble() {
 
    const markGroupAsRead = (groupId: string) => {
       if (!user?.id) return;
-      const timestamp = new Date().toISOString();
-      updateReadReceipt(groupId, timestamp);
-      supabase.from("chat_read_receipts").upsert(
-         {
-            user_id: user.id,
-            group_id: groupId,
-            last_seen_at: timestamp,
-         },
-         { onConflict: "user_id,group_id" }
-      ).then(({ error }) => {
-         if (error) console.error("Failed to mark as read:", error);
-      });
+      markGroupsRead(user.id, [groupId]);
    };
 
    const queueAndDeliver = async (entry: OutboxEntry, deliver: () => Promise<void>) => {
@@ -495,7 +485,6 @@ export default function FloatingChatBubble() {
    const globalMessages = useAppStore((s) => s.globalMessages);
    const readReceipts = useAppStore((s) => s.readReceipts);
    const joinedGroupIds = useAppStore((s) => s.joinedGroupIds);
-   const updateReadReceipt = useAppStore((s) => s.updateReadReceipt);
    const { user } = useAuth();
 
    // Profiles cache for reactor names
@@ -647,6 +636,9 @@ export default function FloatingChatBubble() {
          });
    }, [user?.id]);
 
+   // Mark only conversations actually visited inside the bubble when it closes
+   const visitedGroupsRef = useRef<Set<string>>(new Set());
+
    // Mark all unread messages as read when the bubble overlay closes
    useEffect(() => {
       if (isOverlayOpen || !user?.id) {
@@ -659,34 +651,12 @@ export default function FloatingChatBubble() {
       }
       prevOverlayOpenRef.current = false;
 
-      const state = useAppStore.getState();
-      const receipts = state.readReceipts;
-      const joined = new Set(state.joinedGroupIds);
-      const timestamp = new Date().toISOString();
-      const marked = new Set<string>();
-
-      state.globalMessages.forEach((m: any) => {
-         if (m.user_id === user.id) return;
-         if (!joined.has(m.group_id)) return;
-         if (!hasPlayedToday && m.group_id === "00000000-0000-0000-0000-000000000002") return;
-         const lastSeen = receipts[m.group_id] || new Date(0).toISOString();
-         if (new Date(m.created_at).getTime() > new Date(lastSeen).getTime()) {
-            if (!marked.has(m.group_id)) {
-               marked.add(m.group_id);
-               updateReadReceipt(m.group_id, timestamp);
-               supabase
-                  .from("chat_read_receipts")
-                  .upsert(
-                     { user_id: user.id, group_id: m.group_id, last_seen_at: timestamp },
-                     { onConflict: "user_id,group_id" }
-                  )
-                  .then(({ error }) => {
-                     if (error) console.error("Failed to mark as read:", error);
-                  });
-            }
-         }
-      });
-   }, [isOverlayOpen, user?.id, hasPlayedToday, updateReadReceipt]);
+      const visited = Array.from(visitedGroupsRef.current);
+      visitedGroupsRef.current.clear();
+      if (visited.length > 0) {
+         markGroupsRead(user.id, visited);
+      }
+   }, [isOverlayOpen, user?.id]);
 
    // Auto-scroll detailed message view to bottom
    useEffect(() => {
@@ -727,6 +697,7 @@ export default function FloatingChatBubble() {
       groups.forEach(g => groupMap.set(g.id, { group: g, lastMessage: null, unreadCount: 0 }));
       globalMessages.forEach((m: any) => {
          if (!user?.id) return;
+         if (isReactionRow(m.content)) return;
          if (!joinedSet.has(m.group_id)) return;
          if (!hasPlayedToday && m.group_id === "00000000-0000-0000-0000-000000000002") return;
          const entry = groupMap.get(m.group_id);
@@ -737,7 +708,6 @@ export default function FloatingChatBubble() {
                entry.unreadCount++;
             }
          }
-         if (m.content?.startsWith("[reaction:")) return;
          if (!entry.lastMessage || new Date(m.created_at) > new Date(entry.lastMessage.created_at)) {
             entry.lastMessage = m;
          }
@@ -986,7 +956,9 @@ export default function FloatingChatBubble() {
    const handleBubbleClick = () => {
       if (isDragging) return;
       if (unreadMessages.length > 0) {
-         setSelectedGroupId(unreadMessages[unreadMessages.length - 1].group_id);
+         const autoOpenGroupId = unreadMessages[unreadMessages.length - 1].group_id;
+         visitedGroupsRef.current.add(autoOpenGroupId);
+         setSelectedGroupId(autoOpenGroupId);
       } else {
          setSelectedGroupId(null);
       }
@@ -1058,17 +1030,7 @@ export default function FloatingChatBubble() {
    // Mark a message as read (hover-based)
    const handleMarkAsRead = (messageId: string) => {
       if (!user?.id || !selectedGroupId) return;
-      const timestamp = new Date().toISOString();
-      updateReadReceipt(selectedGroupId, timestamp);
-      supabase
-         .from("chat_read_receipts")
-         .upsert(
-            { user_id: user.id, group_id: selectedGroupId, last_seen_at: timestamp },
-            { onConflict: "user_id,group_id" },
-         )
-         .then(({ error }) => {
-            if (error) console.error("Failed to mark as read:", error);
-         });
+      markGroupsRead(user.id, [selectedGroupId]);
       supabase
          .from("messages")
          .update({ is_read: true })
@@ -1291,7 +1253,7 @@ export default function FloatingChatBubble() {
                                     return (
                                        <button
                                           key={group.id}
-                                          onClick={() => { setSelectedGroupId(group.id); }}
+                                           onClick={() => { visitedGroupsRef.current.add(group.id); setSelectedGroupId(group.id); }}
                                           className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer text-left border border-transparent hover:border-white/5"
                                        >
                                           {isDM ? (

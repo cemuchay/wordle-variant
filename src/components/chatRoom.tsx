@@ -17,6 +17,7 @@ import formatUsername from '../utils/formatUsername';
 import MessageInput from "./chat/MessageInput";
 import formatLastSeen from "../utils/formatLastSeen";
 import { ProtectedAvatar } from "./chat/ProtectedAvatar";
+import { isReactionRow } from "../utils/readReceipts";
 
 const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) => {
     const { setIsChallengeOpen, allProfiles, isDynamicIslandVisible, } = useApp();
@@ -312,6 +313,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     const lastMessages = useMemo(() => {
         const map: Record<string, any> = {};
         globalMessages.forEach((m) => {
+            if (isReactionRow(m.content)) return;
             const existing = map[m.group_id];
             if (!existing || new Date(m.created_at) > new Date(existing.created_at)) {
                 map[m.group_id] = m;
@@ -324,6 +326,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         const counts: Record<string, number> = {};
         globalMessages.forEach((m) => {
             if (m.user_id !== user?.id) {
+                if (isReactionRow(m.content)) return;
                 // Game Analysis is locked if user hasn't played today
                 if (m.group_id === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday) return;
 
