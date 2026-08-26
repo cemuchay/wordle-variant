@@ -23,6 +23,7 @@ import { safeLocalStorage } from "../../utils/storage";
 import { Z_INDEX } from "../../constants/ui";
 import { putOutbox, removeOutbox, type OutboxEntry } from "../../utils/outbox";
 import { uploadVoiceAsset, uploadImageAsset, insertMessageWithRetry } from "../../utils/messageDelivery";
+import { VoiceRecorder } from "../../utils/voiceRecorder";
 
 const CLOSE_DELAY = 10000;
 
@@ -156,7 +157,7 @@ export default function FloatingChatBubble() {
    const [isRecording, setIsRecording] = useState(false);
    const [recordingTime, setRecordingTime] = useState(0);
    const timerRef = useRef<number | null>(null);
-   const wavRecorderRef = useRef<any>(null);
+   const wavRecorderRef = useRef<VoiceRecorder | null>(null);
 
    // Reaction states
    const [reactingMessageId, setReactingMessageId] = useState<string | null>(null);
@@ -249,9 +250,10 @@ export default function FloatingChatBubble() {
 
    const startRecording = async () => {
       try {
-         const { WAVRecorder } = await import("../chat/MessageInput");
-         const recorder = new WAVRecorder();
-         await recorder.start();
+         const recorder = new VoiceRecorder();
+         await recorder.start({
+            onMaxDuration: () => { void stopRecording(); },
+         });
          wavRecorderRef.current = recorder;
 
          setIsRecording(true);
@@ -284,7 +286,7 @@ export default function FloatingChatBubble() {
 
    const cancelRecording = () => {
       if (!wavRecorderRef.current) return;
-      wavRecorderRef.current.stop();
+      wavRecorderRef.current.cancel();
       wavRecorderRef.current = null;
       setIsRecording(false);
       if (timerRef.current) {
