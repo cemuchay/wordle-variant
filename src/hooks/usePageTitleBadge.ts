@@ -12,9 +12,21 @@ export const usePageTitleBadge = (wordupUnreadCount: number) => {
     const challengeUnread = useAppStore(s => s.challengeUnreadCount);
 
     useEffect(() => {
-        const total = chatUnread + notificationUnread + challengeUnread + wordupUnreadCount;
-        document.title = total > 0
-            ? `(${total > 99 ? '99+' : total}) ${BASE_TITLE}`
-            : BASE_TITLE;
+        const otherUnread = notificationUnread + challengeUnread + wordupUnreadCount;
+        const parts: string[] = [];
+
+        if (chatUnread > 0) {
+            parts.push(`💬 ${chatUnread > 99 ? '99+' : chatUnread}`);
+        }
+
+        if (otherUnread > 0) {
+            parts.push(`🔔 ${otherUnread > 99 ? '99+' : otherUnread}`);
+        }
+
+        if (parts.length > 0) {
+            document.title = `(${parts.join(' | ')}) ${BASE_TITLE}`;
+        } else {
+            document.title = BASE_TITLE;
+        }
     }, [chatUnread, notificationUnread, challengeUnread, wordupUnreadCount]);
 };

@@ -732,6 +732,16 @@ export default function FloatingChatBubble() {
       isOverlayOpen && !!selectedGroupId && !isChatOpen,
       profile?.username || null,
    );
+
+   // Pause/clear inactivity timer while other users are typing
+   useEffect(() => {
+      if (typingNames.length > 0) {
+         clearInactivityTimer();
+      } else if (isOverlayOpen) {
+         resetInactivityTimer();
+      }
+   }, [typingNames.length, isOverlayOpen]);
+
    const peerReceipts = usePeerReceipts(selectedGroupId, user?.id, isOverlayOpen && !!selectedGroupId);
    const [infoMsg, setInfoMsg] = useState<any>(null);
 
@@ -754,7 +764,7 @@ export default function FloatingChatBubble() {
       }
    }, [isOverlayOpen, user?.id]);
 
-   // Auto-scroll detailed message view to bottom on initial group open or when new messages arrive
+   // Auto-scroll detailed message view to bottom on initial group open or when new messages arrive / are sent
    const prevGroupIdRef = useRef<string | null>(null);
    const prevMessagesLengthRef = useRef<number>(0);
 
@@ -775,8 +785,10 @@ export default function FloatingChatBubble() {
       if (scrollRef.current) {
          const el = scrollRef.current;
          const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 150;
+         const latestMsg = roomMessages[roomMessages.length - 1];
+         const isMyNewMessage = isNewMessageAdded && latestMsg && latestMsg.user_id === user?.id;
 
-         if (isGroupChange || (isNewMessageAdded && isNearBottom)) {
+         if (isGroupChange || isMyNewMessage || (isNewMessageAdded && isNearBottom)) {
             // Use double-rAF to ensure DOM and layout changes have completely painted
             requestAnimationFrame(() => {
                requestAnimationFrame(() => {
@@ -789,7 +801,7 @@ export default function FloatingChatBubble() {
             });
          }
       }
-   }, [selectedGroupId, globalMessages]);
+   }, [selectedGroupId, globalMessages, user?.id]);
 
    // Re-show bubble on new unread after dismissal
    if (unreadCount !== prevUnreadCount) {
