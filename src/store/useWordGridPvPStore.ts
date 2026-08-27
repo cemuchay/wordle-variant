@@ -234,7 +234,7 @@ interface WordGridPvPState {
    cancelQueue: (userId: string) => Promise<void>;
    startDirectChallenge: (
       userId: string,
-      opponentId: string,
+      opponentIds: string | string[],
       gridSize: number,
       triggerToast: (msg: string, duration?: number) => void,
    ) => Promise<void>;
@@ -510,7 +510,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => {
             .select(
                `*, player1:player1_id(id, username, avatar_url), player2:player2_id(id, username, avatar_url)`,
             )
-            .or(`player1_id.eq.${userId},player2_id.eq.${userId}`)
+            .or(`player1_id.eq.${userId},player2_id.eq.${userId},players_data.cs.[{"id":"${userId}"}]`)
             .eq("is_bot_match", false)
             .order("created_at", { ascending: false });
          if (error) throw error;
@@ -883,32 +883,59 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => {
       set({ loading: false, view: "lobby" });
    },
 
-   startDirectChallenge: async (userId, opponentId, gridSize, triggerToast) => {
+   startDirectChallenge: async (userId, opponentIds, gridSize, triggerToast) => {
       set({ loading: true });
       try {
          const matchId = generateUUID();
-         const initialBag = generateInitialTileBag();
-         const { rack: p1Rack, newBag: bag1 } = await drawBalancedRack(
-            initialBag,
-            [],
-            7,
-            true,
-         );
-         const { rack: p2Rack, newBag: finalBag } = await drawBalancedRack(
-            bag1,
-            [],
-            7,
-            true,
-         );
+         let currentBag = generateInitialTileBag();
+         const oppList = Array.isArray(opponentIds) ? opponentIds : [opponentIds];
+         const primaryOpponentId = oppList[0];
+         const allPlayerIds = [userId, ...oppList];
+
+         // Query profiles for all participants to get accurate avatars & usernames
+         const { data: profilesData } = await supabase
+            .from("profiles")
+            .select("id, username, avatar_url")
+            .in("id", allPlayerIds);
+
+         const profilesMap: Record<string, { username: string; avatar_url: string | null }> = {};
+         (profilesData || []).forEach((p) => {
+            profilesMap[p.id] = { username: p.username, avatar_url: p.avatar_url };
+         });
+
+         // Draw racks for all players
+         const playersData: WordGridPlayer[] = [];
+         for (const pId of allPlayerIds) {
+            const { rack: pRack, newBag } = await drawBalancedRack(
+               currentBag,
+               [],
+               7,
+               true,
+            );
+            currentBag = newBag;
+            const prof = profilesMap[pId];
+            playersData.push({
+               id: pId,
+               username: prof?.username || resolveCachedUsername(pId) || (pId === userId ? "You" : "Player"),
+               avatar_url: prof?.avatar_url || undefined,
+               score: 0,
+               rack: pRack,
+            });
+         }
+
+         const p1Rack = playersData[0]?.rack || [];
+         const p2Rack = playersData[1]?.rack || [];
 
          const payload = {
             id: matchId,
             player1_id: userId,
-            player2_id: opponentId,
+            player2_id: primaryOpponentId,
             status: "active",
             grid_size: gridSize,
+            max_players: allPlayerIds.length,
+            players_data: playersData,
             board: [],
-            tile_bag: finalBag,
+            tile_bag: currentBag,
             p1_rack: p1Rack,
             p2_rack: p2Rack,
             p1_score: 0,
@@ -921,25 +948,33 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => {
          const { data, error } = await supabase
             .from("wordgrid_matches")
             .insert(payload)
-            .select(`*, player1:player1_id(id, username, avatar_url)`)
+            .select(`*, player1:player1_id(id, username, avatar_url), player2:player2_id(id, username, avatar_url)`)
             .single();
          if (error) throw error;
 
          get().updateFromMatchRecord(data, userId);
 
-         // Send challenge notification to opponent via clientPush
+         // Send challenge notifications to all opponents via clientPush
          const challengerName =
+            profilesMap[userId]?.username ||
             (data as any)?.player1?.username ||
             resolveCachedUsername(userId) ||
             "A player";
-         sendWordGridChallengeNotification(
-            opponentId,
-            formatUsername(challengerName) || "A player",
-            gridSize,
-            matchId,
-         );
 
-         triggerToast("Direct challenge started!");
+         for (const oppId of oppList) {
+            sendWordGridChallengeNotification(
+               oppId,
+               formatUsername(challengerName) || "A player",
+               gridSize,
+               matchId,
+            );
+         }
+
+         triggerToast(
+            oppList.length > 1
+               ? `Direct challenge started with ${oppList.length} opponents!`
+               : "Direct challenge started!"
+         );
       } catch (e: any) {
          console.error("[WordGridPvP] Direct challenge error:", e);
          set({ error: e.message });

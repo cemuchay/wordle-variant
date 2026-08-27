@@ -25,6 +25,7 @@ import { putOutbox, removeOutbox, type OutboxEntry } from "../../utils/outbox";
 import { uploadVoiceAsset, uploadImageAsset, insertMessageWithRetry } from "../../utils/messageDelivery";
 import { VoiceRecorder } from "../../utils/voiceRecorder";
 import { isReactionRow, markGroupsRead, resolveTickState } from "../../utils/readReceipts";
+import formatLastSeen from "../../utils/formatLastSeen";
 import TypingBubble from "./TypingBubble";
 import { useTypingPresence } from "../../hooks/useTypingPresence";
 import { usePeerReceipts } from "../../hooks/usePeerReceipts";
@@ -79,7 +80,7 @@ const clampToBounds = (pos: { x: number; y: number }) => {
 };
 
 export default function FloatingChatBubble() {
-   const { unreadCount, isChatOpen, date, profile } = useApp();
+   const { unreadCount, isChatOpen, date, profile, onlineUsers, allProfiles } = useApp();
    const [dismissed, setDismissed] = useState(false);
    const [conversationSearchQuery, setConversationSearchQuery] = useState("");
    const [isDragging, setIsDragging] = useState(false);
@@ -647,7 +648,7 @@ export default function FloatingChatBubble() {
                if (cg.type === "dm") {
                   const { data: partner } = await supabase
                      .from("chat_group_members")
-                     .select("user_id, profiles(username, avatar_url)")
+                     .select("user_id, profiles(username, avatar_url, last_seen_at)")
                      .eq("group_id", cg.id)
                      .neq("user_id", user.id)
                      .maybeSingle();
@@ -658,6 +659,7 @@ export default function FloatingChatBubble() {
                         id: partner.user_id,
                         username: p.username,
                         avatar_url: p.avatar_url,
+                        last_seen_at: p.last_seen_at,
                      };
                      groupName = p.username;
                   }
@@ -1068,8 +1070,18 @@ export default function FloatingChatBubble() {
    // Handle reply
    const handleReply = (msg: any) => {
       setReplyingToMsg(msg);
-      // Focus the input
-      if (replyInputRef.current) replyInputRef.current.focus();
+      // Reliably focus textarea and trigger mobile virtual keyboard
+      requestAnimationFrame(() => {
+         setTimeout(() => {
+            if (replyInputRef.current) {
+               replyInputRef.current.focus();
+               const len = replyInputRef.current.value.length;
+               replyInputRef.current.setSelectionRange(len, len);
+               // Trigger input click/touch to prompt mobile software keyboard
+               replyInputRef.current.click();
+            }
+         }, 30);
+      });
    };
 
    // Handle swipe to reply
@@ -1395,9 +1407,47 @@ export default function FloatingChatBubble() {
                                  <ArrowLeft className="w-4 h-4" />
                               </button>
                            )}
-                           <span className="text-xs font-black uppercase tracking-wider text-gray-200 py-3">
-                              {selectedGroupId ? selectedGroupName : "Conversations"}
-                           </span>
+                           <div className="flex flex-col min-w-0">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                 <span className="text-xs font-black uppercase tracking-wider text-gray-200 truncate">
+                                    {selectedGroupId ? selectedGroupName : "Conversations"}
+                                 </span>
+                                 {(() => {
+                                    if (!selectedGroupId) return null;
+                                    const activeGroup = groups.find(g => g.id === selectedGroupId);
+                                    if (activeGroup?.type !== "dm" || !activeGroup.dm_partner) return null;
+                                    const dmPartnerId = activeGroup.dm_partner.id;
+                                    const isUserOnline = onlineUsers.some((u: any) => u.id === dmPartnerId);
+                                    return (
+                                       <span
+                                          className={`w-2 h-2 rounded-full shrink-0 ${isUserOnline ? "bg-emerald-500 ring-2 ring-emerald-400/40" : "bg-gray-500"}`}
+                                          title={isUserOnline ? "Online" : "Offline"}
+                                       />
+                                    );
+                                 })()}
+                              </div>
+                              {(() => {
+                                 if (!selectedGroupId) return null;
+                                 const activeGroup = groups.find(g => g.id === selectedGroupId);
+                                 if (activeGroup?.type !== "dm" || !activeGroup.dm_partner) return null;
+                                 const dmPartnerId = activeGroup.dm_partner.id;
+                                 const isUserOnline = onlineUsers.some((u: any) => u.id === dmPartnerId);
+                                 const userProfile = allProfiles.find((p: any) => p.id === dmPartnerId);
+                                 const userLastSeenAt = userProfile?.last_seen_at || activeGroup.dm_partner.last_seen_at;
+
+                                 return (
+                                    <span className="text-[10px] text-gray-400 truncate leading-none mt-0.5">
+                                       {isUserOnline ? (
+                                          <span className="text-emerald-400 font-semibold">Online</span>
+                                       ) : userLastSeenAt ? (
+                                          `Last seen ${formatLastSeen(userLastSeenAt)}`
+                                       ) : (
+                                          "Offline"
+                                       )}
+                                    </span>
+                                 );
+                              })()}
+                           </div>
                         </div>
                         <div className="flex items-center gap-1.5">
                            {selectedGroupId && (
@@ -1449,6 +1499,11 @@ export default function FloatingChatBubble() {
                                     const name = group?.name || CORE_GROUPS[group.id] || "Room";
                                     const isCore = CORE_GROUPS[group.id] !== undefined;
                                     const isDM = group?.type === "dm" && !!group?.dm_partner?.avatar_url;
+                                    const dmUserId = isDM ? group.dm_partner?.id : null;
+                                    const isUserOnline = dmUserId ? onlineUsers.some((u: any) => u.id === dmUserId) : false;
+                                    const userProfile = dmUserId ? allProfiles.find((p: any) => p.id === dmUserId) : null;
+                                    const userLastSeenAt = userProfile?.last_seen_at || group?.dm_partner?.last_seen_at;
+
                                     return (
                                        <button
                                           key={group.id}
@@ -1456,12 +1511,17 @@ export default function FloatingChatBubble() {
                                           className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer text-left border border-transparent hover:border-white/5"
                                        >
                                           {isDM ? (
-                                             <ProtectedAvatar
-                                                userId={group.dm_partner!.id}
-                                                src={group.dm_partner!.avatar_url}
-                                                username={name}
-                                                className="w-10 h-10 rounded-full border border-white/10 bg-slate-900 shrink-0"
-                                             />
+                                             <div className="relative shrink-0">
+                                                <ProtectedAvatar
+                                                   userId={group.dm_partner!.id}
+                                                   src={group.dm_partner!.avatar_url}
+                                                   username={name}
+                                                   className="w-10 h-10 rounded-full border border-white/10 bg-slate-900 shrink-0"
+                                                />
+                                                {isUserOnline && (
+                                                   <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-slate-950 rounded-full ring-1 ring-emerald-400/40" />
+                                                )}
+                                             </div>
                                           ) : isCore ? (
                                              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-correct text-black font-black shrink-0 text-sm">
                                                 #
@@ -1472,10 +1532,21 @@ export default function FloatingChatBubble() {
                                              </div>
                                           )}
                                           <div className="min-w-0 flex-1">
-                                             <div className="flex items-center justify-between">
-                                                <span className="text-xs font-black uppercase text-indigo-400 tracking-wide truncate">
-                                                   {name}
-                                                </span>
+                                             <div className="flex items-center justify-between gap-1">
+                                                <div className="flex items-center gap-1.5 min-w-0 truncate">
+                                                   <span className="text-xs font-black uppercase text-indigo-400 tracking-wide truncate">
+                                                      {name}
+                                                   </span>
+                                                   {isDM && (
+                                                      <span className="text-[10px] text-gray-400 shrink-0">
+                                                         {isUserOnline ? (
+                                                            <span className="text-emerald-400 font-semibold">• Online</span>
+                                                         ) : userLastSeenAt ? (
+                                                            `• ${formatLastSeen(userLastSeenAt)}`
+                                                         ) : null}
+                                                      </span>
+                                                   )}
+                                                </div>
                                                 {unreadCount > 0 && (
                                                    <span className="bg-rose-500/25 border border-rose-500/20 text-rose-300 text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0">
                                                       {unreadCount} unread
@@ -1676,37 +1747,37 @@ export default function FloatingChatBubble() {
                                                              </div>
                                                           );
                                                       })()}
-                                                      {msg.voice_url ? (
-                                                         <ConnectedAudioPlayer
-                                                            url={msg.voice_url}
-                                                            messageId={msg.id}
-                                                            allMessageIds={activeRoomMessages.map((m: any) => m.id)}
-                                                            allMessages={activeRoomMessages}
-                                                            userId={user?.id || ""}
-                                                         />
-                                                      ) : msg.image_url ? (
-                                                         <ChatImage url={msg.image_url} />
-                                                      ) : (
-                                                         <motion.div
-                                                            drag={!msg.is_deleted && !isEditing ? "x" : false}
-                                                            dragDirectionLock
-                                                            dragConstraints={{ left: 0, right: 0 }}
-                                                            dragSnapToOrigin
-                                                            dragElastic={{ left: 0, right: 0.6 }}
-                                                            onDragEnd={(_, info) => {
-                                                               if (info.offset.x > 50) {
-                                                                  handleSwipeToReply(msg);
-                                                               }
-                                                            }}
-                                                         >
-                                                             <p className={`text-xs text-left mt-1 leading-relaxed whitespace-pre-wrap break-words px-3 py-2 rounded-2xl ${isMe ? 'bg-indigo-600 border border-indigo-500 text-white' : 'bg-white/5 border border-white/5 text-gray-200'}`}>
+                                                      <motion.div
+                                                         drag={!msg.is_deleted && !isEditing ? "x" : false}
+                                                         dragDirectionLock
+                                                         dragConstraints={{ left: 0, right: 0 }}
+                                                         dragSnapToOrigin
+                                                         dragElastic={{ left: 0, right: 0.6 }}
+                                                         onDragEnd={(_, info) => {
+                                                            if (info.offset.x > 50) {
+                                                               handleSwipeToReply(msg);
+                                                            }
+                                                         }}
+                                                      >
+                                                         {msg.voice_url ? (
+                                                            <ConnectedAudioPlayer
+                                                               url={msg.voice_url}
+                                                               messageId={msg.id}
+                                                               allMessageIds={activeRoomMessages.map((m: any) => m.id)}
+                                                               allMessages={activeRoomMessages}
+                                                               userId={user?.id || ""}
+                                                            />
+                                                         ) : msg.image_url ? (
+                                                            <ChatImage url={msg.image_url} />
+                                                         ) : (
+                                                            <p className={`text-xs text-left mt-1 leading-relaxed whitespace-pre-wrap break-words px-3 py-2 rounded-2xl ${isMe ? 'bg-indigo-600 border border-indigo-500 text-white' : 'bg-white/5 border border-white/5 text-gray-200'}`}>
                                                                {getDecryptedContent(msg)}
                                                                {msg.is_edited && (
                                                                   <span className="text-[8px] text-gray-500 ml-1">(edited)</span>
                                                                )}
                                                             </p>
-                                                         </motion.div>
-                                                      )}
+                                                         )}
+                                                      </motion.div>
 
                                                       {/* Action buttons (Reply, React, Edit, Delete) */}
                                                       {!msg.is_deleted && !isEditing && msg.status !== "failed" && (
