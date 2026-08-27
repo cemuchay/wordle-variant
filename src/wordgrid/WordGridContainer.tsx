@@ -12,6 +12,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabaseClient';
 import { useTheme } from '../hooks/useTheme';
+import { ProtectedAvatar } from '../components/chat/ProtectedAvatar';
 import { TOAST_DURATION } from '../constants/ui';
 import { buildPlayerColorMap } from '../utils/wordgrid/playerColors';
 import formatUsername from '../utils/formatUsername';
@@ -417,12 +418,27 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
                   const isYou = p.id === userId;
                   const isCurrent = currentTurn === p.id && status === 'active';
                   const scheme = colorMap[p.id];
+                  const avatarUrl = p.avatar_url || profileLookup[p.id]?.avatar_url;
+                  const displayName = isYou ? 'You' : (p.username || profileLookup[p.id]?.username || 'Player');
+
                   return (
                     <div key={p.id} className="flex items-center gap-1.5 text-[10px] font-black">
                       {i > 0 && <span className="text-slate-700 font-bold">•</span>}
-                      <span className={`${isCurrent ? `${scheme?.name || 'text-slate-400'} font-extrabold` : scheme?.name || 'text-slate-400'}`}>
-                        {isYou ? 'You' : p.username}:
-                      </span>
+                      <div className="flex items-center gap-1">
+                        {p.id !== 'bot' && !p.id.startsWith('bot') ? (
+                          <ProtectedAvatar
+                            userId={p.id}
+                            src={avatarUrl || undefined}
+                            username={displayName}
+                            className={`w-5 h-5 rounded-full border ${isCurrent ? 'ring-2 ring-indigo-400 border-indigo-300' : 'border-slate-700'}`}
+                          />
+                        ) : (
+                          <span className="text-xs">🤖</span>
+                        )}
+                        <span className={`${isCurrent ? `${scheme?.name || 'text-slate-400'} font-extrabold` : scheme?.name || 'text-slate-400'}`}>
+                          {displayName}:
+                        </span>
+                      </div>
                       <span className={`text-xs font-black ${isCurrent ? 'text-white' : 'text-slate-200'}`}>{p.score}</span>
                     </div>
                   );

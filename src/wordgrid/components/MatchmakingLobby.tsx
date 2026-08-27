@@ -6,11 +6,12 @@ import { useApp } from '../../context/AppContext';
 import { ProtectedAvatar } from '../../components/chat/ProtectedAvatar';
 import { supabase } from '../../lib/supabaseClient';
 import { ALLOWED_GRID_SIZES, RECOMMENDED_MAX_PLAYERS } from '../../utils/wordgrid/constants';
+import type { WordGridPlayer } from '../../utils/wordgrid/constants';
 import { getLastActivityAt } from '../../utils/wordgrid/staleMatches';
 import formatLastSeen from '../../utils/formatLastSeen';
 import { useTheme } from '@/hooks/useTheme';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Users, Bot, Check, Search, Sparkles } from 'lucide-react';
 import { TOAST_DURATION } from '../../constants/ui';
 
 interface PlayerProfile {
@@ -27,6 +28,8 @@ interface WordGridMatchRecord {
   bot_difficulty?: string;
   player1?: PlayerProfile;
   player2?: PlayerProfile;
+  players_data?: WordGridPlayer[];
+  max_players?: number;
   p1_score: number;
   p2_score: number;
   status: string;
@@ -65,10 +68,42 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
   const [matchToDelete, setMatchToDelete] = useState<{ id: string; name: string } | null>(null);
 
   const maxPlayersAllowed = RECOMMENDED_MAX_PLAYERS[selectedGridSize] || 2;
-  const [selectedPlayers, setSelectedPlayers] = useState<number>(2);
+  const targetPlayers = maxPlayersAllowed;
 
-  // Derived target players capped by max players allowed
-  const targetPlayers = Math.min(selectedPlayers, maxPlayersAllowed);
+  const [gameMode, setGameMode] = useState<'bot' | 'human'>('human');
+  const [selectedOpponents, setSelectedOpponents] = useState<string[]>([]);
+  const maxOpponentsAllowed = maxPlayersAllowed - 1; // e.g., if 3 players max, can select up to 2 opponents
+
+  // Auto-adjust selected opponents if grid size changes
+  useEffect(() => {
+    setSelectedOpponents((prev) => prev.slice(0, maxOpponentsAllowed));
+  }, [maxOpponentsAllowed]);
+
+  const toggleOpponentSelection = (oppId: string) => {
+    setSelectedOpponents((prev) => {
+      if (prev.includes(oppId)) {
+        return prev.filter((id) => id !== oppId);
+      }
+      if (prev.length >= maxOpponentsAllowed) {
+        // If max is 1 (e.g. 2-player match), replace the single selection
+        if (maxOpponentsAllowed === 1) {
+          return [oppId];
+        }
+        triggerToast(`You can select up to ${maxOpponentsAllowed} opponent${maxOpponentsAllowed > 1 ? 's' : ''} for a ${selectedGridSize}×${selectedGridSize} board.`);
+        return prev;
+      }
+      return [...prev, oppId];
+    });
+  };
+
+  const handleStartHumanMatch = () => {
+    if (selectedOpponents.length === 0) {
+      triggerToast('Please select at least 1 opponent to start.');
+      return;
+    }
+    // Launch challenge for all selected opponents
+    handleChallengePlayer(selectedOpponents);
+  };
 
   useEffect(() => {
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
@@ -117,9 +152,9 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
     startBotMatch(userId, difficulty, selectedGridSize, triggerToast);
   };
 
-  const handleChallengePlayer = (oppId: string) => {
+  const handleChallengePlayer = (oppIds: string | string[]) => {
     setIsLaunching(true);
-    startDirectChallenge(userId, oppId, selectedGridSize, triggerToast);
+    startDirectChallenge(userId, oppIds, selectedGridSize, triggerToast);
   };
 
   const handleResumeMatch = (matchId: string) => {
@@ -128,15 +163,35 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
   };
 
   const getOpponentInfo = (match: WordGridMatchRecord) => {
+    if (match.is_bot_match) {
+      return {
+        id: 'bot',
+        username: `AI (${(match.bot_difficulty || 'normal').toUpperCase()})`,
+        avatar_url: null,
+        opponents: [{ id: 'bot', username: `AI (${(match.bot_difficulty || 'normal').toUpperCase()})`, avatar_url: null }],
+      };
+    }
+
+    // Check players_data first if available
+    if (match.players_data && match.players_data.length > 0) {
+      const opps = match.players_data.filter((p) => p.id !== userId);
+      const firstOpp = opps[0];
+      const usernames = opps.map((p) => p.username).join(', ');
+      return {
+        id: firstOpp?.id || '',
+        username: usernames || 'Opponents',
+        avatar_url: firstOpp?.avatar_url || null,
+        opponents: opps,
+      };
+    }
+
     const isP1 = match.player1_id === userId;
     const opp = isP1 ? match.player2 : match.player1;
-    if (match.is_bot_match) {
-      return { id: 'bot', username: `AI (${(match.bot_difficulty || 'normal').toUpperCase()})`, avatar_url: null };
-    }
     return {
       id: opp?.id || '',
       username: opp?.username || 'Opponent',
-      avatar_url: opp?.avatar_url || null
+      avatar_url: opp?.avatar_url || null,
+      opponents: opp ? [opp] : [],
     };
   };
 
@@ -184,116 +239,15 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
         </button>
       </div>
 
-      {/* Main Content Layout: Single Column on Mobile, 2-Column Grid on Desktop */}
+      {/* Main Content Layout: Active Matches on Top on Mobile, 2-Column Grid on Desktop */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
-        {/* Left Column: Dimensions, Online Matchmaking & Solo Bot */}
-        <div className="space-y-4">
-          {/* Grid Size & Multiplayer Settings */}
-          <div className="bg-[#0c121e] border border-slate-800/80 rounded-2xl p-4 space-y-3">
-            <div>
-              <label className="text-[11px] font-black uppercase tracking-wider text-slate-300 block mb-2">
-                Board Dimension (Default: 7×7)
-              </label>
-              <div className="grid grid-cols-5 gap-1.5">
-                {ALLOWED_GRID_SIZES.map((sz) => (
-                  <button
-                    key={sz}
-                    onClick={() => setSelectedGridSize(sz)}
-                    className={`py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${selectedGridSize === sz
-                      ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-600/30'
-                      : 'bg-[#101828] border-slate-800 text-slate-400 hover:text-white'
-                      }`}
-                  >
-                    {sz}×{sz}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {maxPlayersAllowed > 2 && (
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[11px] font-black uppercase tracking-wider text-slate-300">Max Players ({selectedGridSize}×{selectedGridSize}):</span>
-                <div className="flex gap-1 bg-[#101828] p-1 rounded-xl border border-slate-800">
-                  {Array.from({ length: maxPlayersAllowed - 1 }).map((_, i) => {
-                    const count = i + 2;
-                    return (
-                      <button
-                        key={count}
-                        onClick={() => setSelectedPlayers(count)}
-                        className={`px-3 py-1 text-[10px] font-black rounded-lg cursor-pointer transition-colors ${targetPlayers === count ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
-                          }`}
-                      >
-                        {count} Players
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Online Matchmaking */}
-          <div className="space-y-2.5">
-            <p className="text-[11px] text-slate-400 font-black uppercase tracking-wider">Fast Matchmaking</p>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => handleQueue(false)}
-                disabled={loading}
-                className="flex flex-col items-center justify-center p-3.5 bg-indigo-950/40 hover:bg-indigo-900/40 border border-indigo-500/40 rounded-2xl transition-all cursor-pointer group shadow-lg"
-              >
-                <span className="text-xl mb-1 group-hover:scale-110 transition-transform">🎪</span>
-                <span className="text-xs font-black uppercase text-indigo-200">Casual Match</span>
-                <span className="text-[9px] text-indigo-300/80 font-bold mt-1">Just for fun</span>
-              </button>
-              <button
-                onClick={() => handleQueue(true)}
-                disabled={loading}
-                className="flex flex-col items-center justify-center p-3.5 bg-emerald-950/40 hover:bg-emerald-900/40 border border-emerald-500/40 rounded-2xl transition-all cursor-pointer group shadow-lg"
-              >
-                <span className="text-xl mb-1 group-hover:scale-110 transition-transform">🏆</span>
-                <span className="text-xs font-black uppercase text-emerald-200">Rated Arena</span>
-                <span className="text-[9px] text-emerald-300/80 font-bold mt-1">Competitive ranking</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Solo Bot Match */}
-          <div className="space-y-2.5">
-            <p className="text-[11px] text-slate-400 font-black uppercase tracking-wider">Solo Bot Practice</p>
-            <div className="bg-[#0c121e] border border-slate-800/80 rounded-2xl p-4 flex flex-col space-y-3.5 shadow-lg">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-white font-bold">Bot Level:</span>
-                <div className="flex gap-1 bg-[#101828] p-1 rounded-xl border border-slate-800">
-                  {(['easy', 'normal', 'hard'] as const).map(diff => (
-                    <button
-                      key={diff}
-                      onClick={() => setDifficulty(diff)}
-                      className={`px-3 py-1 text-[10px] font-black uppercase rounded-lg cursor-pointer transition-colors ${difficulty === diff ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
-                        }`}
-                    >
-                      {diff}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <button
-                onClick={handleBotStart}
-                disabled={loading}
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
-              >
-                Start Solo Match ({selectedGridSize}×{selectedGridSize})
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: Active Matches, Player Search / Challenge & History */}
-        <div className="space-y-4">
+        {/* Active Matches Column (Mobile: order-1 on top, Desktop: right column) */}
+        <div className="order-1 md:order-2 space-y-4">
           {/* Active Matches list */}
           {activeMatches.length > 0 && (
             <div className="space-y-2.5">
               <p className="text-[11px] text-indigo-400 font-black uppercase tracking-wider">Your Active Matches</p>
-              <div className="space-y-2 max-h-[200px] overflow-y-auto scrollbar-hide pr-1">
+              <div className="space-y-2 max-h-[260px] overflow-y-auto scrollbar-hide pr-1">
                 {activeMatches.map(match => {
                   const opp = getOpponentInfo(match);
                   const isMyTurn = match.current_turn === userId;
@@ -307,18 +261,57 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
                       className="bg-[#0c121e] border border-slate-800 hover:border-slate-700 rounded-2xl p-3 flex items-center justify-between transition-all shadow-md"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <ProtectedAvatar
-                          userId={opp.id}
-                          src={opp.avatar_url || undefined}
-                          username={opp.username}
-                          className="w-10 h-10 rounded-full shrink-0 border border-slate-700"
-                        />
+                        {opp.opponents && opp.opponents.length > 1 ? (
+                          <div className="flex -space-x-2 shrink-0">
+                            {opp.opponents.slice(0, 3).map((op: any, i: number) => (
+                              <ProtectedAvatar
+                                key={op.id || i}
+                                userId={op.id}
+                                src={op.avatar_url || undefined}
+                                username={op.username}
+                                className="w-8 h-8 rounded-full border-2 border-slate-900 ring-1 ring-slate-700 shrink-0"
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <ProtectedAvatar
+                            userId={opp.id}
+                            src={opp.avatar_url || undefined}
+                            username={opp.username}
+                            className="w-10 h-10 rounded-full shrink-0 border border-slate-700"
+                          />
+                        )}
                         <div className="min-w-0 flex flex-col">
-                          <span className="text-xs font-black text-white truncate">{opp.username}</span>
-                          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                            <span className="text-[10px] text-slate-400 font-bold">
-                              {myScore} pts vs {oppScore} pts
-                            </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {opp.opponents && opp.opponents.length > 1 ? (
+                              <div className="flex items-center gap-1 flex-wrap">
+                                {opp.opponents.map((op: any) => (
+                                  <span
+                                    key={op.id}
+                                    className="text-[11px] font-black text-indigo-300 bg-indigo-950/80 border border-indigo-700/60 px-2 py-0.5 rounded-lg truncate max-w-[120px]"
+                                    title={op.username}
+                                  >
+                                    @{op.username}
+                                  </span>
+                                ))}
+                                <span className="text-[9px] font-extrabold text-amber-300 bg-amber-950/70 border border-amber-600/50 px-1.5 py-0.5 rounded-md">
+                                  {opp.opponents.length + 1}P
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-xs font-black text-white truncate">vs {opp.username}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                            {match.players_data && match.players_data.length > 2 ? (
+                              <span className="text-[10px] text-slate-400 font-bold">
+                                You: {match.players_data.find((p: any) => p.id === userId)?.score ?? myScore} pts
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 font-bold">
+                                {myScore} pts vs {oppScore} pts
+                              </span>
+                            )}
                             <span className="text-[8px] font-black px-1.5 py-0.5 bg-indigo-950 border border-indigo-800 text-indigo-300 rounded-md">
                               {match.grid_size || 7}×{match.grid_size || 7}
                             </span>
@@ -361,67 +354,11 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
             </div>
           )}
 
-          {/* Direct Challenges Search and List */}
-          <div className="space-y-2.5">
-            <p className="text-[11px] text-slate-400 font-black uppercase tracking-wider">Challenge Active Players</p>
-            <div className="bg-[#0c121e] border border-slate-800/80 rounded-2xl p-3 flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="Search players by username..."
-                value={playerSearch}
-                onChange={(e) => setPlayerSearch(e.target.value)}
-                className="w-full bg-transparent text-xs text-white outline-none placeholder:text-slate-500 font-bold"
-              />
-              {playerSearch && (
-                <button
-                  onClick={() => setPlayerSearch('')}
-                  className="text-[10px] font-black uppercase text-slate-400 hover:text-white cursor-pointer"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-
-            <div className="space-y-2 max-h-[180px] overflow-y-auto scrollbar-hide pr-1">
-              {filteredPlayers.length > 0 ? (
-                filteredPlayers.map((profile: PlayerProfile) => (
-                  <div
-                    key={profile.id}
-                    className="flex items-center justify-between bg-[#0c121e] border border-slate-800 rounded-2xl p-2.5"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <ProtectedAvatar
-                        userId={profile.id}
-                        src={profile.avatar_url || undefined}
-                        username={profile.username}
-                        className="w-8 h-8 rounded-full shrink-0 border border-slate-700"
-                      />
-                      <div className="min-w-0">
-                        <p className="text-xs font-black text-white truncate">{profile.username}</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleChallengePlayer(profile.id)}
-                      disabled={loading}
-                      className="bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 text-[10px] font-black uppercase tracking-wider px-3.5 py-1.5 rounded-xl transition-all cursor-pointer"
-                    >
-                      Challenge
-                    </button>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-5 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                  {playerSearch ? 'No players found matching search' : 'Search for players to challenge'}
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* Completed Matches (History) */}
           {completedMatches.length > 0 && (
             <div className="space-y-2.5">
               <p className="text-[11px] text-slate-400 font-black uppercase tracking-wider">Finished Matches</p>
-              <div className="space-y-2 max-h-[140px] overflow-y-auto scrollbar-hide pr-1">
+              <div className="space-y-2 max-h-[200px] overflow-y-auto scrollbar-hide pr-1">
                 {completedMatches.map(match => {
                   const opp = getOpponentInfo(match);
                   const myScore = match.player1_id === userId ? match.p1_score : match.p2_score;
@@ -477,6 +414,211 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
               </div>
             </div>
           )}
+        </div>
+
+        {/* Left Column: Dimensions, Mode Selection (Solo vs Bot / vs Human) (Mobile: order-2, Desktop: order-1) */}
+        <div className="order-2 md:order-1 space-y-4">
+          {/* Step 1: Grid Size */}
+          <div className="bg-[#0c121e] border border-slate-800/80 rounded-2xl p-4 space-y-3 shadow-lg">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-black uppercase tracking-wider text-slate-300 block">
+                1. Select Board Dimension
+              </label>
+              <span className="text-[10px] font-bold text-indigo-400">
+                Max {maxPlayersAllowed} Players
+              </span>
+            </div>
+            <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
+              {ALLOWED_GRID_SIZES.map((sz) => (
+                <button
+                  key={sz}
+                  onClick={() => setSelectedGridSize(sz)}
+                  className={`py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${selectedGridSize === sz
+                    ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-600/30'
+                    : 'bg-[#101828] border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                >
+                  {sz}×{sz}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Step 2: Game Mode Selection (Solo vs Bot OR vs Human) */}
+          <div className="bg-[#0c121e] border border-slate-800/80 rounded-2xl p-4 space-y-3.5 shadow-lg">
+            <label className="text-[11px] font-black uppercase tracking-wider text-slate-300 block">
+              2. Choose Game Mode
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setGameMode('bot')}
+                className={`flex flex-col items-center justify-center p-3.5 rounded-2xl border transition-all cursor-pointer ${gameMode === 'bot'
+                  ? 'bg-indigo-600/20 border-indigo-500 text-white shadow-lg shadow-indigo-600/20'
+                  : 'bg-[#101828] border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                  }`}
+              >
+                <Bot className={`w-6 h-6 mb-1.5 ${gameMode === 'bot' ? 'text-indigo-400' : 'text-slate-500'}`} />
+                <span className="text-xs font-black uppercase">Solo vs Bot</span>
+                <span className="text-[9px] text-slate-400 font-bold mt-0.5">Practice against AI</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setGameMode('human')}
+                className={`flex flex-col items-center justify-center p-3.5 rounded-2xl border transition-all cursor-pointer ${gameMode === 'human'
+                  ? 'bg-indigo-600/20 border-indigo-500 text-white shadow-lg shadow-indigo-600/20'
+                  : 'bg-[#101828] border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                  }`}
+              >
+                <Users className={`w-6 h-6 mb-1.5 ${gameMode === 'human' ? 'text-indigo-400' : 'text-slate-500'}`} />
+                <span className="text-xs font-black uppercase">vs Human</span>
+                <span className="text-[9px] text-slate-400 font-bold mt-0.5">Challenge players</span>
+              </button>
+            </div>
+
+            {/* Sub-Panel A: Bot Configuration */}
+            {gameMode === 'bot' && (
+              <div className="space-y-3 pt-2 border-t border-slate-800 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-white font-bold">Bot Level:</span>
+                  <div className="flex gap-1 bg-[#101828] p-1 rounded-xl border border-slate-800">
+                    {(['easy', 'normal', 'hard'] as const).map((diff) => (
+                      <button
+                        key={diff}
+                        onClick={() => setDifficulty(diff)}
+                        className={`px-3 py-1 text-[10px] font-black uppercase rounded-lg cursor-pointer transition-colors ${difficulty === diff ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
+                          }`}
+                      >
+                        {diff}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button
+                  onClick={handleBotStart}
+                  disabled={loading}
+                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md flex items-center justify-center gap-2"
+                >
+                  <Sparkles size={14} />
+                  Start Solo Match ({selectedGridSize}×{selectedGridSize})
+                </button>
+              </div>
+            )}
+
+            {/* Sub-Panel B: Human Multi-select Search & Challenge */}
+            {gameMode === 'human' && (
+              <div className="space-y-3 pt-2 border-t border-slate-800 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-black uppercase text-slate-300">
+                    Select Opponents (1 to {maxOpponentsAllowed})
+                  </span>
+                  <span className="font-bold text-indigo-400">
+                    {selectedOpponents.length}/{maxOpponentsAllowed} Selected
+                  </span>
+                </div>
+
+                {/* Search Bar */}
+                <div className="bg-[#101828] border border-slate-800 rounded-xl px-3 py-2 flex items-center gap-2">
+                  <Search size={14} className="text-slate-500 shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Search players by username..."
+                    value={playerSearch}
+                    onChange={(e) => setPlayerSearch(e.target.value)}
+                    className="w-full bg-transparent text-xs text-white outline-none placeholder:text-slate-500 font-bold"
+                  />
+                  {playerSearch && (
+                    <button
+                      onClick={() => setPlayerSearch('')}
+                      className="text-[10px] font-black uppercase text-slate-400 hover:text-white cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {/* Available Players Multi-Select List */}
+                <div className="space-y-1.5 max-h-[220px] overflow-y-auto scrollbar-hide pr-1">
+                  {filteredPlayers.length > 0 ? (
+                    filteredPlayers.map((profile: PlayerProfile) => {
+                      const isSelected = selectedOpponents.includes(profile.id);
+                      return (
+                        <div
+                          key={profile.id}
+                          onClick={() => toggleOpponentSelection(profile.id)}
+                          className={`flex items-center justify-between rounded-xl p-2.5 cursor-pointer border transition-all ${isSelected
+                            ? 'bg-indigo-600/20 border-indigo-500 text-white shadow-sm'
+                            : 'bg-[#101828] border-slate-800/80 hover:border-slate-700 text-slate-300'
+                            }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <ProtectedAvatar
+                              userId={profile.id}
+                              src={profile.avatar_url || undefined}
+                              username={profile.username}
+                              className="w-7 h-7 rounded-full shrink-0 border border-slate-700"
+                            />
+                            <p className="text-xs font-black truncate">{profile.username}</p>
+                          </div>
+                          <div
+                            className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all ${isSelected
+                              ? 'bg-indigo-600 border-indigo-400 text-white'
+                              : 'border-slate-700 bg-slate-900/50'
+                              }`}
+                          >
+                            {isSelected && <Check size={12} strokeWidth={3} />}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center py-5 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+                      {playerSearch ? 'No players found matching search' : 'No available players found'}
+                    </div>
+                  )}
+                </div>
+
+                {/* Challenge Action Button */}
+                <button
+                  onClick={handleStartHumanMatch}
+                  disabled={loading || selectedOpponents.length === 0}
+                  className={`w-full py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${selectedOpponents.length > 0
+                    ? 'bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer shadow-lg shadow-indigo-600/30'
+                    : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                    }`}
+                >
+                  <Users size={14} />
+                  Challenge {selectedOpponents.length > 0 ? `${selectedOpponents.length} Player${selectedOpponents.length > 1 ? 's' : ''}` : 'Players'} ({selectedGridSize}×{selectedGridSize})
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Random Matchmaking Option */}
+          <div className="space-y-2">
+            <p className="text-[11px] text-slate-400 font-black uppercase tracking-wider">Or Fast Auto-Matchmaking</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => handleQueue(false)}
+                disabled={loading}
+                className="flex flex-col items-center justify-center p-3 bg-indigo-950/40 hover:bg-indigo-900/40 border border-indigo-500/40 rounded-2xl transition-all cursor-pointer group shadow-lg"
+              >
+                <span className="text-lg mb-0.5 group-hover:scale-110 transition-transform">🎪</span>
+                <span className="text-xs font-black uppercase text-indigo-200">Casual Match</span>
+                <span className="text-[9px] text-indigo-300/80 font-bold">Random queue</span>
+              </button>
+              <button
+                onClick={() => handleQueue(true)}
+                disabled={loading}
+                className="flex flex-col items-center justify-center p-3 bg-emerald-950/40 hover:bg-emerald-900/40 border border-emerald-500/40 rounded-2xl transition-all cursor-pointer group shadow-lg"
+              >
+                <span className="text-lg mb-0.5 group-hover:scale-110 transition-transform">🏆</span>
+                <span className="text-xs font-black uppercase text-emerald-200">Rated Arena</span>
+                <span className="text-[9px] text-emerald-300/80 font-bold">Competitive queue</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
