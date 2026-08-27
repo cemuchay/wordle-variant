@@ -40,6 +40,28 @@ export type WordGridPvPViewType =
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
+function resolveCachedUsername(userId?: string): string | undefined {
+   if (typeof window === "undefined" || !userId) return undefined;
+   try {
+      const keys = Object.keys(localStorage);
+      for (const k of keys) {
+         if (k.startsWith("sb-") && k.endsWith("-auth-token")) {
+            const raw = localStorage.getItem(k);
+            if (raw) {
+               const parsed = JSON.parse(raw);
+               const u = parsed?.user;
+               if (u?.id === userId) {
+                  return u?.user_metadata?.username || u?.user_metadata?.full_name;
+               }
+            }
+         }
+      }
+   } catch {
+      // ignore
+   }
+   return undefined;
+}
+
 function isUuid(val: any): boolean {
    return (
       typeof val === "string" &&
@@ -689,20 +711,25 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => {
       const nextTurnUserId = updatedState.currentTurn;
       const isCompleted = updatedState.status === "completed";
       const currentPlayer = state.players.find((p) => p.id === userId);
-      const playerName =
-         formatUsername(currentPlayer?.username) || "Your opponent";
+      const rawPlayerName =
+         currentPlayer?.username ||
+         resolveCachedUsername(userId) ||
+         "Your opponent";
+      const playerName = formatUsername(rawPlayerName) || "Your opponent";
 
       if (
          nextTurnUserId &&
          isUuid(nextTurnUserId) &&
          nextTurnUserId !== userId
       ) {
+         const moveCount = updatedState.moves?.length || 0;
          sendWordGridTurnNotification(
             nextTurnUserId,
             playerName,
             state.matchId,
             isCompleted,
             false,
+            moveCount,
          );
       }
 
@@ -771,20 +798,25 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => {
       // Notify opponent that it is their turn after exchange
       const nextTurnUserId = updatedState.currentTurn;
       const currentPlayer = state.players.find((p) => p.id === userId);
-      const playerName =
-         formatUsername(currentPlayer?.username) || "Your opponent";
+      const rawPlayerName =
+         currentPlayer?.username ||
+         resolveCachedUsername(userId) ||
+         "Your opponent";
+      const playerName = formatUsername(rawPlayerName) || "Your opponent";
 
       if (
          nextTurnUserId &&
          isUuid(nextTurnUserId) &&
          nextTurnUserId !== userId
       ) {
+         const moveCount = updatedState.moves?.length || 0;
          sendWordGridTurnNotification(
             nextTurnUserId,
             playerName,
             state.matchId,
             false,
             true,
+            moveCount,
          );
       }
    },
@@ -896,10 +928,13 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => {
          get().updateFromMatchRecord(data, userId);
 
          // Send challenge notification to opponent via clientPush
-         const challengerName = (data as any)?.player1?.username || "A player";
+         const challengerName =
+            (data as any)?.player1?.username ||
+            resolveCachedUsername(userId) ||
+            "A player";
          sendWordGridChallengeNotification(
             opponentId,
-            challengerName,
+            formatUsername(challengerName) || "A player",
             gridSize,
             matchId,
          );

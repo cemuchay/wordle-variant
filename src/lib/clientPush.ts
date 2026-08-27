@@ -270,14 +270,43 @@ export async function sendWordGridChallengeNotification(
    });
 }
 
+/**
+ * Generates a deterministic valid UUID v4/v5 format string from a matchId and turnIndex.
+ * This guarantees strict Supabase UUID column format compatibility while preventing duplicate inserts.
+ */
+function generateDeterministicUUID(seed: string): string {
+   let hash1 = 0x811c9dc5;
+   let hash2 = 0x27d4eb2f;
+   for (let i = 0; i < seed.length; i++) {
+      const char = seed.charCodeAt(i);
+      hash1 = Math.imul(hash1 ^ char, 0x01000193);
+      hash2 = Math.imul(hash2 ^ char, 0x5bd1e995);
+   }
+   const h1 = (hash1 >>> 0).toString(16).padStart(8, "0");
+   const h2 = (hash2 >>> 0).toString(16).padStart(8, "0");
+   const h3 = ((hash1 ^ hash2) >>> 0).toString(16).padStart(8, "0");
+   const h4 = (Math.imul(hash1, 31) >>> 0).toString(16).padStart(8, "0");
+   const raw = (h1 + h2 + h3 + h4).slice(0, 32);
+
+   // Format as standard UUID: 8-4-4-4-12 with version 4 and variant bit
+   return `${raw.slice(0, 8)}-${raw.slice(8, 12)}-4${raw.slice(13, 16)}-a${raw.slice(17, 20)}-${raw.slice(20, 32)}`;
+}
+
 export async function sendWordGridTurnNotification(
    targetUserId: string,
    senderName: string,
    matchId: string,
    isCompleted = false,
    isSwap = false,
+   turnIndex?: number,
 ): Promise<boolean> {
+   const notifId =
+      typeof turnIndex === "number"
+         ? generateDeterministicUUID(`wordgrid_${matchId}_turn_${turnIndex}`)
+         : undefined;
+
    return sendClientNotification({
+      id: notifId,
       user_id: targetUserId,
       type: isCompleted ? "CHALLENGE_COMPLETED" : "CHALLENGE_INVITE",
       title: isCompleted ? "WordGrid Match Completed! 🏆" : "Your Turn in WordGrid! 🔠",
