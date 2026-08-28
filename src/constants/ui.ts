@@ -32,6 +32,8 @@ export const Z_INDEX = {
     DYNAMIC_ISLAND: 999,
     /** Floating chat bubble overlay. */
     CHAT_BUBBLE: 99999,
+    /** Fullscreen image preview modal (sits above everything including chat bubble). */
+    IMAGE_PREVIEW: 100000,
     /** User profile modal overlay. */
     USER_PROFILE: 10000,
     /** Topic details modal. */
