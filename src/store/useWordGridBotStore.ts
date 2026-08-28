@@ -897,6 +897,21 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => {
 
    loadBotMatchesList: async (userId) => {
       if (!userId) return;
+
+      // Instantly populate from local cache if present
+      const cacheKey = `wordgrid_bot_matches_${userId}`;
+      try {
+         const cached = safeLocalStorage.getItem(cacheKey);
+         if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+               set({ botMatchesList: parsed });
+            }
+         }
+      } catch (e) {
+         console.warn("[WordGridBot] loadBotMatchesList cache error:", e);
+      }
+
       try {
          const { data } = await supabase
             .from("wordgrid_matches")
@@ -915,6 +930,7 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => {
             );
          }
          set({ botMatchesList: rows });
+         safeLocalStorage.setItem(cacheKey, JSON.stringify(rows));
       } catch (e) {
          console.warn("[WordGridBot] loadBotMatchesList error:", e);
       }
