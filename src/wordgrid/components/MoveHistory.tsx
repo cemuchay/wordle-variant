@@ -82,7 +82,8 @@ export const MoveHistory = ({ moves, player1, player2, players = [], currentUser
           const chronologicalIdx = moves.length - 1 - reverseIdx;
           const isLatestMove = reverseIdx === 0;
 
-          const isPass = !move.word || move.word === 'PASS' || move.word.startsWith('[') || move.word.startsWith('SWAP');
+          const moveWord = typeof move?.word === 'string' ? move.word : '';
+          const isPass = !moveWord || moveWord === 'PASS' || moveWord.startsWith('[') || moveWord.startsWith('SWAP');
           const hasBreakdown = !!move.breakdown;
           const hasBingo = typeof move.breakdown === 'string' && move.breakdown.includes('(Bingo)');
 
