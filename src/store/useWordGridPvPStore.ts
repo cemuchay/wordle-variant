@@ -415,11 +415,19 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => {
                const opponent = playersList.find(
                   (p) => p.id === lastMoveRecord.player_id,
                );
+               const isP1 = record.player1_id === lastMoveRecord.player_id;
+               const isP2 = record.player2_id === lastMoveRecord.player_id;
                const oppName =
-                  opponent?.username ||
-                  record.player1?.username ||
-                  record.player2?.username ||
-                  "Opponent";
+                  opponent?.username && opponent.username !== "Player 1" && opponent.username !== "Player 2"
+                     ? opponent.username
+                     : isP1 && record.player1?.username
+                     ? record.player1.username
+                     : isP2 && record.player2?.username
+                     ? record.player2.username
+                     : opponent?.username ||
+                       record.player1?.username ||
+                       record.player2?.username ||
+                       "Opponent";
 
                window.dispatchEvent(
                   new CustomEvent("opponent-played-move", {

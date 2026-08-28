@@ -155,9 +155,10 @@ export const DynamicIslandStatus = () => {
         const handleOpponentMove = (e: Event) => {
             const detail = (e as CustomEvent)?.detail;
             if (detail && detail.word) {
+                const name = formatUsername(detail.playerName) || detail.playerName || 'Opponent';
                 const text = detail.isSwap
-                    ? `${detail.playerName} swapped tiles`
-                    : `${detail.playerName} played "${detail.word}" (+${detail.score} pts)!`;
+                    ? `${name} swapped tiles`
+                    : `${name} played "${detail.word}" (+${detail.score} pts)!`;
                 triggerToast(text, TOAST_DURATION.VERY_LONG, true);
             }
         };
