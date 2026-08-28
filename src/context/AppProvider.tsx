@@ -16,7 +16,7 @@ import { getAllMessages, saveMessages, addMessage, updateMessage, removeMessage,
 import { getOutbox, removeOutbox, purgeOldOutbox } from '../utils/outbox';
 import { deliverOutboxEntry } from '../utils/messageDelivery';
 import { isReactionRow } from '../utils/readReceipts';
-import { showDesktopNotification, requestNotificationPermission } from '../utils/notifications';
+import { showDesktopNotification, } from '../utils/notifications';
 import { logger } from '../lib/logger';
 import { TOAST_DURATION } from '../constants/ui';
 import { AppContext, type AppContextType } from './AppContext';
@@ -176,7 +176,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         outboxDrainingRef.current = true;
         try {
             const entries = await getOutbox();
-            purgeOldOutbox().catch(() => {});
+            purgeOldOutbox().catch(() => { });
             for (const entry of entries) {
                 const exists = useAppStore.getState().globalMessages.some((m) => m.id === entry.id);
                 if (!exists) {
@@ -198,7 +198,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 }
                 try {
                     const { voiceUrl, imageUrl } = await deliverOutboxEntry(entry, user.id);
-                    await removeOutbox(entry.id).catch(() => {});
+                    await removeOutbox(entry.id).catch(() => { });
                     useAppStore.getState().updateGlobalMessage({
                         id: entry.id,
                         status: "sent",
@@ -767,10 +767,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                             const previewText = newMessage.voice_url
                                 ? '🎤 Voice note'
                                 : newMessage.image_url
-                                ? '📷 Image'
-                                : newMessage.content?.startsWith('e2ee:')
-                                ? '🔒 New encrypted message'
-                                : newMessage.content || 'New message';
+                                    ? '📷 Image'
+                                    : newMessage.content?.startsWith('e2ee:')
+                                        ? '🔒 New encrypted message'
+                                        : newMessage.content || 'New message';
 
                             showDesktopNotification({
                                 title: `New message from ${senderName}`,
