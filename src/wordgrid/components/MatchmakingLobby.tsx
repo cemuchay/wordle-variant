@@ -216,7 +216,22 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
       (p.username || '').toLowerCase().includes(playerSearch.toLowerCase())
   );
 
-  const activeMatches = (matchesList as WordGridMatchRecord[]).filter(m => m.status === 'active');
+  const activeMatches = (matchesList as WordGridMatchRecord[])
+    .filter((m) => m.status === 'active')
+    .sort((a, b) => {
+      const aIsMyTurn = a.current_turn === userId;
+      const bIsMyTurn = b.current_turn === userId;
+
+      // 1. Games where it's the user's turn come first
+      if (aIsMyTurn && !bIsMyTurn) return -1;
+      if (!aIsMyTurn && bIsMyTurn) return 1;
+
+      // 2. Secondary sort: Games with the latest last move / activity
+      const aTime = new Date(getLastActivityAt(a) || a.last_move_at || a.created_at || 0).getTime();
+      const bTime = new Date(getLastActivityAt(b) || b.last_move_at || b.created_at || 0).getTime();
+      return bTime - aTime;
+    });
+
   const completedMatches = (matchesList as WordGridMatchRecord[]).filter(m => m.status === 'completed' || m.status === 'abandoned');
   const isExpiredMatch = (m: WordGridMatchRecord) => m.status === 'abandoned';
 
@@ -393,8 +408,8 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
                         <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border ${expired
                           ? 'bg-amber-950 border-amber-500/40 text-amber-400'
                           : won
-                          ? 'bg-emerald-950 border-emerald-500/40 text-emerald-400'
-                          : 'bg-rose-950 border-rose-500/40 text-rose-400'
+                            ? 'bg-emerald-950 border-emerald-500/40 text-emerald-400'
+                            : 'bg-rose-950 border-rose-500/40 text-rose-400'
                           }`}>
                           {expired ? 'Expired' : won ? 'Won' : 'Lost'}
                         </span>
@@ -678,5 +693,3 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
 };
 
 export default MatchmakingLobby;
-
-

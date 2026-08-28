@@ -82,7 +82,13 @@ export const MarathonGameList = memo(({
         }, {} as Record<number, any[]>);
     }, [marathonGames, isBotMarathon, numDaysProp]);
 
-    const renderGameButton = (idx: number, label: string, wordLength: number) => {
+    const getGameDay = (idx: number) => {
+        const nd = numDaysProp || 7;
+        const baseSequenceLength = Math.max(1, Math.floor(marathonGames.length / nd));
+        return Math.floor(idx / baseSequenceLength) + 1;
+    };
+
+    const renderGameButton = (idx: number, label: string, wordLength: number, day?: number) => {
         const prog = entry.marathon_progress?.find(
             (p: any) => p.game_index === idx,
         );
@@ -105,14 +111,21 @@ export const MarathonGameList = memo(({
         return (
             <button
                 key={idx}
+                id={`marathon-game-btn-${idx}`}
+                data-game-index={idx}
                 disabled={false}
                 onClick={() => {
                     setMarathonGameIndex(idx);
                     setShowTargetWord(false);
                 }}
-                className={`w-full px-1.5 py-2 h-auto min-h-[32px] rounded-lg text-[10px] font-black transition-all flex items-center justify-center text-center border ${marathonGameIndex === idx ? "bg-correct text-black border-correct scale-105 shadow-md shadow-correct/20 z-10" : canSelect ? colorClasses : "bg-white/5 text-gray-400 border-white/5 hover:bg-white/10 cursor-pointer"}`}
+                className={`w-full px-1.5 py-2 h-auto min-h-[36px] rounded-lg text-[10px] font-black transition-all flex flex-col items-center justify-center text-center border relative ${marathonGameIndex === idx ? "bg-correct text-black border-correct scale-105 shadow-md shadow-correct/20 z-10" : canSelect ? colorClasses : "bg-white/5 text-gray-400 border-white/5 hover:bg-white/10 cursor-pointer"}`}
             >
-                {label}
+                <span>{label}</span>
+                {day !== undefined && isBotMarathon && (
+                    <span className={`text-[8px] font-bold uppercase tracking-tight mt-0.5 ${marathonGameIndex === idx ? "text-black/70" : "text-gray-400/80"}`}>
+                        Day {day}
+                    </span>
+                )}
             </button>
         );
     };
@@ -160,7 +173,7 @@ export const MarathonGameList = memo(({
                 </div>
             ) : sortMode === "number" ? (
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-1.5 w-full">
-                    {marathonGames.map((game, idx) => renderGameButton(idx, `#${idx + 1} (${gameLabels[idx]})`, game.wordLength))}
+                    {marathonGames.map((game, idx) => renderGameButton(idx, `#${idx + 1} (${gameLabels[idx]})`, game.wordLength, getGameDay(idx)))}
                 </div>
             ) : (
                 <div className="flex flex-col gap-3 w-full">
@@ -176,8 +189,8 @@ export const MarathonGameList = memo(({
                         .map(([len, games]) => (
                             <div key={len} className="bg-white/5 rounded-xl p-2.5 border border-white/5">
                                 <h4 className="text-[9px] font-black uppercase text-gray-400 mb-2 px-1 tracking-widest">{len} Letters</h4>
-                                <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5">
-                                    {games.map((game: any) => renderGameButton(game.originalIndex, gameLabels[game.originalIndex], game.wordLength))}
+                                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-1.5">
+                                    {games.map((game: any) => renderGameButton(game.originalIndex, `#${game.originalIndex + 1} (${gameLabels[game.originalIndex]})`, game.wordLength, getGameDay(game.originalIndex)))}
                                 </div>
                             </div>
                         ))}

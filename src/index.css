@@ -15,9 +15,9 @@
   --shadow:
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 
-  --sans: 'Plus Jakarta Sans', system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: 'Outfit', system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  --sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji', sans-serif;
+  --heading: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji', sans-serif;
+  --mono: ui-monospace, Consolas, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', monospace;
 
   font: 18px/145% var(--sans);
   letter-spacing: 0.18px;

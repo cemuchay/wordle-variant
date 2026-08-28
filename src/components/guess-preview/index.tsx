@@ -638,14 +638,30 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
       </button>
 
       <div className="flex items-center justify-center gap-2 mb-2 relative shrink-0">
-        <p className="text-sm uppercase tracking-tighter text-gray-100 font-bold">
-          {username}'s Guesses
+        <p className="text-sm uppercase tracking-tighter text-gray-100 font-bold flex items-center gap-1.5">
+          <span>{username}'s Guesses</span>
+          {isMarathon && (
+            <span className="text-[10px] font-black uppercase text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md">
+              Game #{marathonGameIndex + 1}
+            </span>
+          )}
         </p>
         {isMarathon && (
           <button
-            onClick={() => marathonGamesRef.current?.scrollIntoView({ behavior: 'smooth' })}
-            className="p-1.5 bg-white/5 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors"
-            title="Scroll to game list"
+            onClick={() => {
+              const gameBtn = document.getElementById(`marathon-game-btn-${marathonGameIndex}`);
+              if (gameBtn) {
+                gameBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                gameBtn.classList.add('ring-2', 'ring-correct', 'ring-offset-2', 'ring-offset-gray-900');
+                setTimeout(() => {
+                  gameBtn.classList.remove('ring-2', 'ring-correct', 'ring-offset-2', 'ring-offset-gray-900');
+                }, 1800);
+              } else {
+                marathonGamesRef.current?.scrollIntoView({ behavior: 'smooth' });
+              }
+            }}
+            className="p-1.5 bg-white/5 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors cursor-pointer"
+            title={`Scroll to Game #${marathonGameIndex + 1}`}
           >
             <Search size={14} />
           </button>
