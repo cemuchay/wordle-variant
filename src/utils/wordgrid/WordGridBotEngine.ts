@@ -78,8 +78,16 @@ export class WordGridBotEngine {
     // 5. Update rack & draw from bag
     const currentRack = [...players[activeHumanIdx].rack];
     placedTiles.forEach((tile) => {
-      const idx = currentRack.indexOf(tile.letter);
-      if (idx !== -1) currentRack.splice(idx, 1);
+      // Assigned blanks are stored in placedTiles as lowercase letters; in rack they are '_'
+      const rackLetter = /[a-z]/.test(tile.letter) ? '_' : tile.letter;
+      const idx = currentRack.indexOf(rackLetter);
+      if (idx !== -1) {
+        currentRack.splice(idx, 1);
+      } else {
+        // Fallback in case of exact match
+        const exactIdx = currentRack.indexOf(tile.letter);
+        if (exactIdx !== -1) currentRack.splice(exactIdx, 1);
+      }
     });
 
     const { rack: newRack, newBag } = await drawBalancedRack(
