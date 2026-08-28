@@ -16,6 +16,7 @@ import { getAllMessages, saveMessages, addMessage, updateMessage, removeMessage,
 import { getOutbox, removeOutbox, purgeOldOutbox } from '../utils/outbox';
 import { deliverOutboxEntry } from '../utils/messageDelivery';
 import { isReactionRow } from '../utils/readReceipts';
+import { showDesktopNotification, requestNotificationPermission } from '../utils/notifications';
 import { logger } from '../lib/logger';
 import { TOAST_DURATION } from '../constants/ui';
 import { AppContext, type AppContextType } from './AppContext';
@@ -759,6 +760,25 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                         const messageWithProfile = { ...newMessage, profiles: profile };
                         useAppStore.getState().addGlobalMessage(messageWithProfile);
                         addMessage(messageWithProfile).catch(e => console.warn('IndexedDB add failed:', e));
+
+                        // Trigger PC desktop notification and in-app toast/event if message is from another user
+                        if (user?.id && newMessage.user_id !== user.id) {
+                            const senderName = profile?.username || 'Someone';
+                            const previewText = newMessage.voice_url
+                                ? '🎤 Voice note'
+                                : newMessage.image_url
+                                ? '📷 Image'
+                                : newMessage.content?.startsWith('e2ee:')
+                                ? '🔒 New encrypted message'
+                                : newMessage.content || 'New message';
+
+                            showDesktopNotification({
+                                title: `New message from ${senderName}`,
+                                body: previewText,
+                                icon: profile?.avatar_url || '/favicon.ico',
+                                groupId: newMessage.group_id,
+                            });
+                        }
                     } else if (payload.eventType === 'UPDATE') {
                         useAppStore.getState().updateGlobalMessage(payload.new);
                         updateMessage(payload.new.id, payload.new).catch(e => console.warn('IndexedDB update failed:', e));

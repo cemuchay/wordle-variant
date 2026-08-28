@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence, useMotionValue, useDragControls } from "framer-motion";
 import type { PanInfo } from "framer-motion";
-import { Search, MessageCircle, X, Send, ArrowLeft, ExternalLink, Edit2, Trash2, Check, CheckCheck, ShieldAlert, Mic, Image as ImageIcon, Smile, Reply, Users } from "lucide-react";
+import { Search, MessageCircle, X, Send, ArrowLeft, ExternalLink, Edit2, Trash2, Check, CheckCheck, ShieldAlert, Mic, Image as ImageIcon, Smile, Reply, Users, Phone, ChevronDown } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useAppStore } from "../../store/useAppStore";
 import { TOAST_DURATION } from "../../constants/ui";
@@ -20,8 +20,10 @@ import { ReactionPicker } from "./ChatMessage/ReactionPicker";
 import { ReactionModal } from "./ChatMessage/ReactionModal";
 import { ReactionBadge } from "./ChatMessage/ReactionBadge";
 import { safeLocalStorage } from "../../utils/storage";
+import { requestNotificationPermission } from "../../utils/notifications";
 import { Z_INDEX } from "../../constants/ui";
 import { putOutbox, removeOutbox, type OutboxEntry } from "../../utils/outbox";
+import { renderEmojiNode } from "../../utils/twemoji";
 import { uploadVoiceAsset, uploadImageAsset, insertMessageWithRetry } from "../../utils/messageDelivery";
 import { VoiceRecorder } from "../../utils/voiceRecorder";
 import { isReactionRow, markGroupsRead, resolveTickState } from "../../utils/readReceipts";
@@ -79,8 +81,66 @@ const clampToBounds = (pos: { x: number; y: number }) => {
    };
 };
 
+// Deterministic distinct color palette for user names & chat bubble highlights in group chats
+const USER_COLOR_PALETTE = [
+   { name: "text-indigo-400", border: "border-indigo-500/30", bg: "bg-indigo-500/10" },
+   { name: "text-emerald-400", border: "border-emerald-500/30", bg: "bg-emerald-500/10" },
+   { name: "text-amber-400", border: "border-amber-500/30", bg: "bg-amber-500/10" },
+   { name: "text-rose-400", border: "border-rose-500/30", bg: "bg-rose-500/10" },
+   { name: "text-cyan-400", border: "border-cyan-500/30", bg: "bg-cyan-500/10" },
+   { name: "text-purple-400", border: "border-purple-500/30", bg: "bg-purple-500/10" },
+   { name: "text-pink-400", border: "border-pink-500/30", bg: "bg-pink-500/10" },
+   { name: "text-teal-400", border: "border-teal-500/30", bg: "bg-teal-500/10" },
+   { name: "text-orange-400", border: "border-orange-500/30", bg: "bg-orange-500/10" },
+   { name: "text-lime-400", border: "border-lime-500/30", bg: "bg-lime-500/10" },
+   { name: "text-fuchsia-400", border: "border-fuchsia-500/30", bg: "bg-fuchsia-500/10" },
+   { name: "text-sky-400", border: "border-sky-500/30", bg: "bg-sky-500/10" },
+];
+
+const getUserChatColor = (userId?: string) => {
+   if (!userId) return USER_COLOR_PALETTE[0];
+   let hash = 0;
+   for (let i = 0; i < userId.length; i++) {
+      hash = (hash << 5) - hash + userId.charCodeAt(i);
+      hash |= 0;
+   }
+   const index = Math.abs(hash) % USER_COLOR_PALETTE.length;
+   return USER_COLOR_PALETTE[index];
+};
+
+// High-performance mention and cross-platform emoji parsing
+const MENTION_REGEX = /(@[a-zA-Z0-9_.-]+)/g;
+
+const renderFormattedMessageText = (text: string, currentUsername?: string, isMe?: boolean) => {
+   if (!text) return null;
+   if (!text.includes("@")) return renderEmojiNode(text);
+
+   const parts = text.split(MENTION_REGEX);
+   return parts.map((part, i) => {
+      if (part.startsWith("@") && part.length > 1) {
+         const mentionName = part.slice(1).toLowerCase();
+         const isSelfMention = currentUsername && mentionName === currentUsername.toLowerCase();
+         return (
+            <span
+               key={i}
+               className={`font-extrabold px-1 py-0.5 rounded-md ${
+                  isSelfMention
+                     ? "bg-amber-400/25 text-amber-300 ring-1 ring-amber-400/50 shadow-sm"
+                     : isMe
+                     ? "bg-white/20 text-white underline underline-offset-2"
+                     : "bg-indigo-500/20 text-indigo-300 ring-1 ring-indigo-500/30"
+               }`}
+            >
+               {part}
+            </span>
+         );
+      }
+      return renderEmojiNode(part, `p-${i}`);
+   });
+};
+
 export default function FloatingChatBubble() {
-   const { unreadCount, isChatOpen, date, profile, onlineUsers, allProfiles } = useApp();
+   const { unreadCount, isChatOpen, date, profile, onlineUsers, allProfiles, initiatePrivateCall, activeCall, triggerToast } = useApp();
    const [dismissed, setDismissed] = useState(false);
    const [conversationSearchQuery, setConversationSearchQuery] = useState("");
    const [isDragging, setIsDragging] = useState(false);
@@ -258,6 +318,13 @@ export default function FloatingChatBubble() {
    const [mentionState, setMentionState] = useState<{ isVisible: boolean; filter: string; cursorPosition: number } | null>(null);
    const [profilesList, setProfilesList] = useState<{ id: string; username: string; avatar_url: string }[]>([]);
 
+   // In-chat search state
+   const [isChatSearchOpen, setIsChatSearchOpen] = useState(false);
+   const [chatSearchQuery, setChatSearchQuery] = useState("");
+
+   // Scroll-to-latest button visibility state
+   const [isScrolledUp, setIsScrolledUp] = useState(false);
+
    // Unread divider state
    const [visibleUnreadId, setVisibleUnreadId] = useState<string | null>(null);
    const [showUnreadLine, setShowUnreadLine] = useState(true);
@@ -322,12 +389,26 @@ export default function FloatingChatBubble() {
    // Handle scroll in the messages area
    const handleScroll = () => {
       resetInactivityTimer();
+      if (scrollRef.current) {
+         const el = scrollRef.current;
+         const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+         setIsScrolledUp(distanceFromBottom > 200);
+      }
       if (showUnreadLine && visibleUnreadId && scrollRef.current) {
          const el = document.getElementById("fb-unread-line");
          if (el && el.getBoundingClientRect().bottom < 0) {
             setShowUnreadLine(false);
          }
       }
+   };
+
+   const scrollToLatest = (smooth = true) => {
+      if (messagesEndRef.current) {
+         messagesEndRef.current.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "end" });
+      } else if (scrollRef.current) {
+         scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+      }
+      setIsScrolledUp(false);
    };
 
    const resetInactivityTimer = () => {
@@ -766,23 +847,27 @@ export default function FloatingChatBubble() {
       }
    }, [isOverlayOpen, user?.id]);
 
-   // Auto-scroll detailed message view to bottom on initial group open or when new messages arrive / are sent
+   // Auto-scroll detailed message view to bottom on initial group open, when new messages arrive/are sent, or when typing indicator appears
    const prevGroupIdRef = useRef<string | null>(null);
    const prevMessagesLengthRef = useRef<number>(0);
+   const prevTypingCountRef = useRef<number>(0);
 
    useEffect(() => {
       if (!selectedGroupId) {
          prevGroupIdRef.current = null;
          prevMessagesLengthRef.current = 0;
+         prevTypingCountRef.current = 0;
          return;
       }
 
       const roomMessages = globalMessages.filter(m => m.group_id === selectedGroupId && !isReactionRow(m.content));
       const isGroupChange = prevGroupIdRef.current !== selectedGroupId;
       const isNewMessageAdded = roomMessages.length > prevMessagesLengthRef.current;
+      const isTypingStarted = typingNames.length > 0 && prevTypingCountRef.current === 0;
 
       prevGroupIdRef.current = selectedGroupId;
       prevMessagesLengthRef.current = roomMessages.length;
+      prevTypingCountRef.current = typingNames.length;
 
       if (scrollRef.current) {
          const el = scrollRef.current;
@@ -790,8 +875,8 @@ export default function FloatingChatBubble() {
          const latestMsg = roomMessages[roomMessages.length - 1];
          const isMyNewMessage = isNewMessageAdded && latestMsg && latestMsg.user_id === user?.id;
 
-         if (isGroupChange || isMyNewMessage || (isNewMessageAdded && isNearBottom)) {
-            // Use double-rAF to ensure DOM and layout changes have completely painted
+         if (isGroupChange || isMyNewMessage || (isNewMessageAdded && isNearBottom) || isTypingStarted) {
+            // Use double-rAF to ensure DOM and layout changes (including typing bubble) have completely painted
             requestAnimationFrame(() => {
                requestAnimationFrame(() => {
                   if (messagesEndRef.current) {
@@ -803,7 +888,7 @@ export default function FloatingChatBubble() {
             });
          }
       }
-   }, [selectedGroupId, globalMessages, user?.id]);
+   }, [selectedGroupId, globalMessages, user?.id, typingNames.length]);
 
    // Re-show bubble on new unread after dismissal
    if (unreadCount !== prevUnreadCount) {
@@ -1107,6 +1192,8 @@ export default function FloatingChatBubble() {
 
    const handleBubbleClick = () => {
       if (isDragging) return;
+      // Proactively ask for notification permission on user interaction if not decided yet
+      requestNotificationPermission().catch(() => {});
       if (unreadMessages.length > 0) {
          const autoOpenGroupId = unreadMessages[unreadMessages.length - 1].group_id;
          visitedGroupsRef.current.add(autoOpenGroupId);
@@ -1235,6 +1322,20 @@ export default function FloatingChatBubble() {
       return () => cancelAnimationFrame(raf);
    }, [firstUnreadId, selectedGroupId, allRoomMessages, windowFloorId]);
 
+   // Listen for external open-chat-room triggers (e.g. from desktop notifications or in-app alerts)
+   useEffect(() => {
+      const handleOpenRoom = (e: CustomEvent<{ groupId: string }>) => {
+         if (e.detail?.groupId) {
+            setSelectedGroupId(e.detail.groupId);
+            setIsOverlayOpen(true);
+            clearInactivityTimer();
+         }
+      };
+
+      window.addEventListener('open-chat-room' as any, handleOpenRoom);
+      return () => window.removeEventListener('open-chat-room' as any, handleOpenRoom);
+   }, []);
+
    // Reset snapshot on room change
    useEffect(() => {
       hasCapturedDividerRef.current = false;
@@ -1243,6 +1344,9 @@ export default function FloatingChatBubble() {
       setShowUnreadLine(true);
       setMentionState(null);
       setWindowFloorId(null);
+      setIsChatSearchOpen(false);
+      setChatSearchQuery("");
+      setIsScrolledUp(false);
    }, [selectedGroupId]);
 
    // Divider visibility: auto-hide after 6s if in view, persist if scrolled below
@@ -1450,6 +1554,56 @@ export default function FloatingChatBubble() {
                            </div>
                         </div>
                         <div className="flex items-center gap-1.5">
+                           {(() => {
+                              if (!selectedGroupId) return null;
+                              const activeGroup = groups.find(g => g.id === selectedGroupId);
+                              if (activeGroup?.type !== "dm" || !activeGroup.dm_partner) return null;
+                              const partner = activeGroup.dm_partner;
+                              const isPartnerOnline = onlineUsers.some((u: any) => u.id === partner.id);
+                              if (!isPartnerOnline) return null;
+
+                              const isCalling = activeCall?.targetUser?.id === partner.id && (activeCall?.status === 'calling' || activeCall?.status === 'connected');
+
+                              return (
+                                 <button
+                                    onClick={() => {
+                                       if (isCalling) {
+                                          triggerToast("Call already in progress", TOAST_DURATION.SHORT);
+                                          return;
+                                       }
+                                       initiatePrivateCall({
+                                          id: partner.id,
+                                          username: partner.username || "User",
+                                          avatar_url: partner.avatar_url || ""
+                                       });
+                                    }}
+                                    className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                       isCalling
+                                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 animate-pulse"
+                                          : "text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                                    }`}
+                                    title="Start Voice Call"
+                                 >
+                                    <Phone className="w-3.5 h-3.5" />
+                                 </button>
+                              );
+                           })()}
+                           {selectedGroupId && (
+                              <button
+                                 onClick={() => {
+                                    setIsChatSearchOpen(prev => !prev);
+                                    if (isChatSearchOpen) setChatSearchQuery("");
+                                 }}
+                                 className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                    isChatSearchOpen
+                                       ? "bg-indigo-600/30 text-indigo-300 border border-indigo-500/40"
+                                       : "text-gray-400 hover:text-white hover:bg-white/5"
+                                 }`}
+                                 title="Search in conversation"
+                              >
+                                 <Search className="w-3.5 h-3.5" />
+                              </button>
+                           )}
                            {selectedGroupId && (
                               <button
                                  onClick={handleExpand}
@@ -1547,11 +1701,37 @@ export default function FloatingChatBubble() {
                                                       </span>
                                                    )}
                                                 </div>
-                                                {unreadCount > 0 && (
-                                                   <span className="bg-rose-500/25 border border-rose-500/20 text-rose-300 text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0">
-                                                      {unreadCount} unread
-                                                   </span>
-                                                )}
+                                                <div className="flex items-center gap-1 shrink-0">
+                                                   {isDM && isUserOnline && (
+                                                      <button
+                                                         type="button"
+                                                         onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const partner = group.dm_partner;
+                                                            if (!partner) return;
+                                                            const isCalling = activeCall?.targetUser?.id === partner.id && (activeCall?.status === 'calling' || activeCall?.status === 'connected');
+                                                            if (isCalling) {
+                                                               triggerToast("Call already in progress", TOAST_DURATION.SHORT);
+                                                               return;
+                                                            }
+                                                            initiatePrivateCall({
+                                                               id: partner.id,
+                                                               username: partner.username || "User",
+                                                               avatar_url: partner.avatar_url || ""
+                                                            });
+                                                         }}
+                                                         className="p-1 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-lg transition-colors cursor-pointer"
+                                                         title={`Voice call with ${name}`}
+                                                      >
+                                                         <Phone className="w-3.5 h-3.5" />
+                                                      </button>
+                                                   )}
+                                                   {unreadCount > 0 && (
+                                                      <span className="bg-rose-500/25 border border-rose-500/20 text-rose-300 text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0">
+                                                         {unreadCount} unread
+                                                      </span>
+                                                   )}
+                                                </div>
                                              </div>
                                              <p className="text-[11px] text-gray-400 truncate mt-1">
                                                 {lastMessage.profiles ? `${lastMessage.profiles.username}: ` : ""}
@@ -1579,35 +1759,85 @@ export default function FloatingChatBubble() {
                               </p>
                            </div>
                         ) : (
-                           (
-                              <div className="space-y-4">
-                                 <VoiceControlBar />
-                                 {hasMoreMessages && (
-                                    <div className="flex flex-col items-center gap-2 pb-2">
-                                       <button onClick={handleExpand} className="text-[9px] font-black uppercase text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 px-3 py-1 rounded-full transition-colors cursor-pointer">
-                                          {allRoomMessages.length - 20}+ older · View full chat
-                                       </button>
-                                       <div className="h-px w-full bg-white/10" />
-                                    </div>
-                                 )}
-                                 {activeRoomMessages.map((msg: any) => {
-                                    const isMe = msg.user_id === user?.id;
-                                    const isEditing = editingMessageId === msg.id;
-                                    const content = getDecryptedContent(msg);
+                           <div className="space-y-4">
+                              <VoiceControlBar />
 
-                                     return (
-                                        <div
-                                           key={msg.id}
-                                           data-message-id={msg.id}
-                                           onMouseEnter={() => !isMe && !msg.is_read && handleMarkAsRead(msg.id)}
-                                           onClick={isMe && msg.status === "failed" ? () => handleRetryMessage(msg) : undefined}
-                                           onTouchStart={() => { if (!(isMe && msg.status === "failed")) handleTouchStart(msg.id); }}
-                                           onTouchEnd={handleTouchEnd}
-                                           onTouchMove={handleTouchMove}
-                                           onTouchCancel={handleTouchEnd}
-                                           className={`relative ${reactingMessageId === msg.id || reactingModalMessageId === msg.id ? 'z-50' : 'z-auto'} overflow-visible ${isMe && msg.status === "failed" ? "cursor-pointer" : ""}`}
-                                           title={isMe && msg.status === "failed" ? "Tap to retry" : undefined}
-                                        >
+                              {/* In-chat search bar */}
+                              <AnimatePresence>
+                                 {isChatSearchOpen && (
+                                    <motion.div
+                                       initial={{ opacity: 0, height: 0 }}
+                                       animate={{ opacity: 1, height: "auto" }}
+                                       exit={{ opacity: 0, height: 0 }}
+                                       className="overflow-hidden mb-2"
+                                    >
+                                       <div className="relative">
+                                          <input
+                                             type="text"
+                                             autoFocus
+                                             value={chatSearchQuery}
+                                             onChange={(e) => setChatSearchQuery(e.target.value)}
+                                             placeholder="Search in this conversation..."
+                                             className="w-full bg-slate-900 border border-indigo-500/30 rounded-xl py-1.5 pl-8 pr-8 text-xs text-white placeholder-white/30 outline-none focus:border-indigo-400 transition-all shadow-inner"
+                                          />
+                                          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-indigo-400" />
+                                          {chatSearchQuery && (
+                                             <button
+                                                onClick={() => setChatSearchQuery("")}
+                                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white p-0.5"
+                                             >
+                                                <X size={12} />
+                                             </button>
+                                          )}
+                                       </div>
+                                       {chatSearchQuery.trim() && (
+                                          <div className="text-[10px] text-indigo-300/70 mt-1 px-1 flex justify-between items-center">
+                                             <span>
+                                                {activeRoomMessages.filter((m: any) => {
+                                                   const content = getDecryptedContent(m) || "";
+                                                   const author = m.profiles?.username || "";
+                                                   return content.toLowerCase().includes(chatSearchQuery.toLowerCase()) || author.toLowerCase().includes(chatSearchQuery.toLowerCase());
+                                                }).length} matches found
+                                             </span>
+                                          </div>
+                                       )}
+                                    </motion.div>
+                                 )}
+                              </AnimatePresence>
+
+                              {hasMoreMessages && !chatSearchQuery.trim() && (
+                                 <div className="flex flex-col items-center gap-2 pb-2">
+                                    <button onClick={handleExpand} className="text-[9px] font-black uppercase text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 px-3 py-1 rounded-full transition-colors cursor-pointer">
+                                       {allRoomMessages.length - 20}+ older · View full chat
+                                    </button>
+                                    <div className="h-px w-full bg-white/10" />
+                                 </div>
+                              )}
+                              {activeRoomMessages.map((msg: any) => {
+                                 const isMe = msg.user_id === user?.id;
+                                 const isEditing = editingMessageId === msg.id;
+                                 const content = getDecryptedContent(msg);
+                                 const userColor = getUserChatColor(msg.user_id);
+                                 const isGroupChat = selectedGroupObject?.type !== "dm";
+                                 const isSearchMatch = !!(chatSearchQuery.trim() && (
+                                    (content && content.toLowerCase().includes(chatSearchQuery.toLowerCase())) ||
+                                    (msg.profiles?.username && msg.profiles.username.toLowerCase().includes(chatSearchQuery.toLowerCase()))
+                                 ));
+                                 const isSearchDimmed = !!(chatSearchQuery.trim() && !isSearchMatch);
+
+                                 return (
+                                    <div
+                                       key={msg.id}
+                                       data-message-id={msg.id}
+                                       onMouseEnter={() => !isMe && !msg.is_read && handleMarkAsRead(msg.id)}
+                                       onClick={isMe && msg.status === "failed" ? () => handleRetryMessage(msg) : undefined}
+                                       onTouchStart={() => { if (!(isMe && msg.status === "failed")) handleTouchStart(msg.id); }}
+                                       onTouchEnd={handleTouchEnd}
+                                       onTouchMove={handleTouchMove}
+                                       onTouchCancel={handleTouchEnd}
+                                       className={`relative ${reactingMessageId === msg.id || reactingModalMessageId === msg.id ? 'z-50' : 'z-auto'} overflow-visible ${isMe && msg.status === "failed" ? "cursor-pointer" : ""} ${isSearchDimmed ? "opacity-30 transition-opacity" : isSearchMatch ? "ring-2 ring-indigo-400/80 rounded-2xl p-1 bg-indigo-950/20 transition-all" : "transition-opacity"}`}
+                                       title={isMe && msg.status === "failed" ? "Tap to retry" : undefined}
+                                    >
                                           {/* Unread divider */}
                                           {msg.id === visibleUnreadId && showUnreadLine && (
                                              <motion.div
@@ -1675,109 +1905,115 @@ export default function FloatingChatBubble() {
                                              )}
                                           </AnimatePresence>
 
-                                          <div className={`flex items-start gap-2.5 ${isMe ? "flex-row-reverse" : ""}`}>
-                                             <ProtectedAvatar
-                                                userId={msg.user_id}
-                                                src={msg.profiles?.avatar_url}
-                                                username={msg.profiles?.username}
-                                                className="w-8 h-8 rounded-full border border-white/10 bg-slate-900 shrink-0"
-                                             />
-                                             <div className={`min-w-0 max-w-[75%] ${isMe ? "items-end" : ""}`}>
-                                                <div className="flex items-baseline gap-1.5 flex-wrap">
-                                                   <span className="text-[10px] font-black uppercase tracking-wider text-indigo-400">
-                                                      {msg.profiles?.username || "User"}
-                                                   </span>
-                                                   <span className="text-[8px] text-gray-500 inline-flex items-center gap-1">
-                                                      {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                      {isMe && !msg.is_deleted && (
-                                                         msg.status === "sending" ? (
-                                                            <span className="animate-spin text-white/50 text-[8px]">⌛</span>
-                                                         ) : msg.status === "failed" ? (
-                                                            <span className="text-red-400 text-[8px] font-black cursor-pointer">⚠️ retry</span>
-                                                          ) : (
-                                                             <CheckCheck size={10} className={resolveTickState(msg, user?.id, peerReceipts) === "read" ? "text-blue-400" : "text-white/30"} />
-                                                          )
-                                                       )}
-                                                   </span>
-                                                </div>
+                                              <div className={`flex items-start gap-2.5 ${isMe ? "flex-row-reverse" : ""}`}>
+                                              <ProtectedAvatar
+                                                 userId={msg.user_id}
+                                                 src={msg.profiles?.avatar_url}
+                                                 username={msg.profiles?.username}
+                                                 className={`w-8 h-8 rounded-full border bg-slate-900 shrink-0 ${!isMe && isGroupChat ? userColor.border : "border-white/10"}`}
+                                              />
+                                              <div className={`min-w-0 max-w-[75%] ${isMe ? "items-end" : ""}`}>
+                                                 <div className="flex items-baseline gap-1.5 flex-wrap">
+                                                    <span className={`text-[10px] font-black uppercase tracking-wider ${isMe ? "text-indigo-400" : isGroupChat ? userColor.name : "text-indigo-400"}`}>
+                                                       {msg.profiles?.username || "User"}
+                                                    </span>
+                                                    <span className="text-[8px] text-gray-500 inline-flex items-center gap-1">
+                                                       {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                       {isMe && !msg.is_deleted && (
+                                                          msg.status === "sending" ? (
+                                                             <span className="animate-spin text-white/50 text-[8px]">⌛</span>
+                                                          ) : msg.status === "failed" ? (
+                                                             <span className="text-red-400 text-[8px] font-black cursor-pointer">⚠️ retry</span>
+                                                           ) : (
+                                                              <CheckCheck size={10} className={resolveTickState(msg, user?.id, peerReceipts) === "read" ? "text-blue-400" : "text-white/30"} />
+                                                           )
+                                                        )}
+                                                    </span>
+                                                 </div>
 
-                                                {isEditing ? (
-                                                   <div className="mt-1 flex items-center gap-1.5">
-                                                      <input
-                                                         type="text"
-                                                         value={editText}
-                                                         onChange={(e) => setEditText(e.target.value)}
-                                                         onKeyDown={(e) => {
-                                                            if (e.key === "Enter") handleEditSave(msg.id);
-                                                            else if (e.key === "Escape") setEditingMessageId(null);
-                                                         }}
-                                                         className="flex-1 bg-white/5 border border-white/10 rounded-xl px-2.5 py-1 text-xs text-white placeholder-gray-500 focus:outline-none"
-                                                      />
-                                                      <button
-                                                         onClick={() => handleEditSave(msg.id)}
-                                                         className="bg-indigo-600 hover:bg-indigo-500 p-1.5 rounded-lg text-white cursor-pointer"
-                                                      >
-                                                         <Check className="w-3.5 h-3.5" />
-                                                      </button>
-                                                      <button
-                                                         onClick={() => setEditingMessageId(null)}
-                                                         className="bg-white/10 hover:bg-white/20 p-1.5 rounded-lg text-gray-400 cursor-pointer"
-                                                      >
-                                                         <X className="w-3.5 h-3.5" />
-                                                      </button>
-                                                   </div>
-                                                ) : (
-                                                   <div className="relative group/msg pb-2 sm:pb-4">
-                                                      {/* Reply preview */}
-                                                      {msg.reply_to && !msg.is_deleted && (() => {
-                                                         const replyToMsg = allRoomMessages.find((m: any) => m.id === msg.reply_to);
-                                                         if (!replyToMsg) return null;
-                                                          return (
-                                                             <div
-                                                                onClick={(e) => {
-                                                                   e.stopPropagation();
-                                                                   handleJumpToMessage(msg.reply_to);
-                                                                }}
-                                                                className={`flex items-center gap-2 mb-1.5 text-[10px] text-white/60 bg-white/5 hover:bg-white/10 border-l-2 border-correct/40 px-3 py-1.5 rounded-t-xl max-w-[85%] cursor-pointer transition-colors ${isMe ? 'flex-row-reverse ml-auto' : ''}`}
-                                                             >
-                                                                <Reply size={10} className="text-correct shrink-0" />
-                                                                <span className="truncate text-gray-400">
-                                                                   {replyToMsg.profiles?.username || 'User'}: {replyToMsg.voice_url ? '🎤 Voice note' : replyToMsg.image_url ? '📷 Image' : getDecryptedContent(replyToMsg)}
-                                                                </span>
-                                                             </div>
-                                                          );
-                                                      })()}
-                                                      <motion.div
-                                                         drag={!msg.is_deleted && !isEditing ? "x" : false}
-                                                         dragDirectionLock
-                                                         dragConstraints={{ left: 0, right: 0 }}
-                                                         dragSnapToOrigin
-                                                         dragElastic={{ left: 0, right: 0.6 }}
-                                                         onDragEnd={(_, info) => {
-                                                            if (info.offset.x > 50) {
-                                                               handleSwipeToReply(msg);
-                                                            }
-                                                         }}
-                                                      >
-                                                         {msg.voice_url ? (
-                                                            <ConnectedAudioPlayer
-                                                               url={msg.voice_url}
-                                                               messageId={msg.id}
-                                                               allMessageIds={activeRoomMessages.map((m: any) => m.id)}
-                                                               allMessages={activeRoomMessages}
-                                                               userId={user?.id || ""}
-                                                            />
-                                                         ) : msg.image_url ? (
-                                                            <ChatImage url={msg.image_url} />
-                                                         ) : (
-                                                            <p className={`text-xs text-left mt-1 leading-relaxed whitespace-pre-wrap break-words px-3 py-2 rounded-2xl ${isMe ? 'bg-indigo-600 border border-indigo-500 text-white' : 'bg-white/5 border border-white/5 text-gray-200'}`}>
-                                                               {getDecryptedContent(msg)}
-                                                               {msg.is_edited && (
-                                                                  <span className="text-[8px] text-gray-500 ml-1">(edited)</span>
-                                                               )}
-                                                            </p>
-                                                         )}
-                                                      </motion.div>
+                                                 {isEditing ? (
+                                                    <div className="mt-1 flex items-center gap-1.5">
+                                                       <input
+                                                          type="text"
+                                                          value={editText}
+                                                          onChange={(e) => setEditText(e.target.value)}
+                                                          onKeyDown={(e) => {
+                                                             if (e.key === "Enter") handleEditSave(msg.id);
+                                                             else if (e.key === "Escape") setEditingMessageId(null);
+                                                          }}
+                                                          className="flex-1 bg-white/5 border border-white/10 rounded-xl px-2.5 py-1 text-xs text-white placeholder-gray-500 focus:outline-none"
+                                                       />
+                                                       <button
+                                                          onClick={() => handleEditSave(msg.id)}
+                                                          className="bg-indigo-600 hover:bg-indigo-500 p-1.5 rounded-lg text-white cursor-pointer"
+                                                       >
+                                                          <Check className="w-3.5 h-3.5" />
+                                                       </button>
+                                                       <button
+                                                          onClick={() => setEditingMessageId(null)}
+                                                          className="bg-white/10 hover:bg-white/20 p-1.5 rounded-lg text-gray-400 cursor-pointer"
+                                                       >
+                                                          <X className="w-3.5 h-3.5" />
+                                                       </button>
+                                                    </div>
+                                                 ) : (
+                                                    <div className="relative group/msg pb-2 sm:pb-4">
+                                                       {/* Reply preview */}
+                                                       {msg.reply_to && !msg.is_deleted && (() => {
+                                                          const replyToMsg = allRoomMessages.find((m: any) => m.id === msg.reply_to);
+                                                          if (!replyToMsg) return null;
+                                                           return (
+                                                              <div
+                                                                 onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleJumpToMessage(msg.reply_to);
+                                                                 }}
+                                                                 className={`flex items-center gap-2 mb-1.5 text-[10px] text-white/60 bg-white/5 hover:bg-white/10 border-l-2 border-correct/40 px-3 py-1.5 rounded-t-xl max-w-[85%] cursor-pointer transition-colors ${isMe ? 'flex-row-reverse ml-auto' : ''}`}
+                                                              >
+                                                                 <Reply size={10} className="text-correct shrink-0" />
+                                                                 <span className="truncate text-gray-400">
+                                                                    {replyToMsg.profiles?.username || 'User'}: {replyToMsg.voice_url ? '🎤 Voice note' : replyToMsg.image_url ? '📷 Image' : getDecryptedContent(replyToMsg)}
+                                                                 </span>
+                                                              </div>
+                                                           );
+                                                       })()}
+                                                       <motion.div
+                                                          drag={!msg.is_deleted && !isEditing ? "x" : false}
+                                                          dragDirectionLock
+                                                          dragConstraints={{ left: 0, right: 0 }}
+                                                          dragSnapToOrigin
+                                                          dragElastic={{ left: 0, right: 0.6 }}
+                                                          onDragEnd={(_, info) => {
+                                                             if (info.offset.x > 50) {
+                                                                handleSwipeToReply(msg);
+                                                             }
+                                                          }}
+                                                       >
+                                                          {msg.voice_url ? (
+                                                             <ConnectedAudioPlayer
+                                                                url={msg.voice_url}
+                                                                messageId={msg.id}
+                                                                allMessageIds={activeRoomMessages.map((m: any) => m.id)}
+                                                                allMessages={activeRoomMessages}
+                                                                userId={user?.id || ""}
+                                                             />
+                                                          ) : msg.image_url ? (
+                                                             <ChatImage url={msg.image_url} />
+                                                          ) : (
+                                                             <p className={`text-xs text-left mt-1 leading-relaxed whitespace-pre-wrap break-words px-3 py-2 rounded-2xl ${
+                                                                isMe
+                                                                   ? 'bg-indigo-600 border border-indigo-500 text-white'
+                                                                   : isGroupChat
+                                                                   ? `${userColor.bg} border ${userColor.border} text-gray-100`
+                                                                   : 'bg-white/5 border border-white/5 text-gray-200'
+                                                             }`}>
+                                                                {renderFormattedMessageText(getDecryptedContent(msg), profile?.username, isMe)}
+                                                                {msg.is_edited && (
+                                                                   <span className="text-[8px] text-gray-500 ml-1">(edited)</span>
+                                                                )}
+                                                             </p>
+                                                          )}
+                                                       </motion.div>
 
                                                       {/* Action buttons (Reply, React, Edit, Delete) */}
                                                       {!msg.is_deleted && !isEditing && msg.status !== "failed" && (
@@ -1830,18 +2066,35 @@ export default function FloatingChatBubble() {
                                                       )}
                                                    </div>
                                                 )}
-                                             </div>
-                                          </div>
-                                       </div>
-                                     );
-                                  })}
-                                  {typingNames.length > 0 && (
-                                     <TypingBubble name={typingNames.length === 1 ? typingNames[0] : typingNames.join(", ")} />
-                                  )}
-                                  {/* Bottom scroll anchor sentinel */}
-                                  <div ref={messagesEndRef} className="h-1 shrink-0 pointer-events-none" />
-                               </div>
-                            ))}
+                                              </div>
+                                           </div>
+                                        </div>
+                                      );
+                                   })}
+                                   {typingNames.length > 0 && (
+                                      <TypingBubble name={typingNames.length === 1 ? typingNames[0] : typingNames.join(", ")} />
+                                   )}
+                                   {/* Bottom scroll anchor sentinel */}
+                                   <div ref={messagesEndRef} className="h-1 shrink-0 pointer-events-none" />
+
+                                   {/* Scroll to latest button */}
+                                   <AnimatePresence>
+                                      {isScrolledUp && (
+                                         <motion.button
+                                            initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                                            exit={{ opacity: 0, scale: 0.8, y: 10 }}
+                                            onClick={() => scrollToLatest(true)}
+                                            className="sticky bottom-3 left-1/2 -translate-x-1/2 mx-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-wider shadow-xl border border-indigo-400/40 z-30 cursor-pointer backdrop-blur-md"
+                                            title="Scroll to latest messages"
+                                         >
+                                            <ChevronDown className="w-3.5 h-3.5" />
+                                            <span>Latest</span>
+                                         </motion.button>
+                                      )}
+                                    </AnimatePresence>
+                                 </div>
+                              )}
                       </div>
 
                       {/* Reply footer for detailed chat screen */}
