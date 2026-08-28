@@ -138,10 +138,12 @@ function MainApp() {
     }
   }, [state.guesses.length, state.isRevealing, state.isHintDisabled]);
 
-  // WordUp Async Unread Count
+  // WordUp & WordGrid Async Unread Counts
   const [wordupUnreadCount, setWordupUnreadCount] = useState(0);
+  const [wordgridUnreadCount, setWordgridUnreadCount] = useState(0);
+  const moreGamesUnreadCount = wordupUnreadCount + wordgridUnreadCount;
 
-  usePageTitleBadge(wordupUnreadCount);
+  usePageTitleBadge(moreGamesUnreadCount);
 
   const fetchWordupUnreadCount = useCallback(async (userId: string) => {
     try {
@@ -163,21 +165,50 @@ function MainApp() {
     }
   }, []);
 
+  const fetchWordgridUnreadCount = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("wordgrid_matches")
+        .select("id, current_turn, status, is_bot_match")
+        .eq("status", "active")
+        .eq("current_turn", userId);
+      if (error) throw error;
+      setWordgridUnreadCount(data?.length || 0);
+    } catch (e) {
+      console.error("Failed to fetch wordgrid unread count:", e);
+    }
+  }, []);
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (!user?.id) { setWordupUnreadCount(0); return; }
+    if (!user?.id) {
+      setWordupUnreadCount(0);
+      setWordgridUnreadCount(0);
+      return;
+    }
     fetchWordupUnreadCount(user.id);
-  }, [user?.id, fetchWordupUnreadCount]);
+    fetchWordgridUnreadCount(user.id);
+  }, [user?.id, fetchWordupUnreadCount, fetchWordgridUnreadCount]);
 
   useEffect(() => {
     if (!user?.id) return;
-    const channel = supabase
+    const channel1 = supabase
       .channel(`wordup_unread_${user.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "wordup_async_matches", filter: `player1_id=eq.${user.id}` }, () => fetchWordupUnreadCount(user.id))
       .on("postgres_changes", { event: "*", schema: "public", table: "wordup_async_matches", filter: `player2_id=eq.${user.id}` }, () => fetchWordupUnreadCount(user.id))
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [user?.id, fetchWordupUnreadCount]);
+
+    const channel2 = supabase
+      .channel(`wordgrid_unread_${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "wordgrid_matches", filter: `player1_id=eq.${user.id}` }, () => fetchWordgridUnreadCount(user.id))
+      .on("postgres_changes", { event: "*", schema: "public", table: "wordgrid_matches", filter: `player2_id=eq.${user.id}` }, () => fetchWordgridUnreadCount(user.id))
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel1);
+      supabase.removeChannel(channel2);
+    };
+  }, [user?.id, fetchWordupUnreadCount, fetchWordgridUnreadCount]);
 
   // Initial Challenges Fetch using TanStack Query
   const { data: myChallenges } = useMyChallenges(user?.id);
@@ -1026,6 +1057,8 @@ function MainApp() {
         onOpenSearch: () => setIsSettingsOpen(true),
         onOpenInfo: () => setIsInfoOpen(true),
         onOpenWeeklyWrapped: () => setIsWeeklyWrappedOpen(true),
+        onOpenMoreGames: () => handleNavigation("more"),
+        moreGamesUnreadCount: moreGamesUnreadCount,
         onHint: actions.handleHint,
         onReset: () => window.location.reload(),
         onShare: () => actions.setGameOverModalOpen(true),
@@ -1043,7 +1076,7 @@ function MainApp() {
         onNavigate: handleNavigation,
         challengeUnreadCount: challengeUnreadCount,
         chatUnreadCount: unreadCount,
-        wordupUnreadCount: wordupUnreadCount,
+        wordupUnreadCount: moreGamesUnreadCount,
         userId: user?.id
       }}
     >
@@ -1197,7 +1230,12 @@ function MainApp() {
             {(activeNavigationItem === "wordup" || activeNavigationItem === "more") && (
               <div className="h-full flex flex-col items-center justify-center p-2 bg-dark w-full">
                 {activeNavigationItem === "more" && moreGameMode === "select" ? (
-                  <MoreGamesList setMoreGameMode={setMoreGameMode} handleNavigation={handleNavigation} />
+                  <MoreGamesList
+                    setMoreGameMode={setMoreGameMode}
+                    handleNavigation={handleNavigation}
+                    wordupUnreadCount={wordupUnreadCount}
+                    wordgridUnreadCount={wordgridUnreadCount}
+                  />
                 ) : moreGameMode === "wordgrid" ? (
                   <Suspense fallback={<div className="text-xs text-gray-400 animate-pulse font-bold">Loading WordGrid...</div>}>
                     <WordGridContainer onBackToClassic={() => setMoreGameMode("select")} />

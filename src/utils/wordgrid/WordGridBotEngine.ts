@@ -115,6 +115,11 @@ export class WordGridBotEngine {
 
     const newMoves = [...moves, newMove];
 
+    const isBagEmpty = newBag.length === 0;
+    const isHandEmpty = newRack.length === 0;
+    const isCompleted = isBagEmpty && isHandEmpty;
+    const newStatus = isCompleted ? "completed" : state.status;
+
     return {
       success: true,
       updatedState: {
@@ -124,8 +129,9 @@ export class WordGridBotEngine {
         currentTurnIndex: 1,
         currentTurn: "bot",
         moves: newMoves,
+        status: newStatus,
       },
-      botShouldPlay: true,
+      botShouldPlay: !isCompleted,
     };
   }
 
@@ -212,6 +218,12 @@ export class WordGridBotEngine {
     const humanPlayer = players.find((p) => p.id !== "bot");
     const humanId = humanPlayer?.id || "p1";
 
+    const isBagEmpty = updatedBag.length === 0;
+    const isBotHandEmpty = (updatedPlayers[activeBotIdx]?.rack?.length ?? 0) === 0;
+    const lastConsecutiveZeroMoves = updatedMoves.slice(-4);
+    const isDeadlock = isBagEmpty && lastConsecutiveZeroMoves.length >= 4 && lastConsecutiveZeroMoves.every((m) => m.score === 0);
+    const newStatus = (isBagEmpty && isBotHandEmpty) || isDeadlock ? "completed" : state.status;
+
     return {
       updatedState: {
         board: updatedBoard,
@@ -220,6 +232,7 @@ export class WordGridBotEngine {
         currentTurnIndex: 0,
         currentTurn: humanId,
         moves: updatedMoves,
+        status: newStatus,
       },
       lastBotMove: botMove && botMove.placedTiles.length > 0 ? {
         word: botMove.word,
