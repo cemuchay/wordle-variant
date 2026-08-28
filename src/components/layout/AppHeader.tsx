@@ -1,4 +1,4 @@
-import { HelpCircle, RotateCcw, SettingsIcon, Share, Gamepad2 } from 'lucide-react';
+import { HelpCircle, RotateCcw, SettingsIcon, Share } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirmation } from '../../hooks/useConfirmation';
 import type { SyncStatus } from '../../types/game';
@@ -13,8 +13,6 @@ interface AppHeaderProps {
     onOpenSearch?: () => void;
     onOpenInfo?: () => void;
     onOpenWeeklyWrapped?: () => void;
-    onOpenMoreGames?: () => void;
-    moreGamesUnreadCount?: number;
     onHint?: () => void;
     onReset: () => void;
     onShare: () => void;
@@ -35,8 +33,6 @@ export const AppHeader = ({
     onOpenSettings,
     onOpenInfo,
     onOpenWeeklyWrapped,
-    onOpenMoreGames,
-    moreGamesUnreadCount = 0,
     onReset,
     onShare,
     onRetrySync,
@@ -105,21 +101,6 @@ export const AppHeader = ({
 
                     {/* App Controls */}
                     <div className="flex items-center gap-0.5">
-                        {onOpenMoreGames && (
-                            <button
-                                onClick={onOpenMoreGames}
-                                className="relative p-1.5 text-white hover:text-white rounded-lg hover:bg-white/5 transition-all cursor-pointer"
-                                title="More Games"
-                            >
-                                <Gamepad2 size={ICON_SIZE} />
-                                {moreGamesUnreadCount > 0 && (
-                                    <span className="absolute top-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-correct text-[8px] font-black text-black ring-1 ring-background animate-pulse">
-                                        {moreGamesUnreadCount > 9 ? '9+' : moreGamesUnreadCount}
-                                    </span>
-                                )}
-                            </button>
-                        )}
-
                         {user && isMonday && (
                             <button
                                 onClick={onOpenWeeklyWrapped}

@@ -1057,8 +1057,6 @@ function MainApp() {
         onOpenSearch: () => setIsSettingsOpen(true),
         onOpenInfo: () => setIsInfoOpen(true),
         onOpenWeeklyWrapped: () => setIsWeeklyWrappedOpen(true),
-        onOpenMoreGames: () => handleNavigation("more"),
-        moreGamesUnreadCount: moreGamesUnreadCount,
         onHint: actions.handleHint,
         onReset: () => window.location.reload(),
         onShare: () => actions.setGameOverModalOpen(true),
