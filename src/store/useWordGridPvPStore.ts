@@ -510,8 +510,23 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => {
       });
    },
 
-   loadMatchesList: async (userId) => {
-      if (!isUuid(userId)) return;
+   loadMatchesList: async (userId: string) => {
+      if (!userId) return;
+
+      // Instantly populate from local cache if present
+      const cacheKey = `wordgrid_pvp_matches_${userId}`;
+      try {
+         const cached = safeLocalStorage.getItem(cacheKey);
+         if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+               set({ pvpMatchesList: parsed });
+            }
+         }
+      } catch (e) {
+         console.warn("[WordGridPvP] loadMatchesList cache error:", e);
+      }
+
       try {
          const { data, error } = await supabase
             .from("wordgrid_matches")
@@ -533,6 +548,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => {
             );
          }
          set({ pvpMatchesList: rows });
+         safeLocalStorage.setItem(cacheKey, JSON.stringify(rows));
       } catch (e) {
          console.warn("[WordGridPvP] loadMatchesList error:", e);
       }

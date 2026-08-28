@@ -430,19 +430,20 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
 
               <div className="flex items-center gap-2 bg-[#101828]/90 px-3 py-1.5 border border-slate-800 rounded-2xl shadow-inner flex-wrap">
                 {activePlayersList.map((p: any, i: number) => {
-                  const isYou = p.id === userId;
-                  const isCurrent = currentTurn === p.id && status === 'active';
-                  const scheme = colorMap[p.id];
-                  const avatarUrl = p.avatar_url || profileLookup[p.id]?.avatar_url;
-                  const displayName = isYou ? 'You' : (p.username || profileLookup[p.id]?.username || 'Player');
+                  const pId = p?.id ? String(p.id) : `p-${i}`;
+                  const isYou = pId === userId;
+                  const isCurrent = currentTurn === pId && status === 'active';
+                  const scheme = colorMap[pId];
+                  const avatarUrl = p?.avatar_url || profileLookup[pId]?.avatar_url;
+                  const displayName = isYou ? 'You' : (p?.username || profileLookup[pId]?.username || 'Player');
 
                   return (
-                    <div key={p.id} className="flex items-center gap-1.5 text-[10px] font-black">
+                    <div key={pId} className="flex items-center gap-1.5 text-[10px] font-black">
                       {i > 0 && <span className="text-slate-700 font-bold">•</span>}
                       <div className="flex items-center gap-1">
-                        {p.id !== 'bot' && !p.id.startsWith('bot') ? (
+                        {pId !== 'bot' && !pId.startsWith('bot') ? (
                           <ProtectedAvatar
-                            userId={p.id}
+                            userId={pId}
                             src={avatarUrl || undefined}
                             username={displayName}
                             className={`w-5 h-5 rounded-full border ${isCurrent ? 'ring-2 ring-indigo-400 border-indigo-300' : 'border-slate-700'}`}
@@ -454,7 +455,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
                           {displayName}:
                         </span>
                       </div>
-                      <span className={`text-xs font-black ${isCurrent ? 'text-white' : 'text-slate-200'}`}>{p.score}</span>
+                      <span className={`text-xs font-black ${isCurrent ? 'text-white' : 'text-slate-200'}`}>{p?.score ?? 0}</span>
                     </div>
                   );
                 })}
