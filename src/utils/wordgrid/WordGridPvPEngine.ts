@@ -206,6 +206,16 @@ export class WordGridPvPEngine {
 
     const newMoves = [...moves, newMove];
 
+    // Check game completion condition:
+    // 1. Tile bag is empty and hand is empty
+    // 2. OR tile bag is empty and all active players pass/swap consecutively (no one can play a move)
+    const isBagEmpty = newBag.length === 0;
+    const isHandEmpty = newRack.length === 0;
+    const consecutivePassLimit = updatedPlayers.length * 2;
+    const lastConsecutiveZeroMoves = newMoves.slice(-consecutivePassLimit);
+    const isDeadlock = isBagEmpty && lastConsecutiveZeroMoves.length >= consecutivePassLimit && lastConsecutiveZeroMoves.every((m) => m.score === 0);
+    const newStatus = (isBagEmpty && isHandEmpty) || isDeadlock ? "completed" : state.status;
+
     const payloadToSave: Record<string, any> = {
       tile_bag: newBag,
       players_data: updatedPlayers,
@@ -214,6 +224,7 @@ export class WordGridPvPEngine {
       current_turn_index: nextTurnIndex,
       current_turn: nextTurnUserId,
       moves: newMoves,
+      status: newStatus,
     };
 
     return {
@@ -224,6 +235,7 @@ export class WordGridPvPEngine {
         currentTurnIndex: nextTurnIndex,
         currentTurn: nextTurnUserId,
         moves: newMoves,
+        status: newStatus,
       },
       payloadToSave,
     };

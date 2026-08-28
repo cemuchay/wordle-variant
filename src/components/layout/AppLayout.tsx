@@ -13,6 +13,8 @@ export interface AppLayoutHeaderProps {
     onOpenSearch?: () => void;
     onOpenInfo?: () => void;
     onOpenWeeklyWrapped?: () => void;
+    onOpenMoreGames?: () => void;
+    moreGamesUnreadCount?: number;
     onHint: () => void;
     onReset: () => void;
     onShare: () => void;
