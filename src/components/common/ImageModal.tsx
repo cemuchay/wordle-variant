@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import { useEffect } from "react";
 import { useAppStore } from "../../store/useAppStore";
+import { Z_INDEX } from "../../constants/ui";
 
 export const ImageModal = () => {
     const previewImage = useAppStore(s => s.previewImage);
@@ -29,11 +30,12 @@ export const ImageModal = () => {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 bg-black z-[20000] flex flex-col items-center justify-center p-0 touch-none"
+                    style={{ zIndex: Z_INDEX.IMAGE_PREVIEW }}
+                    className="fixed inset-0 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-0 touch-none pointer-events-auto"
                     onClick={() => setPreviewImage(null)}
                 >
                     {/* Header with Close Button */}
-                    <div className="absolute top-0 left-0 right-0 p-6 flex justify-end z-[20002] pointer-events-none">
+                    <div className="absolute top-0 left-0 right-0 p-6 flex justify-end pointer-events-none" style={{ zIndex: Z_INDEX.IMAGE_PREVIEW + 2 }}>
                         <button
                             type="button"
                             onClick={(e) => {

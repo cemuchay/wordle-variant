@@ -137,10 +137,15 @@ export function calculateTurnScore(
   }
 
   // Scrabble-style bingo: using ALL tiles from the rack in one play earns +50
-  const placedTilesCount = wordsFormed.reduce(
-    (sum, item) => sum + (item.tiles ? new Set(item.tiles.map((t) => `${t.x},${t.y}`)).size : 0),
-    0
-  );
+  const uniquePlacedCoords = new Set<string>();
+  for (const item of wordsFormed) {
+    if (item.tiles) {
+      for (const t of item.tiles) {
+        uniquePlacedCoords.add(`${t.x},${t.y}`);
+      }
+    }
+  }
+  const placedTilesCount = uniquePlacedCoords.size;
   const bingoApplied = rackSizeBeforeMove > 0 && placedTilesCount === rackSizeBeforeMove;
   if (bingoApplied) {
     totalScore += 50;

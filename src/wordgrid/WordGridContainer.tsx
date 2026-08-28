@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { calculateTurnScore } from '../utils/wordgrid/scoring';
+import { validateBoardPlacement } from '../utils/wordgrid/boardValidation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWordGridStore } from '../store/useWordGridStore';
 import { MatchmakingLobby } from './components/MatchmakingLobby';
@@ -206,16 +208,29 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     recallTile(x, y);
   };
 
+  // Potential score preview calculated in real-time as tiles are placed on the grid
+  const potentialScore = useMemo(() => {
+    if (!placedTiles || placedTiles.length === 0) return null;
+    const validation = validateBoardPlacement(placedTiles, board, gridSize);
+    if (!validation.isValid || !validation.wordsFormed || validation.wordsFormed.length === 0) {
+      return null;
+    }
+    const currentActiveRackSize = (rack?.length ?? 0) + placedTiles.length;
+    const scoreRes = calculateTurnScore(validation.wordsFormed, currentActiveRackSize, board, gridSize);
+    return {
+      score: scoreRes.totalScore,
+      isBingo: scoreRes.bingoApplied,
+      words: scoreRes.words,
+    };
+  }, [placedTiles, board, gridSize, rack?.length]);
+
   const [isValidatingWord, setIsValidatingWord] = useState(false);
 
   const handleSubmit = async () => {
+    if (placedTiles.length === 0 || isValidatingWord) return;
     setIsValidatingWord(true);
-    triggerToast("Validating word...", TOAST_DURATION.DEFAULT, true);
     try {
-      const success = await submitMove(effectiveUserId, triggerToast);
-      if (!success) {
-        // Keep placed tiles on validation error
-      }
+      await submitMove(effectiveUserId, triggerToast);
     } finally {
       setIsValidatingWord(false);
     }
@@ -450,63 +465,8 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
           </div>
         </div>
 
-        {/* Action Panel & Tile Rack (Mobile: 2nd, Desktop: 2nd block of left column) */}
-        <div className="order-2 md:col-span-5 md:col-start-1 flex flex-col space-y-4 w-full max-w-[480px] mx-auto md:max-w-none">
-          {/* Bot Thinking Banner Indicator */}
-          {isBotMatch && (isBotThinking || currentTurn === 'bot') && status === 'active' && (
-            <div className="w-full bg-linear-to-r from-emerald-950/90 via-teal-950/90 to-emerald-950/90 border border-emerald-500/60 rounded-2xl p-3 flex items-center justify-center gap-3 shadow-lg shadow-emerald-950/50 animate-pulse">
-              <div className="w-4 h-4 rounded-full border-2 border-emerald-400 border-t-transparent animate-spin" />
-              <span className="text-xs font-black uppercase text-emerald-300 tracking-wider">
-                🤖 AI Bot is thinking of a move...
-              </span>
-            </div>
-          )}
-
-          {/* Action panel: Play Word vs Swap Tiles */}
-          {isMyTurn && (
-            <div className="w-full grid grid-cols-2 gap-3 animate-in fade-in duration-300">
-              <button
-                onClick={handleSubmit}
-                disabled={placedTiles.length === 0 || isValidatingWord}
-                className={`py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg ${isValidatingWord
-                  ? 'bg-indigo-700 text-white animate-pulse border border-indigo-500'
-                  : placedTiles.length > 0
-                    ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30 active:scale-95 border border-indigo-400'
-                    : 'bg-[#0c121e] text-slate-600 border border-slate-800 cursor-not-allowed opacity-50'
-                  }`}
-              >
-                {isValidatingWord ? (
-                  <>
-                    <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                    <span>Validating Word...</span>
-                  </>
-                ) : (
-                  <span>Play Word ({placedTiles.length})</span>
-                )}
-              </button>
-              <button
-                onClick={handleOpenExchange}
-                className="py-3.5 bg-amber-600 hover:bg-amber-500 text-white rounded-2xl text-xs font-black uppercase tracking-wider border border-amber-400 transition-all active:scale-95 cursor-pointer shadow-lg shadow-amber-600/20"
-              >
-                🔄 Swap Tiles
-              </button>
-            </div>
-          )}
-
-          {/* Tile Rack */}
-          <TileRack
-            rack={rack}
-            selectedIdx={selectedRackIdx}
-            onSelectTile={handleSelectTile}
-            onShuffle={shuffleRack}
-            onRecallAll={recallAllTiles}
-            isMyTurn={isMyTurn}
-            onReorderRack={reorderRack}
-          />
-        </div>
-
-        {/* Board Grid (Mobile: 3rd, Desktop: Right column md:col-span-7) */}
-        <div className="order-3 md:order-none md:col-span-7 md:col-start-6 md:row-start-1 md:row-span-4 flex flex-col items-center justify-center w-full">
+        {/* Board Grid Column (Mobile: 2nd, Desktop: Right column md:col-span-7) */}
+        <div className="order-2 md:order-none md:col-span-7 md:col-start-6 md:row-start-1 md:row-span-4 flex flex-col items-center justify-center w-full space-y-3">
           <BoardGrid
             gridSize={gridSize}
             board={board}
@@ -520,6 +480,74 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
             onPlaceTile={handlePlaceTile}
             onPickLetterForCell={handlePickLetterForCell}
             onRecallTile={handleRecallTile}
+          />
+
+          {/* Action panel: Play Word vs Swap Tiles directly attached to the Grid for maximum ergonomics */}
+          {isMyTurn && (
+            <div className="w-full max-w-[480px] grid grid-cols-2 gap-2.5 animate-in fade-in duration-200 px-1">
+              <button
+                onClick={handleSubmit}
+                disabled={placedTiles.length === 0 || isValidatingWord}
+                className={`py-3.5 px-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95 ${isValidatingWord
+                  ? 'bg-indigo-700 text-white animate-pulse border border-indigo-500'
+                  : placedTiles.length > 0
+                    ? 'bg-linear-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white shadow-indigo-600/30 border border-indigo-400'
+                    : 'bg-[#0c121e] text-slate-600 border border-slate-800 cursor-not-allowed opacity-50'
+                  }`}
+              >
+                {isValidatingWord ? (
+                  <>
+                    <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                    <span className="truncate">Playing...</span>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span>Play Word</span>
+                    {potentialScore !== null && potentialScore.score > 0 ? (
+                      <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-lg text-[10px] font-black tracking-normal">
+                        +{potentialScore.score} pts{potentialScore.isBingo ? ' 🎉' : ''}
+                      </span>
+                    ) : (
+                      placedTiles.length > 0 && (
+                        <span className="text-[10px] opacity-75 font-bold">
+                          ({placedTiles.length})
+                        </span>
+                      )
+                    )}
+                  </div>
+                )}
+              </button>
+              <button
+                onClick={handleOpenExchange}
+                className="py-3.5 px-3 bg-slate-900/90 hover:bg-slate-800 text-amber-300 rounded-2xl text-xs font-black uppercase tracking-wider border border-amber-500/30 hover:border-amber-400 transition-all active:scale-95 cursor-pointer shadow-lg flex items-center justify-center gap-1.5"
+              >
+                <span>🔄 Swap Tiles</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Tile Rack & Bot Status (Mobile: 3rd, Desktop: 2nd block of left column) */}
+        <div className="order-3 md:col-span-5 md:col-start-1 flex flex-col space-y-4 w-full max-w-[480px] mx-auto md:max-w-none">
+          {/* Bot Thinking Banner Indicator */}
+          {isBotMatch && (isBotThinking || currentTurn === 'bot') && status === 'active' && (
+            <div className="w-full bg-linear-to-r from-emerald-950/90 via-teal-950/90 to-emerald-950/90 border border-emerald-500/60 rounded-2xl p-3 flex items-center justify-center gap-3 shadow-lg shadow-emerald-950/50 animate-pulse">
+              <div className="w-4 h-4 rounded-full border-2 border-emerald-400 border-t-transparent animate-spin shrink-0" />
+              <span className="text-xs font-black uppercase text-emerald-300 tracking-wider">
+                🤖 AI Bot is thinking of a move...
+              </span>
+            </div>
+          )}
+
+          {/* Tile Rack */}
+          <TileRack
+            rack={rack}
+            selectedIdx={selectedRackIdx}
+            onSelectTile={handleSelectTile}
+            onShuffle={shuffleRack}
+            onRecallAll={recallAllTiles}
+            isMyTurn={isMyTurn}
+            onReorderRack={reorderRack}
           />
         </div>
 
