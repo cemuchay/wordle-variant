@@ -12,6 +12,7 @@ import { MENTION_COLORS } from './constants';
 import { ReactionPicker } from './ReactionPicker';
 import { ReactionModal } from './ReactionModal';
 import { ReactionBadge } from './ReactionBadge';
+import { ReactionSplash } from './ReactionSplash';
 import { ConnectedAudioPlayer } from './ConnectedAudioPlayer';
 import { TOAST_DURATION } from '../../../constants/ui';
 import { ChatImage } from './ChatImage';
@@ -48,8 +49,17 @@ const ChatMessage = memo(({
     const [showReactionsMenu, setShowReactionsMenu] = useState(false);
     const [showReactionsModal, setShowReactionsModal] = useState(false);
     const [showReactionDetails, setShowReactionDetails] = useState(false);
+    const [activeSplash, setActiveSplash] = useState<string | null>(null);
     const reactionsRef = useRef<HTMLDivElement>(null);
     const detailsRef = useRef<HTMLDivElement>(null);
+
+    const handleReactionSelect = (emoji: string | null) => {
+        if (emoji) {
+            setActiveSplash(emoji);
+            if (navigator.vibrate) navigator.vibrate(20);
+        }
+        onReact(emoji);
+    };
 
     // Outside click to close menus
     useEffect(() => {
@@ -158,7 +168,7 @@ const ChatMessage = memo(({
                     <ReactionModal
                         isMe={isMe}
                         onReact={(emoji) => {
-                            onReact(emoji);
+                            handleReactionSelect(emoji);
                             setShowReactionsModal(false);
                         }}
                         currentReaction={msg.reactions?.[currentUserId]}
@@ -192,7 +202,7 @@ const ChatMessage = memo(({
                         ref={reactionsRef}
                         isMe={isMe}
                         onReact={(emoji) => {
-                            onReact(emoji);
+                            handleReactionSelect(emoji);
                             setShowReactionsMenu(false);
                         }}
                         currentReaction={msg.reactions?.[currentUserId]}
@@ -200,9 +210,19 @@ const ChatMessage = memo(({
                             copyToClipboard(msg.content);
                             setShowReactionsMenu(false);
                         }}
-                        onEdit={isEditable ? () => { setEditText(msg.content); setIsEditing(true); setShowReactionsMenu(false); } : undefined}
-                        onDelete={isEditable ? () => { onDelete(); setShowReactionsMenu(false); } : undefined}
+                        onEdit={isEditable ? () => { setEditText(msg.content); setIsEditing(true); setShowReactionsModal(false); } : undefined}
+                        onDelete={isEditable ? () => { onDelete(); setShowReactionsModal(false); } : undefined}
                         onInfo={isMe ? () => { onInfo?.(); setShowReactionsMenu(false); } : undefined}
+                    />
+                )}
+            </AnimatePresence>
+
+            {/* Messenger-style Reaction Splash Animation */}
+            <AnimatePresence>
+                {activeSplash && (
+                    <ReactionSplash
+                        emoji={activeSplash}
+                        onComplete={() => setActiveSplash(null)}
                     />
                 )}
             </AnimatePresence>

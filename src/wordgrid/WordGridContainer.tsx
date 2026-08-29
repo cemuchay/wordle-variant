@@ -412,7 +412,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
                 </div>
               </div>
 
-              {status !== 'completed' && (
+              {status !== 'completed' && status !== 'abandoned' && (
                 <button
                   onClick={handleResign}
                   className="px-2.5 py-1.5 bg-rose-950/80 hover:bg-rose-900 border border-rose-800/80 text-rose-300 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer shrink-0"
@@ -425,7 +425,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
             {/* Bottom row: Turn status & Player scores */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 w-full">
               <span className={`text-[11px] font-black leading-tight truncate ${isMyTurn ? 'text-amber-400 animate-pulse' : 'text-slate-400'}`}>
-                {status === 'completed' ? 'Match Finished' : isMyTurn ? '🔥 Your Turn' : isBotMatch && (isBotThinking || currentTurn === 'bot') ? '🤖 Bot is thinking...' : 'Waiting for move...'}
+                {status === 'completed' ? '🏁 Match Finished (Preview)' : status === 'abandoned' ? '⌛ Match Expired (Preview)' : isMyTurn ? '🔥 Your Turn' : isBotMatch && (isBotThinking || currentTurn === 'bot') ? '🤖 Bot is thinking...' : 'Waiting for move...'}
               </span>
 
               <div className="flex items-center gap-2 bg-[#101828]/90 px-3 py-1.5 border border-slate-800 rounded-2xl shadow-inner flex-wrap">

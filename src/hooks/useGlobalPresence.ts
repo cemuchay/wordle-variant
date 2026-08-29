@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { TIMEOUT, LIMITS } from '../constants/game';
+import { pruneQueueForUser } from '../lib/clientPush';
 
 export interface PresenceUser {
     id: string;
@@ -68,6 +69,8 @@ export const useGlobalPresence = (userId: string | undefined, currentVoiceRoomId
                         ...latest.user,
                         activeVoiceRoomId: latest.activeVoiceRoomId
                     });
+                    // Evict queued push notifications since the user is now actively online
+                    pruneQueueForUser(latest.user.id);
                 }
             });
 

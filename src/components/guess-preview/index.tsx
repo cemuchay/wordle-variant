@@ -93,6 +93,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
   });
 
   const marathonGamesRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const activeGame = useMemo(() => {
     if (!isMarathon) return null;
@@ -649,15 +650,55 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
         {isMarathon && (
           <button
             onClick={() => {
-              const gameBtn = document.getElementById(`marathon-game-btn-${marathonGameIndex}`);
+              const container = scrollContainerRef.current;
+              // Query by either id or data attribute
+              const gameBtn = document.getElementById(`marathon-game-btn-${marathonGameIndex}`) ||
+                document.querySelector(`[data-game-index="${marathonGameIndex}"]`) as HTMLElement | null;
+              const section = document.getElementById('marathon-games-section') || marathonGamesRef.current;
+              const target = gameBtn || section;
+
+              if (container && target) {
+                const containerRect = container.getBoundingClientRect();
+                const targetRect = target.getBoundingClientRect();
+                
+                // Exact target position relative to scroll container
+                const currentScrollTop = container.scrollTop;
+                const offsetFromContainer = targetRect.top - containerRect.top;
+                const targetScrollTop = Math.max(
+                  0,
+                  currentScrollTop + offsetFromContainer - (container.clientHeight / 2) + (targetRect.height / 2)
+                );
+
+                // Smooth custom animated scroll for consistent ease-in-out pacing
+                const startPos = currentScrollTop;
+                const distance = targetScrollTop - startPos;
+                const duration = 600; // ms
+                let startTime: number | null = null;
+
+                const easeInOutCubic = (t: number) =>
+                  t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+                const step = (timestamp: number) => {
+                  if (!startTime) startTime = timestamp;
+                  const elapsed = timestamp - startTime;
+                  const progress = Math.min(elapsed / duration, 1);
+                  const easedProgress = easeInOutCubic(progress);
+
+                  container.scrollTop = startPos + distance * easedProgress;
+
+                  if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                  }
+                };
+
+                window.requestAnimationFrame(step);
+              }
+
               if (gameBtn) {
-                gameBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 gameBtn.classList.add('ring-2', 'ring-correct', 'ring-offset-2', 'ring-offset-gray-900');
                 setTimeout(() => {
                   gameBtn.classList.remove('ring-2', 'ring-correct', 'ring-offset-2', 'ring-offset-gray-900');
-                }, 1800);
-              } else {
-                marathonGamesRef.current?.scrollIntoView({ behavior: 'smooth' });
+                }, 2200);
               }
             }}
             className="p-1.5 bg-white/5 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors cursor-pointer"
@@ -668,7 +709,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
         )}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto pr-1 scrollbar-hide">
+      <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto pr-1 scrollbar-hide">
 
 
         {loading ? (
@@ -687,18 +728,11 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
 
             {/* Fake Gibberish Grid */}
             <FakeGrid targetWordToUse={targetWordToUse} />
-
-            <button
-              onClick={onClose}
-              className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-gray-100 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors cursor-pointer"
-            >
-              Close
-            </button>
           </div>
         ) : !gameData || !gameData.guesses || gameData.guesses.length === 0 ? (
           <div className="py-12 text-center">
-            <p className="text-xs text-gray-500 italic">
-              No guesses recorded for this length.
+            <p className="text-xs text-gray-500 italic mb-6">
+              No guesses recorded for this game.
             </p>
           </div>
         ) : (
@@ -789,33 +823,57 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
                 <ShareButton text={shareText} />
               </div>
             )}
-
-            {isMarathon && (
-              <MarathonGameList
-                sortMode={sortMode}
-                setSortMode={setSortMode}
-                marathonGames={marathonGames}
-                marathonGameIndex={marathonGameIndex}
-                setMarathonGameIndex={setMarathonGameIndex}
-                setShowTargetWord={setShowTargetWord}
-                entry={entry}
-                myParticipation={myParticipation}
-                profile={profile}
-                isCreator={!!isCreator}
-                marathonGamesRef={marathonGamesRef}
-                isBotMarathon={challenge?.is_bot_marathon || entry?.challenge?.is_bot_marathon || entry?.is_bot_marathon}
-                numDays={numDays}
-              />
-            )}
-
-            <button
-              onClick={onClose}
-              className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-gray-100 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors cursor-pointer"
-            >
-              Close
-            </button>
           </div>
         )}
+
+        {isMarathon && (
+          <MarathonGameList
+            sortMode={sortMode}
+            setSortMode={setSortMode}
+            marathonGames={marathonGames}
+            marathonGameIndex={marathonGameIndex}
+            setMarathonGameIndex={setMarathonGameIndex}
+            setShowTargetWord={setShowTargetWord}
+            onSelectGame={() => {
+              const container = scrollContainerRef.current;
+              if (container) {
+                const startPos = container.scrollTop;
+                const distance = -startPos;
+                const duration = 500;
+                let startTime: number | null = null;
+
+                const easeInOutCubic = (t: number) =>
+                  t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+                const step = (timestamp: number) => {
+                  if (!startTime) startTime = timestamp;
+                  const elapsed = timestamp - startTime;
+                  const progress = Math.min(elapsed / duration, 1);
+                  container.scrollTop = startPos + distance * easeInOutCubic(progress);
+                  if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                  }
+                };
+
+                window.requestAnimationFrame(step);
+              }
+            }}
+            entry={entry}
+            myParticipation={myParticipation}
+            profile={profile}
+            isCreator={!!isCreator}
+            marathonGamesRef={marathonGamesRef}
+            isBotMarathon={challenge?.is_bot_marathon || entry?.challenge?.is_bot_marathon || entry?.is_bot_marathon}
+            numDays={numDays}
+          />
+        )}
+
+        <button
+          onClick={onClose}
+          className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-gray-100 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors cursor-pointer mt-2"
+        >
+          Close
+        </button>
 
         <ShowScoringInfo showScoringInfo={showScoringInfo} setShowScoringInfo={setShowScoringInfo} />
 

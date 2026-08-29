@@ -15,6 +15,7 @@ import {
 import { getOutbox, putOutbox, removeOutbox } from "../utils/outbox";
 import { uploadVoiceAsset, uploadImageAsset, insertMessageWithRetry } from "../utils/messageDelivery";
 import { isReactionRow, markGroupsRead } from "../utils/readReceipts";
+import { sendDirectMessagePushNotification } from "../lib/clientPush";
 
 export interface Message {
    id: string;
@@ -41,7 +42,7 @@ export interface ChatGroup {
    created_by?: string;
    created_at: string;
    is_core: boolean;
-   dm_partner?: { id: string; username: string; avatar_url: string };
+   dm_partner?: { id: string; username: string; avatar_url: string; last_seen_at?: string | null };
    dm_key?: string | null;
    members?: { user_id: string; username?: string; avatar_url?: string }[];
 }
@@ -235,7 +236,7 @@ export const useChat = (userId: string) => {
 
    const [typingUsers, setTypingUsers] = useState<string[]>([]);
    const channelRef = useRef<any>(null);
-   const { date } = useApp();
+   const { date, profile, onlineUsers, allProfiles } = useApp();
    const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
    const typingTimeoutRef = useRef<number | null>(null);
    const isCurrentlyTypingLocally = useRef(false);
@@ -758,6 +759,24 @@ export const useChat = (userId: string) => {
             .getState()
             .updateGlobalMessage({ id: tempId, status: "sent" });
          removeOutbox(tempId).catch(() => {});
+
+         // Client-side push notification if sending a DM to an offline recipient
+         if (activeRoom && activeRoom.type === "dm" && activeRoom.dm_partner) {
+            const partner = activeRoom.dm_partner;
+            const senderProfile = globalMessages.find((m) => m.user_id === userId)?.profiles || { username: profile?.username || "Someone" };
+            const isPartnerOnline = onlineUsers?.some((u) => u.id === partner.id);
+            const partnerLastSeen = partner.last_seen_at || allProfiles?.find((p) => p.id === partner.id)?.last_seen_at;
+            void sendDirectMessagePushNotification({
+               senderId: userId,
+               senderName: senderProfile.username || profile?.username || "Someone",
+               recipientId: partner.id,
+               recipientLastSeenAt: partnerLastSeen,
+               isRecipientOnline: isPartnerOnline,
+               messageSnippet: content || voiceUrl ? "[Voice Message]" : imageUrl ? "[Image]" : "",
+               groupId: activeRoomId,
+               sentAt: optimisticMessage.created_at,
+            });
+         }
       } else {
          useAppStore
             .getState()
