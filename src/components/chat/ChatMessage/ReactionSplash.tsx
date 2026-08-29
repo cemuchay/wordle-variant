@@ -47,16 +47,16 @@ export function ReactionSplash({ emoji, onComplete, className = "" }: ReactionSp
         >
             {/* 1. Shockwave glow ring */}
             <motion.div
-                initial={{ scale: 0.2, opacity: 0.8, borderWidth: 3 }}
-                animate={{ scale: 2.8, opacity: 0, borderWidth: 0 }}
-                transition={{ duration: 0.6, ease: "easeOut" }}
-                className="absolute w-12 h-12 rounded-full border border-white/60 bg-white/10 shadow-[0_0_20px_rgba(255,255,255,0.4)]"
+                initial={{ scale: 0.2, opacity: 0.9, borderWidth: 3 }}
+                animate={{ scale: [0.2, 2.0, 3.2], opacity: [0.9, 0.4, 0], borderWidth: [3, 1.5, 0] }}
+                transition={{ duration: 1.2, times: [0, 0.4, 1], ease: "easeOut" }}
+                className="absolute w-12 h-12 rounded-full border border-white/60 bg-white/10 shadow-[0_0_24px_rgba(255,255,255,0.5)]"
             />
 
-            {/* 2. Smaller Particle Splash radiating outward */}
+            {/* 2. Smaller Particle Splash radiating outward with gravity */}
             {particles.map((p) => {
                 const targetX = Math.cos(p.angle) * p.distance;
-                const targetY = Math.sin(p.angle) * p.distance - 15; // bias slightly upward
+                const targetY = Math.sin(p.angle) * p.distance - 20; // bias upward
 
                 return (
                     <motion.div
@@ -69,19 +69,19 @@ export function ReactionSplash({ emoji, onComplete, className = "" }: ReactionSp
                             rotate: 0
                         }}
                         animate={{
-                            x: [0, targetX * 0.7, targetX],
-                            y: [0, targetY * 0.7, targetY + 18], // parabolic arc / gravity drop
-                            scale: [0.2, p.scale * 1.2, 0],
-                            opacity: [1, 1, 0],
+                            x: [0, targetX * 0.75, targetX * 1.15],
+                            y: [0, targetY * 0.7, targetY + 28], // gravity drop curve
+                            scale: [0.2, p.scale * 1.3, 0],
+                            opacity: [1, 1, 0.9, 0],
                             rotate: [0, p.rotation * 0.5, p.rotation]
                         }}
                         transition={{
-                            duration: 0.75,
+                            duration: 1.4,
                             delay: p.delay,
-                            times: [0, 0.45, 1],
+                            times: [0, 0.45, 0.8, 1],
                             ease: "easeOut"
                         }}
-                        className="absolute text-[16px] select-none filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
+                        className="absolute text-[18px] select-none filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
                     >
                         {emoji}
                     </motion.div>
@@ -92,18 +92,18 @@ export function ReactionSplash({ emoji, onComplete, className = "" }: ReactionSp
             <motion.div
                 initial={{ scale: 0, y: 10, rotate: 0, opacity: 1 }}
                 animate={{
-                    scale: [0, 2.2, 1.6, 1.4, 0],
-                    y: [10, -25, -55, -85, -115],
-                    rotate: [0, -12, 12, -6, 0],
-                    opacity: [1, 1, 1, 0.9, 0]
+                    scale: [0, 2.4, 1.8, 1.6, 1.4, 0],
+                    y: [10, -25, -55, -90, -135, -165],
+                    rotate: [0, -14, 14, -8, 6, 0],
+                    opacity: [1, 1, 1, 1, 0.85, 0]
                 }}
                 transition={{
-                    duration: 0.9,
-                    times: [0, 0.25, 0.55, 0.8, 1],
+                    duration: 1.6,
+                    times: [0, 0.2, 0.45, 0.7, 0.88, 1],
                     ease: [0.175, 0.885, 0.32, 1.275]
                 }}
                 onAnimationComplete={() => onComplete?.()}
-                className="text-[44px] select-none filter drop-shadow-[0_8px_24px_rgba(0,0,0,0.6)]"
+                className="text-[48px] select-none filter drop-shadow-[0_8px_24px_rgba(0,0,0,0.6)]"
             >
                 {emoji}
             </motion.div>
