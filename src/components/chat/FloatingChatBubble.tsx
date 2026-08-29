@@ -1382,7 +1382,7 @@ export default function FloatingChatBubble() {
       return () => cancelAnimationFrame(raf);
    }, [firstUnreadId, selectedGroupId, allRoomMessages, windowFloorId]);
 
-   // Listen for external open-chat-room triggers (e.g. from desktop notifications or in-app alerts)
+   // Listen for external open-chat-room triggers and incoming reaction splash events
    useEffect(() => {
       const handleOpenRoom = (e: CustomEvent<{ groupId: string }>) => {
          if (e.detail?.groupId) {
@@ -1392,9 +1392,22 @@ export default function FloatingChatBubble() {
          }
       };
 
+      const handleIncomingReaction = (e: CustomEvent<{ messageId: string; emoji: string; userId: string; groupId: string }>) => {
+         const { messageId, emoji, userId: reactorId } = e.detail || {};
+         // Trigger splash animation if reaction is from another user
+         if (messageId && emoji && reactorId !== user?.id) {
+            setActiveSplashes((prev) => ({ ...prev, [messageId]: emoji }));
+            if (navigator.vibrate) navigator.vibrate(20);
+         }
+      };
+
       window.addEventListener('open-chat-room' as any, handleOpenRoom);
-      return () => window.removeEventListener('open-chat-room' as any, handleOpenRoom);
-   }, []);
+      window.addEventListener('new-message-reaction' as any, handleIncomingReaction);
+      return () => {
+         window.removeEventListener('open-chat-room' as any, handleOpenRoom);
+         window.removeEventListener('new-message-reaction' as any, handleIncomingReaction);
+      };
+   }, [user?.id]);
 
    // Reset snapshot on room change
    useEffect(() => {

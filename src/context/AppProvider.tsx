@@ -731,6 +731,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                                     const updatedReactions = { ...(target.reactions || {}), [newMessage.user_id]: emoji };
                                     useAppStore.getState().updateGlobalMessage({ id: targetId, reactions: updatedReactions });
                                 }
+                                // Broadcast event so recipient's chat view triggers the reaction splash animation
+                                if (typeof window !== 'undefined') {
+                                    window.dispatchEvent(new CustomEvent('new-message-reaction', {
+                                        detail: {
+                                            messageId: targetId,
+                                            emoji,
+                                            userId: newMessage.user_id,
+                                            groupId: newMessage.group_id,
+                                        }
+                                    }));
+                                }
                             } else if (targetId && emoji === 'None') {
                                 const allMsgs = useAppStore.getState().globalMessages;
                                 const target = allMsgs.find((m: any) => m.id === targetId);

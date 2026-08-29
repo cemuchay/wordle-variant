@@ -61,6 +61,20 @@ const ChatMessage = memo(({
         onReact(emoji);
     };
 
+    // Listen for incoming reactions from other users on this message
+    useEffect(() => {
+        const handleIncomingReaction = (e: CustomEvent<{ messageId: string; emoji: string; userId: string; groupId: string }>) => {
+            const { messageId, emoji, userId } = e.detail || {};
+            if (messageId === msg.id && emoji && userId !== currentUserId) {
+                setActiveSplash(emoji);
+                if (navigator.vibrate) navigator.vibrate(20);
+            }
+        };
+
+        window.addEventListener('new-message-reaction' as any, handleIncomingReaction);
+        return () => window.removeEventListener('new-message-reaction' as any, handleIncomingReaction);
+    }, [msg.id, currentUserId]);
+
     // Outside click to close menus
     useEffect(() => {
         if (!showReactionsMenu && !showReactionDetails) return;

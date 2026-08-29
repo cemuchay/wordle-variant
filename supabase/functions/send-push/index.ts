@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
             if (record.data?.challenge_id) {
                targetUrl = `/?challenge=${record.data.challenge_id}`;
             }
-         } else if (record.type === 'DM_MESSAGE') {
+         } else if (record.type === 'DM_MESSAGE' || record.type === 'DM_REMINDER') {
             if (record.data?.group_id) {
                targetUrl = `/?open=chat&group_id=${record.data.group_id}`;
             }
