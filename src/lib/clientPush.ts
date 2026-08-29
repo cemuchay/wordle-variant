@@ -322,3 +322,155 @@ export async function sendWordGridTurnNotification(
       },
    });
 }
+
+// ==========================================
+// Direct Message Client Push Notification Helpers
+// ==========================================
+
+const DM_OFFLINE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+const DM_BURST_COOLDOWN_MS = 20 * 60 * 1000; // 20 minutes cooldown per string of messages
+const DM_NOTIFICATION_TRACKER_KEY = "variant_dm_push_tracker_v1";
+
+interface DMTrackerEntry {
+   lastNotifiedAt: number;
+   messageCount: number;
+}
+
+function loadDMTracker(): Record<string, DMTrackerEntry> {
+   if (typeof window === "undefined") return {};
+   try {
+      const raw = localStorage.getItem(DM_NOTIFICATION_TRACKER_KEY);
+      return raw ? JSON.parse(raw) : {};
+   } catch {
+      return {};
+   }
+}
+
+function saveDMTracker(tracker: Record<string, DMTrackerEntry>): void {
+   if (typeof window === "undefined") return;
+   try {
+      localStorage.setItem(DM_NOTIFICATION_TRACKER_KEY, JSON.stringify(tracker));
+   } catch (e) {
+      console.warn("[ClientPush] Failed to save DM tracker:", e);
+   }
+}
+
+/**
+ * Removes any pending queued notifications targeted to a user once they are confirmed online/active.
+ */
+export function pruneQueueForUser(userId: string): void {
+   if (typeof window === "undefined" || !userId) return;
+   const queue = loadQueue();
+   if (!queue || queue.length === 0) return;
+
+   const filtered = queue.filter((item) => item.user_id !== userId);
+   if (filtered.length !== queue.length) {
+      saveQueue(filtered);
+   }
+
+   // Also clear DM burst cooldown for this user so future offline sessions can trigger cleanly
+   const tracker = loadDMTracker();
+   let modified = false;
+   Object.keys(tracker).forEach((key) => {
+      if (key.startsWith(`${userId}_`) || key.endsWith(`_${userId}`)) {
+         delete tracker[key];
+         modified = true;
+      }
+   });
+   if (modified) saveDMTracker(tracker);
+}
+
+/**
+ * Evaluates whether recipient qualifies as offline (> 5 mins) and dispatches a single
+ * consolidated push notification per string of messages.
+ */
+export async function sendDirectMessagePushNotification({
+   senderId,
+   senderName,
+   recipientId,
+   recipientLastSeenAt,
+   isRecipientOnline,
+   messageSnippet,
+   groupId,
+   sentAt = new Date().toISOString(),
+}: {
+   senderId: string;
+   senderName: string;
+   recipientId: string;
+   recipientLastSeenAt?: string | null;
+   isRecipientOnline?: boolean;
+   messageSnippet: string;
+   groupId: string;
+   sentAt?: string;
+}): Promise<boolean> {
+   if (!isUuid(recipientId) || !isUuid(senderId) || senderId === recipientId) {
+      return false;
+   }
+
+   // 1. If recipient is currently online (presence active), skip push
+   if (isRecipientOnline) {
+      return false;
+   }
+
+   // 2. Offline check: verify recipient has been away for >= 5 minutes from message time
+   const messageTimeMs = new Date(sentAt).getTime();
+   if (recipientLastSeenAt) {
+      const lastSeenMs = new Date(recipientLastSeenAt).getTime();
+      const elapsedSinceSeen = messageTimeMs - lastSeenMs;
+      if (elapsedSinceSeen < DM_OFFLINE_THRESHOLD_MS) {
+         return false; // User was active less than 5 minutes ago
+      }
+   }
+
+   // 3. String-of-messages deduplication: only 1 push notification per burst
+   const trackerKey = `${recipientId}_${senderId}`;
+   const tracker = loadDMTracker();
+   const existing = tracker[trackerKey];
+   const now = Date.now();
+
+   if (existing && now - existing.lastNotifiedAt < DM_BURST_COOLDOWN_MS) {
+      // Update burst count in tracker without firing another notification
+      tracker[trackerKey] = {
+         lastNotifiedAt: existing.lastNotifiedAt,
+         messageCount: (existing.messageCount || 1) + 1,
+      };
+      saveDMTracker(tracker);
+      return false;
+   }
+
+   // 4. Update tracker with new notification dispatch
+   tracker[trackerKey] = {
+      lastNotifiedAt: now,
+      messageCount: 1,
+   };
+   saveDMTracker(tracker);
+
+   // 5. Build clean, sanitized snippet preview
+   let cleanPreview = (messageSnippet || "").trim();
+   if (cleanPreview.startsWith("e2ee:")) {
+      cleanPreview = "Sent you a new message";
+   } else if (cleanPreview === "[Voice Message]") {
+      cleanPreview = "🎤 Sent you a voice message";
+   } else if (cleanPreview === "[Image]") {
+      cleanPreview = "📷 Sent you an image";
+   } else if (cleanPreview.length > 80) {
+      cleanPreview = cleanPreview.slice(0, 77) + "...";
+   }
+
+   const notifId = generateDeterministicUUID(`dm_${recipientId}_${senderId}_${now}`);
+
+   return sendClientNotification({
+      id: notifId,
+      user_id: recipientId,
+      type: "DM_MESSAGE",
+      title: `${senderName || "New Message"} 💬`,
+      message: cleanPreview || `You have a new direct message from ${senderName}.`,
+      data: {
+         mode: "chat_dm",
+         groupId,
+         senderId,
+         senderName,
+      },
+   });
+}
+

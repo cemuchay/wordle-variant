@@ -1,5 +1,5 @@
+import { motion } from 'framer-motion';
 import { useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 
 interface ReactionSplashProps {
     emoji: string;
@@ -41,7 +41,7 @@ export function ReactionSplash({ emoji, onComplete, className = "" }: ReactionSp
     }, []);
 
     return (
-        <div 
+        <div
             className={`pointer-events-none absolute inset-0 flex items-center justify-center z-[120] overflow-visible ${className}`}
             aria-hidden="true"
         >

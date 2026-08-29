@@ -28,6 +28,7 @@ import { renderEmojiNode } from "../../utils/twemoji";
 import { uploadVoiceAsset, uploadImageAsset, insertMessageWithRetry } from "../../utils/messageDelivery";
 import { VoiceRecorder } from "../../utils/voiceRecorder";
 import { isReactionRow, markGroupsRead, resolveTickState } from "../../utils/readReceipts";
+import { sendDirectMessagePushNotification } from "../../lib/clientPush";
 import formatLastSeen from "../../utils/formatLastSeen";
 import TypingBubble from "./TypingBubble";
 import { useTypingPresence } from "../../hooks/useTypingPresence";
@@ -581,6 +582,22 @@ export default function FloatingChatBubble() {
          removeOutbox(messageId).catch(() => { });
 
          markGroupAsRead(groupId);
+
+         // Trigger client-side push notification if recipient is offline in a DM
+         const currentGroup = groups.find((g) => g.id === groupId);
+         if (currentGroup?.type === "dm" && currentGroup?.dm_partner) {
+            const partner = currentGroup.dm_partner;
+            const isPartnerOnline = onlineUsers?.some((u) => u.id === partner.id);
+            void sendDirectMessagePushNotification({
+               senderId: user.id,
+               senderName: profile?.username || "Someone",
+               recipientId: partner.id,
+               recipientLastSeenAt: partner.last_seen_at,
+               isRecipientOnline: isPartnerOnline,
+               messageSnippet: "[Voice Message]",
+               groupId,
+            });
+         }
       } catch (err) {
          console.error("Failed to send voice note:", err);
          useAppStore.getState().updateGlobalMessage({ id: messageId, status: "failed" });
@@ -644,6 +661,22 @@ export default function FloatingChatBubble() {
          removeOutbox(messageId).catch(() => { });
 
          markGroupAsRead(groupId);
+
+         // Trigger client-side push notification if recipient is offline in a DM
+         const currentGroup = groups.find((g) => g.id === groupId);
+         if (currentGroup?.type === "dm" && currentGroup?.dm_partner) {
+            const partner = currentGroup.dm_partner;
+            const isPartnerOnline = onlineUsers?.some((u) => u.id === partner.id);
+            void sendDirectMessagePushNotification({
+               senderId: user.id,
+               senderName: profile?.username || "Someone",
+               recipientId: partner.id,
+               recipientLastSeenAt: partner.last_seen_at,
+               isRecipientOnline: isPartnerOnline,
+               messageSnippet: "[Image]",
+               groupId,
+            });
+         }
       } catch (err) {
          console.error("Failed to send image:", err);
          useAppStore.getState().updateGlobalMessage({ id: messageId, status: "failed" });
@@ -1057,6 +1090,22 @@ export default function FloatingChatBubble() {
          useAppStore.getState().updateGlobalMessage({ id: payload.id, status: "sent" });
          removeOutbox(payload.id).catch(() => { });
          markGroupAsRead(payload.group_id);
+
+         // Trigger client-side push notification if recipient is offline in a DM
+         const currentGroup = groups.find((g) => g.id === payload.group_id);
+         if (currentGroup?.type === "dm" && currentGroup?.dm_partner) {
+            const partner = currentGroup.dm_partner;
+            const isPartnerOnline = onlineUsers?.some((u) => u.id === partner.id);
+            void sendDirectMessagePushNotification({
+               senderId: user.id,
+               senderName: profile?.username || "Someone",
+               recipientId: partner.id,
+               recipientLastSeenAt: partner.last_seen_at,
+               isRecipientOnline: isPartnerOnline,
+               messageSnippet: plainTextForRestore || payload.content || "",
+               groupId: payload.group_id,
+            });
+         }
       } catch (err) {
          console.error("Failed to send message:", err);
          useAppStore.getState().updateGlobalMessage({ id: payload.id, status: "failed" });

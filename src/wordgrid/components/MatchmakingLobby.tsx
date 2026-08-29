@@ -11,7 +11,7 @@ import { getLastActivityAt } from '../../utils/wordgrid/staleMatches';
 import formatLastSeen from '../../utils/formatLastSeen';
 import { useTheme } from '@/hooks/useTheme';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
-import { Trash2, Users, Bot, Check, Search, Sparkles } from 'lucide-react';
+import { Trash2, Users, Bot, Check, Search, Sparkles, Eye } from 'lucide-react';
 import { TOAST_DURATION } from '../../constants/ui';
 
 interface PlayerProfile {
@@ -413,6 +413,14 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
                           }`}>
                           {expired ? 'Expired' : won ? 'Won' : 'Lost'}
                         </span>
+                        <button
+                          onClick={() => handleResumeMatch(match.id)}
+                          className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-sm active:scale-95"
+                          title="Preview Game Board and History"
+                        >
+                          <Eye size={12} className="text-indigo-400" />
+                          <span>Preview</span>
+                        </button>
                         {match.is_bot_match && (
                           <button
                             onClick={() => setMatchToDelete({ id: match.id, name: opp.username })}
