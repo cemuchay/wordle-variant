@@ -34,7 +34,7 @@ import { useTypingPresence } from "../../hooks/useTypingPresence";
 import { usePeerReceipts } from "../../hooks/usePeerReceipts";
 import MessageInfoModal from "./ChatMessage/MessageInfoModal";
 
-const CLOSE_DELAY = 45000;
+const CLOSE_DELAY = 60000; // 1 full minute
 // Desktop docked panel width (anchored beside the bubble)
 const PANEL_WIDTH = 380;
 
@@ -125,10 +125,10 @@ const renderFormattedMessageText = (text: string, currentUsername?: string, isMe
             <span
                key={i}
                className={`font-extrabold px-1 py-0.5 rounded-md ${isSelfMention
-                     ? "bg-amber-400/25 text-amber-300 ring-1 ring-amber-400/50 shadow-sm"
-                     : isMe
-                        ? "bg-white/20 text-white underline underline-offset-2"
-                        : "bg-indigo-500/20 text-indigo-300 ring-1 ring-indigo-500/30"
+                  ? "bg-amber-400/25 text-amber-300 ring-1 ring-amber-400/50 shadow-sm"
+                  : isMe
+                     ? "bg-white/20 text-white underline underline-offset-2"
+                     : "bg-indigo-500/20 text-indigo-300 ring-1 ring-indigo-500/30"
                   }`}
             >
                {part}
@@ -1160,18 +1160,19 @@ export default function FloatingChatBubble() {
    // Handle reply
    const handleReply = (msg: any) => {
       setReplyingToMsg(msg);
-      // Reliably focus textarea and trigger mobile virtual keyboard
-      requestAnimationFrame(() => {
-         setTimeout(() => {
-            if (replyInputRef.current) {
-               replyInputRef.current.focus();
-               const len = replyInputRef.current.value.length;
-               replyInputRef.current.setSelectionRange(len, len);
-               // Trigger input click/touch to prompt mobile software keyboard
-               replyInputRef.current.click();
-            }
-         }, 30);
-      });
+      // Reliably focus textarea and summon mobile virtual keyboard within user gesture tick
+      const focusTextarea = () => {
+         if (replyInputRef.current) {
+            replyInputRef.current.focus({ preventScroll: true });
+            const len = replyInputRef.current.value.length;
+            replyInputRef.current.setSelectionRange(len, len);
+         }
+      };
+
+      // 1. Immediate synchronous focus (required by iOS Safari & Android Chrome user gesture token)
+      focusTextarea();
+      // 2. Immediate microtask tick fallback in case state re-render temporarily interrupted focus
+      setTimeout(focusTextarea, 0);
    };
 
    // Handle swipe to reply
@@ -1583,8 +1584,8 @@ export default function FloatingChatBubble() {
                                           });
                                        }}
                                        className={`p-1.5 rounded-lg transition-colors cursor-pointer ${isCalling
-                                             ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 animate-pulse"
-                                             : "text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 animate-pulse"
+                                          : "text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
                                           }`}
                                        title="Start Voice Call"
                                     >
@@ -1599,8 +1600,8 @@ export default function FloatingChatBubble() {
                                        if (isChatSearchOpen) setChatSearchQuery("");
                                     }}
                                     className={`p-1.5 rounded-lg transition-colors cursor-pointer ${isChatSearchOpen
-                                          ? "bg-indigo-600/30 text-indigo-300 border border-indigo-500/40"
-                                          : "text-gray-400 hover:text-white hover:bg-white/5"
+                                       ? "bg-indigo-600/30 text-indigo-300 border border-indigo-500/40"
+                                       : "text-gray-400 hover:text-white hover:bg-white/5"
                                        }`}
                                     title="Search in conversation"
                                  >
@@ -2004,10 +2005,10 @@ export default function FloatingChatBubble() {
                                                             <ChatImage url={msg.image_url} />
                                                          ) : (
                                                             <p className={`text-xs text-left mt-1 leading-relaxed whitespace-pre-wrap break-words px-3 py-2 rounded-2xl ${isMe
-                                                                  ? 'bg-indigo-600 border border-indigo-500 text-white'
-                                                                  : isGroupChat
-                                                                     ? `${userColor.bg} border ${userColor.border} text-gray-100`
-                                                                     : 'bg-white/5 border border-white/5 text-gray-200'
+                                                               ? 'bg-indigo-600 border border-indigo-500 text-white'
+                                                               : isGroupChat
+                                                                  ? `${userColor.bg} border ${userColor.border} text-gray-100`
+                                                                  : 'bg-white/5 border border-white/5 text-gray-200'
                                                                }`}>
                                                                {renderFormattedMessageText(getDecryptedContent(msg), profile?.username, isMe)}
                                                                {msg.is_edited && (
