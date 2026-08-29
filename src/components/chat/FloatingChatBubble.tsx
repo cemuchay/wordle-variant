@@ -990,6 +990,11 @@ export default function FloatingChatBubble() {
    const getSmartInitials = (name: string) =>
       name.split(' ').map(w => w[0]?.toUpperCase() || '').join('');
 
+   // Unread count from other conversations when a conversation is open
+   const otherRoomsUnreadCount = selectedGroupId
+      ? unreadMessages.filter((m) => m.group_id !== selectedGroupId).length
+      : 0;
+
    // Latest unread sender info for the bubble display
    const latestUnreadMsg = unreadMessages[unreadMessages.length - 1] as any;
    const latestUnreadGroup = latestUnreadMsg ? groups.find((g: any) => g.id === latestUnreadMsg.group_id) : null;
@@ -1561,9 +1566,14 @@ export default function FloatingChatBubble() {
                               {selectedGroupId && (
                                  <button
                                     onClick={() => setSelectedGroupId(null)}
-                                    className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                                    className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer flex items-center gap-1"
                                  >
                                     <ArrowLeft className="w-4 h-4" />
+                                    {otherRoomsUnreadCount > 0 && (
+                                       <span className="bg-rose-500 text-white font-extrabold text-[10px] leading-none px-1.5 py-0.5 rounded-full flex items-center justify-center shadow-md animate-pulse">
+                                          {otherRoomsUnreadCount > 99 ? "99+" : otherRoomsUnreadCount}
+                                       </span>
+                                    )}
                                  </button>
                               )}
                               <div className="flex flex-col min-w-0">
