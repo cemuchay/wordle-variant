@@ -24,7 +24,7 @@ interface VoicePlaybackState {
   pause: () => void;
   stop: () => void;
   /** Silently primes chained <audio> elements so iOS allows auto-advance. */
-  unlockChain: (ids: string[]) => void;
+  unlockChain: (ids: string[], activeId?: string) => void;
   playNext: (messageIds: string[], messages: VoiceMessageLike[]) => void;
 }
 
@@ -35,32 +35,35 @@ const attemptPlay = (ref: HTMLAudioElement, onFail?: () => void) => {
     if (session) session.type = "playback";
   } catch { /* noop */ }
 
-  const start = () => {
-    ref.play().catch((err) => {
-      // One retry once the element can play — recovers transient loading races
-      if (err?.name === "NotSupportedError" || err?.name === "AbortError") {
+  // Ensure element is unmuted
+  ref.muted = false;
+
+  // Modern browsers: initiate play immediately within user gesture tick
+  const playPromise = ref.play();
+  if (playPromise !== undefined) {
+    playPromise.catch((err) => {
+      // If playback aborted due to loading or transient network race, retry when ready
+      if (
+        err?.name === "AbortError" ||
+        err?.name === "NotSupportedError" ||
+        err?.name === "InvalidStateError"
+      ) {
         const retry = () => {
-          ref.removeEventListener("canplay", retry);
+          cleanup();
           ref.play().catch(() => onFail?.());
         };
+        const cleanup = () => {
+          ref.removeEventListener("canplay", retry);
+          ref.removeEventListener("loadeddata", retry);
+        };
         ref.addEventListener("canplay", retry);
-        setTimeout(() => ref.removeEventListener("canplay", retry), 4000);
+        ref.addEventListener("loadeddata", retry);
+        setTimeout(cleanup, 4000);
       } else {
+        console.warn("[VoicePlayback] Audio play failed:", err);
         onFail?.();
       }
     });
-  };
-
-  // Never call load()+play() back-to-back — the load abort races playback.
-  if (ref.readyState >= 2) {
-    start();
-  } else {
-    const whenReady = () => {
-      ref.removeEventListener("canplay", whenReady);
-      start();
-    };
-    ref.addEventListener("canplay", whenReady);
-    setTimeout(() => ref.removeEventListener("canplay", whenReady), 4000);
   }
 };
 
@@ -129,9 +132,11 @@ export const useVoicePlaybackStore = create<VoicePlaybackState>((set, get) => ({
     set({ currentlyPlaying: null, isPaused: false });
   },
 
-  unlockChain: (ids) => {
+  unlockChain: (ids: string[], activeId?: string) => {
     const { audioRefs } = get();
     ids.forEach((id) => {
+      // Never prime/mute the active track currently being played
+      if (id === activeId) return;
       const ref = audioRefs[id];
       if (!ref || !ref.paused) return;
       ref.muted = true;

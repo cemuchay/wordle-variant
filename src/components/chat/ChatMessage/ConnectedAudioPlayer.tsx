@@ -120,7 +120,7 @@ export const ConnectedAudioPlayer = ({
   const handleToggle = () => {
     if (!chainUnlockedRef.current && allMessageIds?.length) {
       chainUnlockedRef.current = true;
-      unlockChain(allMessageIds);
+      unlockChain(allMessageIds, messageId);
     }
     if (hasError) setHasError(false);
     const isActive = currentlyPlaying?.messageId === messageId;
