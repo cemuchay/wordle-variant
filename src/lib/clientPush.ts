@@ -327,8 +327,8 @@ export async function sendWordGridTurnNotification(
 // Direct Message Client Push Notification Helpers
 // ==========================================
 
-const DM_OFFLINE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
-const DM_BURST_COOLDOWN_MS = 20 * 60 * 1000; // 20 minutes cooldown per string of messages
+const DM_OFFLINE_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes
+const DM_BURST_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes cooldown per string of messages
 const DM_NOTIFICATION_TRACKER_KEY = "variant_dm_push_tracker_v1";
 
 interface DMTrackerEntry {
@@ -381,7 +381,7 @@ export function pruneQueueForUser(userId: string): void {
 }
 
 /**
- * Evaluates whether recipient qualifies as offline (> 5 mins) and dispatches a single
+ * Evaluates whether recipient qualifies as offline (>= 2 mins) and dispatches a single
  * consolidated push notification per string of messages.
  */
 export async function sendDirectMessagePushNotification({
@@ -412,21 +412,22 @@ export async function sendDirectMessagePushNotification({
       return false;
    }
 
-   // 2. Offline check: verify recipient has been away for >= 5 minutes from message time
+   // 2. Offline check: verify recipient has been away for >= 2 minutes from message time
    const messageTimeMs = new Date(sentAt).getTime();
    if (recipientLastSeenAt) {
       const lastSeenMs = new Date(recipientLastSeenAt).getTime();
       const elapsedSinceSeen = messageTimeMs - lastSeenMs;
       if (elapsedSinceSeen < DM_OFFLINE_THRESHOLD_MS) {
-         return false; // User was active less than 5 minutes ago
+         return false; // User was active less than 2 minutes ago
       }
    }
 
-   // 3. String-of-messages deduplication: only 1 push notification per burst
+   // 3. String-of-messages deduplication: only 1 push notification per 15-minute burst
+   const now = Date.now();
+   const timeBucket = Math.floor(now / DM_BURST_COOLDOWN_MS);
    const trackerKey = `${recipientId}_${senderId}`;
    const tracker = loadDMTracker();
    const existing = tracker[trackerKey];
-   const now = Date.now();
 
    if (existing && now - existing.lastNotifiedAt < DM_BURST_COOLDOWN_MS) {
       // Update burst count in tracker without firing another notification
@@ -445,31 +446,32 @@ export async function sendDirectMessagePushNotification({
    };
    saveDMTracker(tracker);
 
-   // 5. Build clean, sanitized snippet preview
+   // 5. Build clean, Safari/iOS WebPush-friendly snippet preview
    let cleanPreview = (messageSnippet || "").trim();
    if (cleanPreview.startsWith("e2ee:")) {
-      cleanPreview = "Sent you a new message";
+      cleanPreview = "Sent you a new encrypted message";
    } else if (cleanPreview === "[Voice Message]") {
-      cleanPreview = "🎤 Sent you a voice message";
+      cleanPreview = "Sent you a voice message";
    } else if (cleanPreview === "[Image]") {
-      cleanPreview = "📷 Sent you an image";
-   } else if (cleanPreview.length > 80) {
-      cleanPreview = cleanPreview.slice(0, 77) + "...";
+      cleanPreview = "Sent you an image";
+   } else if (cleanPreview.length > 60) {
+      cleanPreview = cleanPreview.slice(0, 57) + "...";
    }
 
-   const notifId = generateDeterministicUUID(`dm_${recipientId}_${senderId}_${now}`);
+   const safeSender = senderName ? senderName.trim() : "Someone";
+   const notifId = generateDeterministicUUID(`dm_reminder_${recipientId}_${senderId}_${timeBucket}`);
 
    return sendClientNotification({
       id: notifId,
       user_id: recipientId,
-      type: "DM_MESSAGE",
-      title: `${senderName || "New Message"} 💬`,
-      message: cleanPreview || `You have a new direct message from ${senderName}.`,
+      type: "DM_REMINDER",
+      title: `Message from ${safeSender}`,
+      message: cleanPreview || `You have a new message from ${safeSender}.`,
       data: {
          mode: "chat_dm",
-         groupId,
+         group_id: groupId,
          senderId,
-         senderName,
+         senderName: safeSender,
       },
    });
 }

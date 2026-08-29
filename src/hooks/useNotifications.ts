@@ -25,8 +25,8 @@ export const useNotifications = (userId: string | undefined, options: { enableRe
                 .limit(LIMITS.NOTIFICATIONS);
 
             if (error) throw error;
-            // Filter out DM_MESSAGE notifications from the in-app notifications system
-            return (data as AppNotification[]).filter(n => n.type !== 'DM_MESSAGE');
+            // Filter out DM_MESSAGE and DM_REMINDER notifications from the in-app notifications system
+            return (data as AppNotification[]).filter(n => n.type !== 'DM_MESSAGE' && n.type !== 'DM_REMINDER');
         },
         enabled: !!userId,
     });
@@ -47,7 +47,7 @@ export const useNotifications = (userId: string | undefined, options: { enableRe
                 },
                 (payload) => {
                     const newNotif = payload.new as AppNotification;
-                    if (newNotif.type === 'DM_MESSAGE') return; // Ignore DM message notifications in-app
+                    if (newNotif.type === 'DM_MESSAGE' || newNotif.type === 'DM_REMINDER') return; // Ignore DM message/reminder in-app bell
                     
                     // Optimistically add to query cache
                     queryClient.setQueryData(['notifications', userId], (old: AppNotification[] = []) => [
