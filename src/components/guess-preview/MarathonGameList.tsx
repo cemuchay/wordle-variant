@@ -9,6 +9,7 @@ interface MarathonGameListProps {
     marathonGameIndex: number;
     setMarathonGameIndex: (idx: number) => void;
     setShowTargetWord: (show: boolean) => void;
+    onSelectGame?: (idx: number) => void;
     entry: any;
     myParticipation: any;
     profile: any;
@@ -39,6 +40,7 @@ export const MarathonGameList = memo(({
     marathonGameIndex,
     setMarathonGameIndex,
     setShowTargetWord,
+    onSelectGame,
     entry,
     myParticipation,
     profile,
@@ -117,6 +119,7 @@ export const MarathonGameList = memo(({
                 onClick={() => {
                     setMarathonGameIndex(idx);
                     setShowTargetWord(false);
+                    onSelectGame?.(idx);
                 }}
                 className={`w-full px-1.5 py-2 h-auto min-h-[36px] rounded-lg text-[10px] font-black transition-all flex flex-col items-center justify-center text-center border relative ${marathonGameIndex === idx ? "bg-correct text-black border-correct scale-105 shadow-md shadow-correct/20 z-10" : canSelect ? colorClasses : "bg-white/5 text-gray-400 border-white/5 hover:bg-white/10 cursor-pointer"}`}
             >
@@ -131,7 +134,7 @@ export const MarathonGameList = memo(({
     };
 
     return (
-        <div ref={marathonGamesRef} className="mb-4 border-b border-white/5 py-4 w-full scroll-mt-20">
+        <div id="marathon-games-section" ref={marathonGamesRef} className="mb-4 border-b border-white/5 py-4 w-full scroll-mt-20">
             <div className="flex justify-between items-center mb-3 px-1">
                 <span className="text-[10px] font-black uppercase text-gray-500 tracking-wider">
                     Marathon Games

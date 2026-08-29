@@ -1,4 +1,5 @@
 import type { GuessResult } from "../types/game";
+import { calculateSkillIndex } from "./game-logic";
 
 /**
  * Generates a formatted text summary of the game result for clipboard sharing.
@@ -30,12 +31,10 @@ export const censorRoast = (message: string): string => {
  * Generates a formatted text summary of the game result for clipboard sharing.
  * 
  * @what Creates the "Grid" of emojis (🟩🟨⬛) synonymous with Wordle, 
- * along with metadata like the date, word length, and attempt count.
+ * along with metadata like the date, word length, attempt count, and skill score.
  * 
  * @param params - Game result metadata.
  * @returns A multi-line string formatted for social sharing.
- * 
- * @adjustment Tip: If you switch to light-mode support, consider replacing '⬛' with '⬜'.
  */
 export const generateShareText = ({
    date,
@@ -46,6 +45,8 @@ export const generateShareText = ({
    gameMessage,
    wordLength,
    isAuthenticated,
+   score: explicitScore,
+   hintRecord,
 }: {
    date: string;
    guesses: GuessResult[][];
@@ -55,9 +56,31 @@ export const generateShareText = ({
    gameMessage: string;
    wordLength: number;
    isAuthenticated?: boolean;
+   score?: number;
+   hintRecord?: { index: number; letter: string; row?: number } | null;
 }) => {
-   const score = won ? guesses.length : "X";
+   const attemptsText = won ? guesses.length : "X";
    const hintMarker = usedHint ? " 💡" : "";
+
+   // Calculate skill score if not explicitly passed
+   let skillScore: number;
+   if (typeof explicitScore === "number") {
+      skillScore = explicitScore;
+   } else {
+      try {
+         const breakdown = calculateSkillIndex({
+            attempts: guesses.length,
+            maxAttempts,
+            usedHint,
+            guesses,
+            gameDate: date,
+            hintRecord: hintRecord || null,
+         });
+         skillScore = breakdown.finalScore;
+      } catch {
+         skillScore = 0;
+      }
+   }
    
    // Format the date strictly to DD/MM/YYYY
    let localDate = "";
@@ -80,8 +103,7 @@ export const generateShareText = ({
       localDate += "**";
    }
    
-   const header = `Variant - ${localDate} \n
-  ${score}/${maxAttempts}${` (${wordLength}L)`}${hintMarker}\n`;
+   const header = `Variant - ${localDate}\n${attemptsText}/${maxAttempts} (${wordLength}L) • Score: ${skillScore} pts${hintMarker}`;
 
    const grid = guesses
       .map((row) => {
@@ -96,5 +118,5 @@ export const generateShareText = ({
       .join("\n");
    const footer = usedHint ? "\n* assisted by a hint" : "";
    const censoredMessage = gameMessage ? censorRoast(gameMessage) : "";
-   return `${header}\n${grid}${footer}\n\n${censoredMessage ? `"${censoredMessage}"` : ""}`;
+   return `${header}\n\n${grid}${footer}\n\n${censoredMessage ? `"${censoredMessage}"` : ""}`.trimEnd();
 };
