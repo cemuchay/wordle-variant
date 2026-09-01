@@ -375,13 +375,8 @@ export const calculateSkillIndexSub = ({
    }
 
    let localHint = 0;
-
-   // DEDUCT HINT POINTS
-   if (hintRecord && hintRecord?.row !== undefined) {
-      const rowBonus = rows[hintRecord.row - 1];
-      if (rowBonus !== undefined) {
-         localHint -= SCORING.HINT_PENALTY;
-      }
+   if (usedHint || (hintRecord && hintRecord?.row !== undefined)) {
+      localHint -= SCORING.HINT_PENALTY;
    }
 
    // 3. FINAL AGGREGATION

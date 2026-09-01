@@ -45,6 +45,7 @@ interface ModalsManagerProps {
         guesses: GuessResult[][];
         config: any;
         usedHint: boolean;
+        hintRecord?: { index: number; letter: string; row?: number } | null;
         gameMessage: string;
         stats: any;
     };
@@ -179,6 +180,7 @@ export const ModalsManager = ({
                     date={gameContext.date}
                     config={gameContext.config}
                     usedHint={gameContext.usedHint}
+                    hintRecord={gameContext.hintRecord}
                     gameMessage={gameContext.gameMessage}
                     stats={gameContext.stats}
                     isAuthenticated={gameContext.user ? true : false}
