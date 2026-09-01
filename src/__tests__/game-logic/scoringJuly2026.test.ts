@@ -101,6 +101,21 @@ describe('calculateSkillIndexJuly2026', () => {
       expect(result.hint).toBe(-100)
    })
 
+   it('hint penalty applied when usedHint is true even without hintRecord', () => {
+      const guesses = [
+         [g('T', 'present'), g('R', 'absent'), g('A', 'absent'), g('C', 'absent'), g('E', 'absent')],
+         [g('W', 'correct'), g('O', 'correct'), g('R', 'correct'), g('D', 'correct'), g('S', 'correct')],
+      ]
+      const result = calculateSkillIndexJuly2026({
+         attempts: 2,
+         maxAttempts: 6,
+         usedHint: true,
+         guesses,
+         hintRecord: null,
+      })
+      expect(result.hint).toBe(-100)
+   })
+
    it('green→yellow regression deducted', () => {
       const guesses = [
          [g('W', 'correct'), g('O', 'absent'), g('R', 'absent'), g('D', 'absent'), g('S', 'absent')],

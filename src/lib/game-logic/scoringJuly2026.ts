@@ -4,7 +4,7 @@ import { SCORING } from "../../constants/game";
 export const calculateSkillIndexJuly2026 = ({
    attempts: _attempts,
    maxAttempts,
-   usedHint: _usedHint,
+   usedHint,
    guesses,
    hintRecord,
 }: {
@@ -407,11 +407,8 @@ export const calculateSkillIndexJuly2026 = ({
    }
 
    let localHint = 0;
-   if (hintRecord && hintRecord?.row !== undefined) {
-      const rowBonus = rows[hintRecord.row - 1];
-      if (rowBonus !== undefined) {
-         localHint -= SCORING.HINT_PENALTY;
-      }
+   if (usedHint || (hintRecord && hintRecord?.row !== undefined)) {
+      localHint -= SCORING.HINT_PENALTY;
    }
 
    const currentAttempts = guesses.length;

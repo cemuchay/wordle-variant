@@ -347,6 +347,7 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
         maxAttempts,
         won: isWon,
         usedHint: usedHint ?? false,
+        hintRecord: hintRecord || null,
         gameMessage: gameMessage ?? '',
         wordLength,
         isAuthenticated: !!profile,

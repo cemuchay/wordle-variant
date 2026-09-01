@@ -14,6 +14,7 @@ interface Props {
   date: string;
   config: GameConfig;
   usedHint: boolean;
+  hintRecord?: { index: number; letter: string; row?: number } | null;
   gameMessage: string;
   stats: GameStats;
   isAuthenticated: boolean;
@@ -26,6 +27,7 @@ export const GameOverModal: React.FC<Props> = ({
   date,
   config,
   usedHint,
+  hintRecord,
   gameMessage,
   stats,
   isAuthenticated,
@@ -176,6 +178,7 @@ export const GameOverModal: React.FC<Props> = ({
                       (r) => r.status === "correct",
                     ) ?? false,
                   usedHint,
+                  hintRecord,
                   gameMessage,
                   wordLength: config?.word?.length || 0,
                   isAuthenticated,

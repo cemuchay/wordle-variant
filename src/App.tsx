@@ -1315,6 +1315,7 @@ function MainApp() {
           guesses: state.guesses,
           config,
           usedHint: state.usedHint,
+          hintRecord: state.hintRecord,
           gameMessage: state.gameMessage,
           stats,
           isGameOver: state.isGameOver,
