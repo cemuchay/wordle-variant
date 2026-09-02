@@ -71,6 +71,7 @@ export const PostGameHub: React.FC<PostGameHubProps> = ({
           isWon={isWon}
           attemptsCount={guesses.length}
           maxAttempts={maxAttempts}
+          date={date}
         />
       </div>
 

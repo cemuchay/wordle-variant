@@ -175,17 +175,17 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
     const extraWidth = maxAttempts > LAYOUT.COMPACT_GRID_THRESHOLD ? LAYOUT.GRID_EXTRA_WIDTH : 0;
     const topButtonsHeight = shouldHideNavButtons ? 0 : 36;
 
-    const usableWidth = maxGridWidth - padding - extraWidth;
-    const cellWidthLimit = Math.max(24, (usableWidth - (wordLength - 1) * gapSize) / wordLength);
+    const usableWidth = Math.max(180, maxGridWidth - padding - extraWidth);
+    const cellWidthLimit = Math.max(32, (usableWidth - (wordLength - 1) * gapSize) / wordLength);
 
     if (maxAttempts > LAYOUT.COMPACT_GRID_THRESHOLD) {
       cellSizePx = Math.floor(cellWidthLimit);
     } else {
-      const usableHeight = maxGridHeight - padding - topButtonsHeight;
-      const cellHeightLimit = (usableHeight - (displayedRowCount - 1) * gapSize) / displayedRowCount;
+      const usableHeight = Math.max(180, maxGridHeight - padding - topButtonsHeight);
+      const cellHeightLimit = Math.max(32, (usableHeight - (displayedRowCount - 1) * gapSize) / displayedRowCount);
       // Provide generous sizing while bounding to standard maximum
-      const maxTileBound = isDesktop ? 64 : 56;
-      cellSizePx = Math.floor(Math.max(20, Math.min(cellWidthLimit, cellHeightLimit, maxTileBound)));
+      const maxTileBound = isDesktop ? 62 : 54;
+      cellSizePx = Math.floor(Math.max(28, Math.min(cellWidthLimit, cellHeightLimit, maxTileBound)));
     }
 
     // On desktop in challenge mode, apply resize scale
@@ -193,6 +193,9 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
       const resizeScale = maxAttempts > LAYOUT.COMPACT_GRID_THRESHOLD ? 0.35 : LAYOUT.GRID_RESIZE_SCALE;
       cellSizePx = Math.floor(cellSizePx * resizeScale);
     }
+  } else {
+    // Fallback default cellSize if container dimensions haven't fired yet
+    cellSizePx = isDesktop ? 58 : 50;
   }
 
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

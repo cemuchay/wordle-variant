@@ -51,6 +51,8 @@ export function hasWordPrefix(prefix: string): boolean {
   return trie.hasPrefix(prefix);
 }
 
+import { safeLocalStorage } from '../storage';
+
 export interface DictionaryDefinition {
   word: string;
   partOfSpeech?: string;
@@ -60,15 +62,35 @@ export interface DictionaryDefinition {
 
 /**
  * Fetches the definition and pronunciation of a word using CORS-friendly Datamuse and Wiktionary endpoints.
+ * Automatically caches definitions in safeLocalStorage using the game date so old words don't clutter storage.
  */
-export async function fetchWordDefinition(word: string): Promise<DictionaryDefinition> {
+export async function fetchWordDefinition(word: string, date?: string): Promise<DictionaryDefinition> {
   const normalized = word.trim().toLowerCase();
+  if (!normalized) {
+    return { word: '', definition: 'A valid English word.' };
+  }
+
+  // 1. Check local cache first (keyed by date so it auto-expires or can be purged daily)
+  const todayKey = date || new Date().toISOString().split('T')[0];
+  const cacheKey = `wordle_def_${todayKey}`;
+  try {
+    const cached = safeLocalStorage.getItem(cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed && parsed.word?.toLowerCase() === normalized && parsed.definition) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    // Silent cache read error
+  }
+
   const fallback: DictionaryDefinition = {
     word: word.toUpperCase(),
     definition: 'A valid English word.',
   };
 
-  // 1. Primary: Datamuse API (always has Access-Control-Allow-Origin: *, provides definitions, parts of speech, and IPA / pron)
+  // 2. Primary: Datamuse API (always has Access-Control-Allow-Origin: *, provides definitions, parts of speech, and IPA / pron)
   try {
     const res = await fetch(`https://api.datamuse.com/words?sp=${normalized}&md=dp&ipa=1&max=1`);
     if (res.ok) {
@@ -111,12 +133,16 @@ export async function fetchWordDefinition(word: string): Promise<DictionaryDefin
         }
 
         if (definition) {
-          return {
+          const result: DictionaryDefinition = {
             word: word.toUpperCase(),
             partOfSpeech,
             definition,
             phonetic,
           };
+          try {
+            safeLocalStorage.setItem(cacheKey, JSON.stringify(result));
+          } catch {}
+          return result;
         }
       }
     }
@@ -124,7 +150,7 @@ export async function fetchWordDefinition(word: string): Promise<DictionaryDefin
     console.error('Datamuse API error:', e);
   }
 
-  // 2. Fallback: Wikipedia/Wiktionary REST API (supports CORS)
+  // 3. Fallback: Wikipedia/Wiktionary REST API (supports CORS)
   try {
     const res = await fetch(`https://en.wiktionary.org/api/rest_v1/page/definition/${normalized}`);
     if (res.ok) {
@@ -133,13 +159,16 @@ export async function fetchWordDefinition(word: string): Promise<DictionaryDefin
         const firstEntry = data.en[0];
         const partOfSpeech = firstEntry.partOfSpeech ? String(firstEntry.partOfSpeech).toUpperCase() : undefined;
         if (Array.isArray(firstEntry.definitions) && firstEntry.definitions.length > 0) {
-          // Strip html tags if present
           const cleanDef = firstEntry.definitions[0].definition.replace(/<[^>]*>?/gm, '').trim();
-          return {
+          const result: DictionaryDefinition = {
             word: word.toUpperCase(),
             partOfSpeech,
             definition: cleanDef,
           };
+          try {
+            safeLocalStorage.setItem(cacheKey, JSON.stringify(result));
+          } catch {}
+          return result;
         }
       }
     }

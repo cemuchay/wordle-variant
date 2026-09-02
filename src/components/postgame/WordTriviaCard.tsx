@@ -7,6 +7,7 @@ interface WordTriviaCardProps {
   isWon?: boolean;
   attemptsCount?: number;
   maxAttempts?: number;
+  date?: string;
 }
 
 export const WordTriviaCard: React.FC<WordTriviaCardProps> = ({
@@ -14,6 +15,7 @@ export const WordTriviaCard: React.FC<WordTriviaCardProps> = ({
   isWon = true,
   attemptsCount,
   maxAttempts = 6,
+  date,
 }) => {
   const [definitionData, setDefinitionData] = useState<DictionaryDefinition | null>(null);
   const [phonetic, setPhonetic] = useState<string>("");
@@ -27,7 +29,7 @@ export const WordTriviaCard: React.FC<WordTriviaCardProps> = ({
 
     const loadDetails = async () => {
       try {
-        const def = await fetchWordDefinition(word);
+        const def = await fetchWordDefinition(word, date);
         if (!isMounted) return;
         setDefinitionData(def);
         if (def.phonetic) {
@@ -44,7 +46,7 @@ export const WordTriviaCard: React.FC<WordTriviaCardProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [word]);
+  }, [word, date]);
 
   const playPronunciation = () => {
     if (audioUrl) {

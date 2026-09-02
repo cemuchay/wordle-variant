@@ -173,7 +173,7 @@ export const DesktopGameLayout: React.FC<DesktopGameLayoutProps> = ({
             </div>
 
             {/* Grid */}
-            <div className="py-2">
+            <div className="relative grid-wrapper-parent shrink-0 py-2">
               <NewGrid
                 wordLength={wordLength}
                 maxAttempts={maxAttempts}
@@ -187,8 +187,8 @@ export const DesktopGameLayout: React.FC<DesktopGameLayoutProps> = ({
                 gameplayType={gameplayType}
                 onSetCursor={onSetCursor}
                 onSetEditIndex={onSetEditIndex}
-                maxGridWidth={gridDimensions.maxWidth}
-                maxGridHeight={gridDimensions.maxHeight}
+                maxGridWidth={null}
+                maxGridHeight={null}
                 onToggleRules={onToggleRules}
                 showRules={showHelp}
                 onHint={onHint}

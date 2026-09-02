@@ -78,6 +78,8 @@ export const GameArea = ({
     const containerRef = useRef<HTMLDivElement>(null);
     const keyboardRef = useRef<HTMLDivElement>(null);
     const wasGameOverOnMount = useRef(isGameOver || isAlreadyPlayed);
+    
+    // Instantaneous game over state resolution
     const [hideKeyboard, setHideKeyboard] = useState(wasGameOverOnMount.current);
     const [isBoardCollapsed, setIsBoardCollapsed] = useState(true);
 
@@ -209,7 +211,7 @@ export const GameArea = ({
         usedHint,
         canShowHint,
         isHintLocked,
-        hideKeyboard,
+        hideKeyboard: hideKeyboard || isGameOver || isAlreadyPlayed,
         isBoardCollapsed,
         gridDimensions,
         showHelp,
