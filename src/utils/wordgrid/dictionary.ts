@@ -1,8 +1,6 @@
-// src/utils/wordgrid/dictionary.ts
+import { loadScrabbleDictionary, getScrabbleTrie } from './scrabbleTrie';
 
-import { loadWordLists } from '../../data/words';
-
-// Standard 107 Scrabble 2-letter words
+// Fallback 107 Scrabble 2-letter words if network/trie is initializing
 const VALID_2_LETTER_WORDS = new Set([
   'AA', 'AB', 'AD', 'AE', 'AG', 'AH', 'AI', 'AL', 'AM', 'AN', 'AR', 'AS', 'AT', 'AW', 'AX', 'AY',
   'BA', 'BE', 'BI', 'BO', 'BY', 'DE', 'DO', 'ED', 'EF', 'EH', 'EL', 'EM', 'EN', 'ER', 'ES', 'ET',
@@ -14,57 +12,43 @@ const VALID_2_LETTER_WORDS = new Set([
 ]);
 
 /**
- * Validates whether a word is in the official dictionary.
+ * Validates whether a word is in the official Scrabble dictionary (CSW21 / SOWPODS).
  */
 export async function validateWordInDictionary(word: string): Promise<boolean> {
   const normalized = word.trim().toUpperCase();
   const len = normalized.length;
 
-  if (len < 2) return false;
+  if (len < 2 || len > 15) return false;
 
-  // 1. Two-letter words validation (from hardcoded set)
+  const trie = getScrabbleTrie() || (await loadScrabbleDictionary());
+  return trie.isWord(normalized);
+}
+
+/**
+ * Synchronous dictionary check (if Trie is already loaded in memory)
+ */
+export function isWordValidSync(word: string): boolean {
+  const normalized = word.trim().toUpperCase();
+  const len = normalized.length;
+  if (len < 2 || len > 15) return false;
+
+  const trie = getScrabbleTrie();
+  if (trie) {
+    return trie.isWord(normalized);
+  }
   if (len === 2) {
     return VALID_2_LETTER_WORDS.has(normalized);
   }
+  return false;
+}
 
-  // 2. Three-to-ten letter words validation (loaded dynamically using IndexedDB & official files)
-  if (len >= 3 && len <= 10) {
-    try {
-      const lists = await loadWordLists(len, false);
-      return lists.valid.has(normalized) || lists.official.includes(normalized);
-    } catch (e) {
-      console.warn(`Failed to load word list for length ${len}, fallback to true`, e);
-      return true;
-    }
-  }
-
-  // 3. Eleven or more letters: Fallback to Free Dictionary API or Datamuse API
-  try {
-    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${normalized.toLowerCase()}`);
-    if (res.ok) {
-      return true;
-    }
-    if (res.status === 404) {
-      return false;
-    }
-  } catch (e) {
-    // CORS or network error on api.dictionaryapi.dev
-  }
-
-  // Fallback to Datamuse (CORS friendly)
-  try {
-    const res = await fetch(`https://api.datamuse.com/words?sp=${normalized.toLowerCase()}&max=1`);
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0 && data[0].word.toLowerCase() === normalized.toLowerCase()) {
-        return true;
-      }
-    }
-  } catch (e) {
-    // Network errors shouldn't block play
-  }
-
-  return true;
+/**
+ * Fast prefix checker for search pruning in bot algorithms
+ */
+export function hasWordPrefix(prefix: string): boolean {
+  const trie = getScrabbleTrie();
+  if (!trie) return true;
+  return trie.hasPrefix(prefix);
 }
 
 export interface DictionaryDefinition {

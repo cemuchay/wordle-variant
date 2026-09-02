@@ -17,6 +17,7 @@ import { useTheme } from '../hooks/useTheme';
 import { ProtectedAvatar } from '../components/chat/ProtectedAvatar';
 import { TOAST_DURATION } from '../constants/ui';
 import { buildPlayerColorMap } from '../utils/wordgrid/playerColors';
+import { loadScrabbleDictionary } from '../utils/wordgrid/scrabbleTrie';
 import formatUsername from '../utils/formatUsername';
 
 interface WordGridContainerProps {
@@ -132,6 +133,13 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
   };
 
 
+
+  // Preload Scrabble dictionary into IndexedDB / memory
+  useEffect(() => {
+    loadScrabbleDictionary().catch(err => {
+      console.warn('Scrabble dictionary preload warning:', err);
+    });
+  }, []);
 
   // Subscribe to match updates when matchId changes
   useEffect(() => {
