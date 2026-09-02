@@ -388,6 +388,9 @@ export default function FloatingChatBubble() {
       }, CLOSE_DELAY);
    };
 
+   // Track whether the unread line was seen in the viewport before hiding on scroll past
+   const unreadLineSeenRef = useRef(false);
+
    // Handle scroll in the messages area
    const handleScroll = () => {
       resetInactivityTimer();
@@ -398,8 +401,16 @@ export default function FloatingChatBubble() {
       }
       if (showUnreadLine && visibleUnreadId && scrollRef.current) {
          const el = document.getElementById("fb-unread-line");
-         if (el && el.getBoundingClientRect().bottom < 0) {
-            setShowUnreadLine(false);
+         if (el) {
+            const rect = el.getBoundingClientRect();
+            const containerRect = scrollRef.current.getBoundingClientRect();
+            const inView = rect.top >= containerRect.top && rect.bottom <= containerRect.bottom;
+            if (inView) {
+               unreadLineSeenRef.current = true;
+            } else if (unreadLineSeenRef.current && rect.bottom < containerRect.top) {
+               // Only hide if the user actually scrolled down past the seen divider
+               setShowUnreadLine(false);
+            }
          }
       }
    };
@@ -1355,13 +1366,18 @@ export default function FloatingChatBubble() {
    const handleMarkAsRead = (messageId: string) => {
       if (!user?.id || !selectedGroupId) return;
       markGroupsRead(user.id, [selectedGroupId]);
-      supabase
-         .from("messages")
-         .update({ is_read: true })
-         .eq("id", messageId)
-         .then(({ error }) => {
-            if (error) console.error("Failed to update message read status:", error);
-         });
+
+      // Only update the message row's legacy is_read column for 1-on-1 DMs to avoid false read ticks in group chats
+      const currentGroup = groups.find((g) => g.id === selectedGroupId);
+      if (currentGroup?.type === "dm") {
+         supabase
+            .from("messages")
+            .update({ is_read: true })
+            .eq("id", messageId)
+            .then(({ error }) => {
+               if (error) console.error("Failed to update message read status:", error);
+            });
+      }
    };
 
    const hasCapturedDividerRef = useRef(false);
@@ -1412,6 +1428,7 @@ export default function FloatingChatBubble() {
    // Reset snapshot on room change
    useEffect(() => {
       hasCapturedDividerRef.current = false;
+      unreadLineSeenRef.current = false;
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisibleUnreadId(null);
       setShowUnreadLine(true);
@@ -1578,7 +1595,13 @@ export default function FloatingChatBubble() {
                            <div className="flex items-center gap-2">
                               {selectedGroupId && (
                                  <button
-                                    onClick={() => setSelectedGroupId(null)}
+                                    onClick={() => {
+                                       if (user?.id && selectedGroupId) {
+                                          markGroupsRead(user.id, [selectedGroupId]);
+                                          visitedGroupsRef.current.delete(selectedGroupId);
+                                       }
+                                       setSelectedGroupId(null);
+                                    }}
                                     className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer flex items-center gap-1"
                                  >
                                     <ArrowLeft className="w-4 h-4" />
