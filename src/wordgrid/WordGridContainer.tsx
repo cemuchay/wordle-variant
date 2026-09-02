@@ -18,6 +18,7 @@ import { ProtectedAvatar } from '../components/chat/ProtectedAvatar';
 import { TOAST_DURATION } from '../constants/ui';
 import { buildPlayerColorMap } from '../utils/wordgrid/playerColors';
 import { loadScrabbleDictionary } from '../utils/wordgrid/scrabbleTrie';
+import { useWordGridPresence } from '../hooks/useWordGridPresence';
 import formatUsername from '../utils/formatUsername';
 
 interface WordGridContainerProps {
@@ -27,7 +28,7 @@ interface WordGridContainerProps {
 export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) => {
   useTheme('wordGrid');
   const { user } = useAuth();
-  const { triggerToast, allProfiles } = useApp();
+  const { triggerToast, allProfiles, profile } = useApp();
 
   const {
     matchId,
@@ -176,8 +177,26 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     }
   }, [status, isBotMatch, currentTurn, isBotThinking]);
 
+  const myUsername = profile?.username || user?.user_metadata?.username || 'You';
+  const { presenceMap, setSelfPlacing } = useWordGridPresence(
+    matchId,
+    effectiveUserId,
+    myUsername,
+    status === 'active' && !isBotMatch
+  );
+
+  // Auto-broadcast placing state when local player places tiles
+  useEffect(() => {
+    if (placedTiles.length > 0) {
+      setSelfPlacing(true);
+    }
+  }, [placedTiles.length, setSelfPlacing]);
+
   const handleSelectTile = (idx: number) => {
     setSelectedRackIdx(idx < 0 ? null : idx);
+    if (idx >= 0) {
+      setSelfPlacing(true);
+    }
   };
 
   // Tiles can be arranged any time (even off-turn) for strategizing; only
@@ -187,12 +206,14 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     if (letter !== undefined) {
       placeTile(x, y, letter);
       setSelectedRackIdx(null);
+      setSelfPlacing(true);
     }
   };
 
   // Empty-cell tap with no (or a blank) tile selected → Scrabble letter picker
   const handlePickLetterForCell = (x: number, y: number) => {
     setPickerCell({ x, y });
+    setSelfPlacing(true);
   };
 
   const handlePickerChoose = (chosen: string) => {
@@ -210,10 +231,12 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     }
     setPickerCell(null);
     setSelectedRackIdx(null);
+    setSelfPlacing(true);
   };
 
   const handleRecallTile = (x: number, y: number) => {
     recallTile(x, y);
+    setSelfPlacing(true);
   };
 
   // Potential score preview calculated in real-time as tiles are placed on the grid
@@ -237,6 +260,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
   const handleSubmit = async () => {
     if (placedTiles.length === 0 || isValidatingWord) return;
     setIsValidatingWord(true);
+    setSelfPlacing(false);
     try {
       await submitMove(effectiveUserId, triggerToast);
     } finally {
@@ -432,9 +456,57 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
 
             {/* Bottom row: Turn status & Player scores */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 w-full">
-              <span className={`text-[11px] font-black leading-tight truncate ${isMyTurn ? 'text-amber-400 animate-pulse' : 'text-slate-400'}`}>
-                {status === 'completed' ? '🏁 Match Finished (Preview)' : status === 'abandoned' ? '⌛ Match Expired (Preview)' : isMyTurn ? '🔥 Your Turn' : isBotMatch && (isBotThinking || currentTurn === 'bot') ? '🤖 Bot is thinking...' : 'Waiting for move...'}
-              </span>
+              {(() => {
+                // Find if an opponent is currently active or placing tiles
+                const opponentEntries = Object.entries(presenceMap).filter(([pId]) => pId !== effectiveUserId);
+                const activePlacer = opponentEntries.find(([_, data]) => data.isPlacing);
+                const isAnyOpponentInGame = opponentEntries.some(([_, data]) => data.inGame);
+
+                if (status === 'completed') {
+                  return <span className="text-[11px] font-black text-slate-400">🏁 Match Finished (Preview)</span>;
+                }
+                if (status === 'abandoned') {
+                  return <span className="text-[11px] font-black text-slate-400">⌛ Match Expired (Preview)</span>;
+                }
+                if (isBotMatch) {
+                  return (
+                    <span className={`text-[11px] font-black leading-tight truncate ${isMyTurn ? 'text-amber-400 animate-pulse' : 'text-slate-400'}`}>
+                      {isMyTurn ? '🔥 Your Turn' : isBotThinking || currentTurn === 'bot' ? '🤖 Bot is thinking...' : 'Waiting for move...'}
+                    </span>
+                  );
+                }
+
+                if (activePlacer) {
+                  const placerName = activePlacer[1].username || 'Opponent';
+                  return (
+                    <span className="text-[11px] font-black text-amber-300 flex items-center gap-1.5 animate-pulse">
+                      <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                      ⚡ {placerName} is placing tiles...
+                    </span>
+                  );
+                }
+
+                if (isMyTurn) {
+                  return (
+                    <span className="text-[11px] font-black text-amber-400 flex items-center gap-1.5 animate-pulse">
+                      🔥 Your Turn
+                    </span>
+                  );
+                }
+
+                return (
+                  <span className="text-[11px] font-black text-slate-400 flex items-center gap-1.5">
+                    {isAnyOpponentInGame ? (
+                      <>
+                        <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" />
+                        Opponent is in game
+                      </>
+                    ) : (
+                      'Waiting for opponent...'
+                    )}
+                  </span>
+                );
+              })()}
 
               <div className="flex items-center gap-2 bg-[#101828]/90 px-3 py-1.5 border border-slate-800 rounded-2xl shadow-inner flex-wrap">
                 {activePlayersList.map((p: any, i: number) => {
@@ -444,18 +516,35 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
                   const scheme = colorMap[pId];
                   const avatarUrl = p?.avatar_url || profileLookup[pId]?.avatar_url;
                   const displayName = isYou ? 'You' : (p?.username || profileLookup[pId]?.username || 'Player');
+                  const isOpponentInMatch = !isYou && presenceMap[pId]?.inGame;
+                  const isOpponentPlacingTiles = !isYou && presenceMap[pId]?.isPlacing;
 
                   return (
                     <div key={pId} className="flex items-center gap-1.5 text-[10px] font-black">
                       {i > 0 && <span className="text-slate-700 font-bold">•</span>}
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 relative">
                         {pId !== 'bot' && !pId.startsWith('bot') ? (
-                          <ProtectedAvatar
-                            userId={pId}
-                            src={avatarUrl || undefined}
-                            username={displayName}
-                            className={`w-5 h-5 rounded-full border ${isCurrent ? 'ring-2 ring-indigo-400 border-indigo-300' : 'border-slate-700'}`}
-                          />
+                          <div className="relative">
+                            <ProtectedAvatar
+                              userId={pId}
+                              src={avatarUrl || undefined}
+                              username={displayName}
+                              className={`w-5 h-5 rounded-full border ${isCurrent ? 'ring-2 ring-indigo-400 border-indigo-300' : 'border-slate-700'}`}
+                            />
+                            {/* Live online dot indicator */}
+                            {!isYou && (
+                              <span
+                                className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-slate-900 ${
+                                  isOpponentPlacingTiles
+                                    ? 'bg-amber-400 animate-ping'
+                                    : isOpponentInMatch
+                                    ? 'bg-emerald-400 shadow-xs'
+                                    : 'bg-slate-600'
+                                }`}
+                                title={isOpponentPlacingTiles ? 'Placing tiles' : isOpponentInMatch ? 'In game' : 'Offline'}
+                              />
+                            )}
+                          </div>
                         ) : (
                           <span className="text-xs">🤖</span>
                         )}

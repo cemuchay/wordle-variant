@@ -78,13 +78,13 @@ export const BoardGrid = ({
           key={key}
           className={`aspect-square rounded-lg sm:rounded-xl flex flex-col items-center justify-center relative shadow-lg transform transition-all select-none ${
             isLatestPlay && playScheme
-              ? `bg-linear-to-br from-amber-100 via-amber-200 to-amber-300 border-2 border-white ${playScheme.ring} ${playScheme.glowShadow} scale-105 z-10 animate-pulse`
-              : 'bg-linear-to-br from-amber-200 via-amber-300 to-amber-400 border border-amber-200 hover:scale-[1.02]'
+              ? `${playScheme.tileSurface} ${playScheme.glowShadow} scale-105 z-10 animate-pulse`
+              : 'bg-linear-to-br from-amber-200 via-amber-300 to-amber-400 border border-amber-300/80 hover:scale-[1.02]'
           }`}
         >
-          <span className={`${textClass} text-slate-950 select-none leading-none ${isBlank ? 'underline decoration-2 underline-offset-2' : ''}`}>{letter}</span>
+          <span className={`${textClass} ${isLatestPlay && playScheme ? playScheme.tileText : 'text-slate-950'} select-none leading-none ${isBlank ? 'underline decoration-2 underline-offset-2' : ''}`}>{letter}</span>
           {gridSize <= 11 && (
-            <span className={`text-[9px] font-black absolute bottom-0.5 right-1 select-none text-slate-900`}>{val}</span>
+            <span className={`text-[9px] font-black absolute bottom-0.5 right-1 select-none ${isLatestPlay && playScheme ? playScheme.tileValueText : 'text-slate-900'}`}>{val}</span>
           )}
           {isLatestPlay && playScheme && (
             <span
