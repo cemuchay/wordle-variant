@@ -47,7 +47,6 @@ import { initTelemetry } from "./lib/telemetry";
 import { flushNotificationQueue } from "./lib/clientPush";
 import { useWordGridStore } from "./store/useWordGridStore";
 
-const ChatRoom = safeLazy(() => import("./components/chatRoom"));
 const StatsModal = safeLazy(() => import("./components/StatsModal").then(m => ({ default: m.StatsModal })));
 const ChallengeModal = safeLazy(() => import("./components/ChallengeModal").then(m => ({ default: m.ChallengeModal })));
 const WordUpContainer = safeLazy(() => import("./wordup/WordUpContainer").then(m => ({ default: m.WordUpContainer })));
@@ -462,7 +461,6 @@ function MainApp() {
   // Preload ChatRoom and other lazy chunks in the background when the app is idle
   useEffect(() => {
     const preloadLazyComponents = () => {
-      ChatRoom.preload?.();
       WordUpContainer.preload?.();
       StatsModal.preload?.();
       ChallengeModal.preload?.();
@@ -1083,7 +1081,7 @@ function MainApp() {
       <LandscapeBlocker />
       <GlobalAudioPlayer />
       <NotificationsManager />
-      {user && <FloatingChatBubble />}
+      {user && !isChatOpen && <FloatingChatBubble mode="bubble" />}
       {user && showDisconnectedUI && (
         <DisconnectedUI reconnectStatus={reconnectStatus} handleManualReconnect={handleManualReconnect} />
       )}
@@ -1187,9 +1185,9 @@ function MainApp() {
             )}
 
             {activeNavigationItem === "chat" && (
-              <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
+              <div className="h-full w-full flex flex-col p-0 sm:p-2 bg-dark">
                 <Suspense fallback={<ChatSkeleton />}>
-                  <ChatRoom user={user as AppUser} onClose={() => setIsChatOpen(false)} />
+                  <FloatingChatBubble mode="full" onCloseFull={() => setIsChatOpen(false)} />
                 </Suspense>
               </div>
             )}

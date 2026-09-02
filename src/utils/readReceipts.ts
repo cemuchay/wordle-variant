@@ -45,8 +45,27 @@ export function getSeenBy(msgCreatedAt: string, peerReceipts: Record<string, str
 }
 
 /**
+ * Safely merges incoming read receipts with existing local receipts,
+ * ensuring timestamps only move forward monotonically.
+ */
+export function mergeReadReceipts(
+   current: Record<string, string>,
+   incoming: Record<string, string>,
+): Record<string, string> {
+   const merged = { ...current };
+   for (const [groupId, incomingTs] of Object.entries(incoming)) {
+      if (!incomingTs) continue;
+      const currentTs = merged[groupId];
+      if (!currentTs || new Date(incomingTs).getTime() > new Date(currentTs).getTime()) {
+         merged[groupId] = incomingTs;
+      }
+   }
+   return merged;
+}
+
+/**
  * Marks groups as read with a server-anchored timestamp (the newest known
- * non-reaction message per group) so device-clock skew can never make read
+ * non-reaction message per group, or current time) so device-clock skew can never make read
  * messages reappear as unread after a refresh. Optimistic locally, persisted
  * in the background; failed upserts fall back to the persisted
  * pendingReadReceipts queue which is flushed on reconnect/startup.
@@ -64,10 +83,10 @@ export function markGroupsRead(userId: string, groupIds: string[]): void {
          const t = new Date(m.created_at).getTime();
          if (t > latestMessageTs) latestMessageTs = t;
       }
-      // Never regress below an already-known receipt
+      // Never regress below an already-known receipt or current time when messages exist
       const existingTs = new Date(state.readReceipts[groupId] || 0).getTime();
-      const anchorMs = Math.max(latestMessageTs, existingTs);
-      const iso = new Date(anchorMs > 0 ? anchorMs : Date.now()).toISOString();
+      const anchorMs = Math.max(latestMessageTs, existingTs, Date.now());
+      const iso = new Date(anchorMs).toISOString();
       anchors[groupId] = iso;
       state.updateReadReceipt(groupId, iso);
    }

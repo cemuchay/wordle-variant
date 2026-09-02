@@ -15,7 +15,7 @@ import { safeLocalStorage } from '../utils/storage';
 import { getAllMessages, saveMessages, addMessage, updateMessage, removeMessage, purgeMessagesOlderThan } from '../utils/indexedDBMessages';
 import { getOutbox, removeOutbox, purgeOldOutbox } from '../utils/outbox';
 import { deliverOutboxEntry } from '../utils/messageDelivery';
-import { isReactionRow } from '../utils/readReceipts';
+import { isReactionRow, mergeReadReceipts } from '../utils/readReceipts';
 import { showDesktopNotification, } from '../utils/notifications';
 import { logger } from '../lib/logger';
 import { TOAST_DURATION } from '../constants/ui';
@@ -564,7 +564,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     receipts[r.group_id] = r.last_seen_at;
                 });
             }
-            useAppStore.getState().setReadReceipts(receipts);
+            const currentReceipts = useAppStore.getState().readReceipts;
+            useAppStore.getState().setReadReceipts(mergeReadReceipts(currentReceipts, receipts));
 
             const { data: memberData } = await supabase
                 .from('chat_group_members')
