@@ -181,8 +181,8 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
    const [isSubmittingNewConv, setIsSubmittingNewConv] = useState(false);
    const [invites, setInvites] = useState<{ id: string; name: string; creator: string }[]>([]);
 
-   // Incremental pagination (page size: 25)
-   const [messageLimit, setMessageLimit] = useState(25);
+   // Incremental pagination (page size: 100 in full view, 25 in bubble mode)
+   const [messageLimit, setMessageLimit] = useState(() => (propMode === "full" || isChatOpen ? 100 : 25));
 
    const [prevUnreadCount, setPrevUnreadCount] = useState(unreadCount);
 
@@ -1616,7 +1616,8 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
       setIsChatSearchOpen(false);
       setChatSearchQuery("");
       setIsScrolledUp(false);
-   }, [selectedGroupId]);
+      setMessageLimit(isFullMode ? 100 : 25);
+   }, [selectedGroupId, isFullMode]);
 
    // Divider visibility: auto-hide after 6s if in view, persist if scrolled below
    useEffect(() => {
@@ -2047,140 +2048,148 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                           </motion.div>
                                        )}
 
-                                       <div className={`flex flex-col group/msg ${isMe ? "items-end" : "items-start"}`}>
-                                          {isGroupChat && !isMe && (
-                                             <span className={`text-[10px] font-black uppercase mb-1 px-1 tracking-wider ${userColor.name}`}>
-                                                {msg.profiles?.username || "Unknown"}
-                                             </span>
-                                          )}
-
-                                          {/* Message bubble */}
-                                          <div className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-xs relative ${isMe
-                                             ? "bg-indigo-600 text-white rounded-tr-xs"
-                                             : "bg-white/10 text-white rounded-tl-xs"
-                                             }`}>
-                                             {/* Replied message preview */}
-                                             {msg.reply_to && (
-                                                <div
-                                                   onClick={() => handleJumpToMessage(msg.reply_to.id)}
-                                                   className="mb-1 p-1.5 bg-black/20 border-l-2 border-indigo-400 rounded text-[10px] opacity-80 cursor-pointer hover:opacity-100"
-                                                >
-                                                   <div className="font-bold">{msg.reply_to.author || "User"}</div>
-                                                   <div className="truncate">{msg.reply_to.text}</div>
-                                                </div>
+                                       <div className={`flex items-start gap-2.5 ${isMe ? "flex-row-reverse" : ""}`}>
+                                          <ProtectedAvatar
+                                             userId={msg.user_id}
+                                             src={msg.profiles?.avatar_url}
+                                             username={msg.profiles?.username}
+                                             className={`w-8 h-8 rounded-full border bg-slate-900 shrink-0 ${!isMe && isGroupChat ? userColor.border : "border-white/10"}`}
+                                          />
+                                          <div className={`flex flex-col group/msg min-w-0 max-w-[80%] ${isMe ? "items-end" : "items-start"}`}>
+                                             {isGroupChat && !isMe && (
+                                                <span className={`text-[10px] font-black uppercase mb-1 px-1 tracking-wider ${userColor.name}`}>
+                                                   {msg.profiles?.username || "Unknown"}
+                                                </span>
                                              )}
 
-                                             {/* Message Content */}
-                                             {isEditing ? (
-                                                <div className="flex flex-col gap-1.5 min-w-[200px]">
-                                                   <textarea
-                                                      rows={2}
-                                                      value={editText}
-                                                      onChange={(e) => setEditText(e.target.value)}
-                                                      className="bg-slate-900 border border-indigo-400 rounded p-1.5 text-xs text-white outline-none"
-                                                   />
-                                                   <div className="flex justify-end gap-1">
-                                                      <button onClick={() => setEditingMessageId(null)} className="px-2 py-0.5 text-[10px] text-gray-400 hover:text-white cursor-pointer">
-                                                         Cancel
-                                                      </button>
-                                                      <button onClick={() => handleEditSave(msg.id)} className="px-2 py-0.5 text-[10px] bg-indigo-500 text-white rounded cursor-pointer">
-                                                         Save
-                                                      </button>
+                                             {/* Message bubble */}
+                                             <div className={`rounded-2xl px-3.5 py-2 text-xs relative ${isMe
+                                                ? "bg-indigo-600 text-white rounded-tr-xs"
+                                                : "bg-white/10 text-white rounded-tl-xs"
+                                                }`}>
+                                                {/* Replied message preview */}
+                                                {msg.reply_to && (
+                                                   <div
+                                                      onClick={() => handleJumpToMessage(msg.reply_to.id)}
+                                                      className="mb-1 p-1.5 bg-black/20 border-l-2 border-indigo-400 rounded text-[10px] opacity-80 cursor-pointer hover:opacity-100"
+                                                   >
+                                                      <div className="font-bold">{msg.reply_to.author || "User"}</div>
+                                                      <div className="truncate">{msg.reply_to.text}</div>
                                                    </div>
-                                                </div>
-                                             ) : (
-                                                <>
-                                                   {msg.voice_url ? (
-                                                      <ConnectedAudioPlayer
-                                                         url={msg.voice_url}
-                                                         messageId={msg.id}
-                                                         allMessageIds={activeRoomMessages.map((m: any) => m.id)}
-                                                         allMessages={activeRoomMessages}
-                                                         userId={user?.id || ""}
-                                                      />
-                                                   ) : msg.image_url ? (
-                                                      <ChatImage url={msg.image_url} />
-                                                   ) : (
-                                                      <div className="leading-relaxed break-words whitespace-pre-wrap">
-                                                         {renderEmojiNode(content || "")}
-                                                      </div>
-                                                   )}
-                                                </>
-                                             )}
+                                                )}
 
-                                             {/* Metadata row: time + read status */}
-                                             <div className="flex items-center justify-end gap-1 mt-1 text-[9px] opacity-60 select-none">
-                                                {msg.is_edited && <span className="italic">edited</span>}
-                                                <span>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                                {isMe && (
-                                                   <span>
-                                                      {msg.status === "sending" ? (
-                                                         "•"
-                                                      ) : msg.status === "failed" ? (
-                                                         <span className="text-red-400 font-bold">!</span>
+                                                {/* Message Content */}
+                                                {isEditing ? (
+                                                   <div className="flex flex-col gap-1.5 min-w-[200px]">
+                                                      <textarea
+                                                         rows={2}
+                                                         value={editText}
+                                                         onChange={(e) => setEditText(e.target.value)}
+                                                         className="bg-slate-900 border border-indigo-400 rounded p-1.5 text-xs text-white outline-none"
+                                                      />
+                                                      <div className="flex justify-end gap-1">
+                                                         <button onClick={() => setEditingMessageId(null)} className="px-2 py-0.5 text-[10px] text-gray-400 hover:text-white cursor-pointer">
+                                                            Cancel
+                                                         </button>
+                                                         <button onClick={() => handleEditSave(msg.id)} className="px-2 py-0.5 text-[10px] bg-indigo-500 text-white rounded cursor-pointer">
+                                                            Save
+                                                         </button>
+                                                      </div>
+                                                   </div>
+                                                ) : (
+                                                   <>
+                                                      {msg.voice_url ? (
+                                                         <ConnectedAudioPlayer
+                                                            url={msg.voice_url}
+                                                            messageId={msg.id}
+                                                            allMessageIds={activeRoomMessages.map((m: any) => m.id)}
+                                                            allMessages={activeRoomMessages}
+                                                            userId={user?.id || ""}
+                                                         />
+                                                      ) : msg.image_url ? (
+                                                         <ChatImage url={msg.image_url} />
                                                       ) : (
-                                                         <CheckCheck size={10} className={resolveTickState(msg, user?.id, peerReceipts) === "read" ? "text-blue-400 inline" : "text-white/30 inline"} />
+                                                         <div className="leading-relaxed break-words whitespace-pre-wrap">
+                                                            {renderEmojiNode(content || "")}
+                                                         </div>
                                                       )}
-                                                   </span>
+                                                   </>
+                                                )}
+
+                                                {/* Metadata row: time + read status */}
+                                                <div className="flex items-center justify-end gap-1 mt-1 text-[9px] opacity-60 select-none">
+                                                   {msg.is_edited && <span className="italic">edited</span>}
+                                                   <span>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                   {isMe && (
+                                                      <span>
+                                                         {msg.status === "sending" ? (
+                                                            "•"
+                                                         ) : msg.status === "failed" ? (
+                                                            <span className="text-red-400 font-bold">!</span>
+                                                         ) : (
+                                                            <CheckCheck size={10} className={resolveTickState(msg, user?.id, peerReceipts) === "read" ? "text-blue-400 inline" : "text-white/30 inline"} />
+                                                         )}
+                                                      </span>
+                                                   )}
+                                                </div>
+
+                                                {/* Reactions Badge */}
+                                                {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                                                   <ReactionBadge
+                                                      reactions={msg.reactions}
+                                                      isMe={isMe}
+                                                      onShowDetails={() => setShowReactionDetailsId(showReactionDetailsId === msg.id ? null : msg.id)}
+                                                   />
                                                 )}
                                              </div>
 
-                                             {/* Reactions Badge */}
-                                             {msg.reactions && Object.keys(msg.reactions).length > 0 && (
-                                                <ReactionBadge
-                                                   reactions={msg.reactions}
-                                                   isMe={isMe}
-                                                   onShowDetails={() => setShowReactionDetailsId(showReactionDetailsId === msg.id ? null : msg.id)}
-                                                />
-                                             )}
-                                          </div>
-
-                                          {/* Hover quick action buttons (desktop) */}
-                                          <div className="opacity-0 group-hover/msg:opacity-100 transition-opacity flex items-center gap-1 mt-0.5 px-1">
-                                             <button onClick={() => setReactingMessageId(reactingMessageId === msg.id ? null : msg.id)} className="p-1 hover:text-white text-gray-400 rounded cursor-pointer" title="React">
-                                                <Smile className="w-3 h-3" />
-                                             </button>
-                                             <button onClick={() => { setReplyingToMsg(msg); replyInputRef.current?.focus(); }} className="p-1 hover:text-white text-gray-400 rounded cursor-pointer" title="Reply">
-                                                <Reply className="w-3 h-3" />
-                                             </button>
-                                             {isMe && !msg.voice_url && !msg.image_url && (
-                                                <button onClick={() => { setEditingMessageId(msg.id); setEditText(content); }} className="p-1 hover:text-white text-gray-400 rounded cursor-pointer" title="Edit">
-                                                   <Edit2 className="w-3 h-3" />
+                                             {/* Hover quick action buttons (desktop) */}
+                                             <div className="opacity-0 group-hover/msg:opacity-100 transition-opacity flex items-center gap-1 mt-0.5 px-1">
+                                                <button onClick={() => setReactingMessageId(reactingMessageId === msg.id ? null : msg.id)} className="p-1 hover:text-white text-gray-400 rounded cursor-pointer" title="React">
+                                                   <Smile className="w-3 h-3" />
                                                 </button>
-                                             )}
-                                             {isMe && (
-                                                <button onClick={() => handleDeleteMessage(msg.id)} className="p-1 hover:text-red-400 text-gray-400 rounded cursor-pointer" title="Delete">
-                                                   <Trash2 className="w-3 h-3" />
+                                                <button onClick={() => { setReplyingToMsg(msg); replyInputRef.current?.focus(); }} className="p-1 hover:text-white text-gray-400 rounded cursor-pointer" title="Reply">
+                                                   <Reply className="w-3 h-3" />
                                                 </button>
-                                             )}
-                                          </div>
+                                                {isMe && !msg.voice_url && !msg.image_url && (
+                                                   <button onClick={() => { setEditingMessageId(msg.id); setEditText(content); }} className="p-1 hover:text-white text-gray-400 rounded cursor-pointer" title="Edit">
+                                                      <Edit2 className="w-3 h-3" />
+                                                   </button>
+                                                )}
+                                                {isMe && (
+                                                   <button onClick={() => handleDeleteMessage(msg.id)} className="p-1 hover:text-red-400 text-gray-400 rounded cursor-pointer" title="Delete">
+                                                      <Trash2 className="w-3 h-3" />
+                                                   </button>
+                                                )}
+                                             </div>
 
-                                          {/* Inline Reaction Picker Popover */}
-                                          <AnimatePresence>
-                                             {reactingMessageId === msg.id && (
-                                                <>
-                                                   <motion.div
-                                                      initial={{ opacity: 0 }}
-                                                      animate={{ opacity: 1 }}
-                                                      exit={{ opacity: 0 }}
-                                                      onClick={() => setReactingMessageId(null)}
-                                                      className="fixed inset-0 bg-black/20 z-40"
-                                                   />
-                                                   <ReactionPicker
-                                                      ref={reactionsRef}
-                                                      isMe={isMe}
-                                                      onReact={(emoji) => handleReact(msg.id, emoji)}
-                                                      currentReaction={user?.id ? msg.reactions?.[user.id] : undefined}
-                                                      onCopy={() => {
-                                                         copyToClipboard(content);
-                                                         setReactingMessageId(null);
-                                                      }}
-                                                      onEdit={isMe && !msg.voice_url && !msg.image_url ? () => { setEditingMessageId(msg.id); setEditText(content); setReactingMessageId(null); } : undefined}
-                                                      onDelete={isMe ? () => { handleDeleteMessage(msg.id); setReactingMessageId(null); } : undefined}
-                                                   />
-                                                </>
-                                             )}
-                                          </AnimatePresence>
+                                             {/* Inline Reaction Picker Popover */}
+                                             <AnimatePresence>
+                                                {reactingMessageId === msg.id && (
+                                                   <>
+                                                      <motion.div
+                                                         initial={{ opacity: 0 }}
+                                                         animate={{ opacity: 1 }}
+                                                         exit={{ opacity: 0 }}
+                                                         onClick={() => setReactingMessageId(null)}
+                                                         className="fixed inset-0 bg-black/20 z-40"
+                                                      />
+                                                      <ReactionPicker
+                                                         ref={reactionsRef}
+                                                         isMe={isMe}
+                                                         onReact={(emoji) => handleReact(msg.id, emoji)}
+                                                         currentReaction={user?.id ? msg.reactions?.[user.id] : undefined}
+                                                         onCopy={() => {
+                                                            copyToClipboard(content);
+                                                            setReactingMessageId(null);
+                                                         }}
+                                                         onEdit={isMe && !msg.voice_url && !msg.image_url ? () => { setEditingMessageId(msg.id); setEditText(content); setReactingMessageId(null); } : undefined}
+                                                         onDelete={isMe ? () => { handleDeleteMessage(msg.id); setReactingMessageId(null); } : undefined}
+                                                      />
+                                                   </>
+                                                )}
+                                             </AnimatePresence>
+                                          </div>
                                        </div>
                                     </div>
                                  );
