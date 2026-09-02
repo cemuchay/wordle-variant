@@ -3,6 +3,10 @@ import { supabase } from "./supabaseClient";
 import type { NotificationType } from "../types/notifications";
 
 const PUSH_QUEUE_STORAGE_KEY = "variant_client_push_queue_v1";
+// Drop queued messages older than 2 hours (or 30 mins for real-time DMs/reminders)
+export const QUEUE_DEFAULT_MAX_AGE_MS = 2 * 60 * 60 * 1000; // 2 hours
+export const QUEUE_DM_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes for DMs / DM_REMINDER
+export const QUEUE_MAX_RETRIES = 5;
 
 export interface ClientNotificationPayload {
    id?: string;
@@ -15,15 +19,54 @@ export interface ClientNotificationPayload {
    retryCount?: number;
 }
 
-function loadQueue(): ClientNotificationPayload[] {
+/**
+ * Checks if a queued notification has expired or exceeded max retries.
+ */
+export function isNotificationStale(item: ClientNotificationPayload, now = Date.now()): boolean {
+   if ((item.retryCount || 0) >= QUEUE_MAX_RETRIES) {
+      return true;
+   }
+   if (!item.created_at) {
+      return false;
+   }
+   const createdTime = new Date(item.created_at).getTime();
+   if (isNaN(createdTime)) {
+      return true; // invalid date is considered stale
+   }
+   const maxAge = item.type === "DM_REMINDER" || item.type === "DM_MESSAGE"
+      ? QUEUE_DM_MAX_AGE_MS
+      : QUEUE_DEFAULT_MAX_AGE_MS;
+   return now - createdTime > maxAge;
+}
+
+/**
+ * Prunes expired or exhausted notifications from the localStorage queue.
+ * Returns the cleaned queue.
+ */
+export function pruneStaleNotificationQueue(): ClientNotificationPayload[] {
    if (typeof window === "undefined") return [];
    try {
       const raw = localStorage.getItem(PUSH_QUEUE_STORAGE_KEY);
       if (!raw) return [];
-      return JSON.parse(raw);
+      const parsed: ClientNotificationPayload[] = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+         localStorage.removeItem(PUSH_QUEUE_STORAGE_KEY);
+         return [];
+      }
+      const now = Date.now();
+      const freshQueue = parsed.filter((item) => !isNotificationStale(item, now));
+      if (freshQueue.length !== parsed.length) {
+         saveQueue(freshQueue);
+      }
+      return freshQueue;
    } catch {
+      localStorage.removeItem(PUSH_QUEUE_STORAGE_KEY);
       return [];
    }
+}
+
+function loadQueue(): ClientNotificationPayload[] {
+   return pruneStaleNotificationQueue();
 }
 
 function saveQueue(queue: ClientNotificationPayload[]): void {
@@ -158,14 +201,24 @@ export async function flushNotificationQueue(): Promise<void> {
    if (!queue || queue.length === 0) return;
 
    const remainingQueue: ClientNotificationPayload[] = [];
+   const now = Date.now();
 
    for (const item of queue) {
+      if (isNotificationStale(item, now)) {
+         // Drop stale item immediately without dispatching
+         continue;
+      }
+
       const success = await dispatchNotificationWithRetry(item, 3);
       if (!success) {
-         remainingQueue.push({
+         const nextRetryCount = (item.retryCount || 0) + 1;
+         const updatedItem = {
             ...item,
-            retryCount: (item.retryCount || 0) + 1,
-         });
+            retryCount: nextRetryCount,
+         };
+         if (!isNotificationStale(updatedItem, Date.now())) {
+            remainingQueue.push(updatedItem);
+         }
       }
    }
 

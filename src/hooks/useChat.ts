@@ -772,7 +772,7 @@ export const useChat = (userId: string) => {
                recipientId: partner.id,
                recipientLastSeenAt: partnerLastSeen,
                isRecipientOnline: isPartnerOnline,
-               messageSnippet: content || voiceUrl ? "[Voice Message]" : imageUrl ? "[Image]" : "",
+               messageSnippet: content || (voiceUrl ? "[Voice Message]" : imageUrl ? "[Image]" : ""),
                groupId: activeRoomId,
                sentAt: optimisticMessage.created_at,
             });
