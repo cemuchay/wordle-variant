@@ -85,6 +85,68 @@ describe("Client Push Notification Manager", () => {
       expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
    });
 
+   it("prunes stale queued notifications (> max age or max retries) from localStorage without dispatching them", async () => {
+      const expiredTime = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(); // 3 hours ago (default max is 2 hours)
+      const staleDmTime = new Date(Date.now() - 40 * 60 * 1000).toISOString(); // 40 mins ago (DM max is 30 mins)
+
+      const staleNotif1 = {
+         id: "stale-1",
+         user_id: mockUserId,
+         type: "CHALLENGE_INVITE",
+         title: "Old Challenge",
+         message: "Expired challenge invite",
+         created_at: expiredTime,
+         retryCount: 0,
+      };
+
+      const staleDmNotif = {
+         id: "stale-dm",
+         user_id: mockUserId,
+         type: "DM_REMINDER",
+         title: "Old DM",
+         message: "Expired DM reminder",
+         created_at: staleDmTime,
+         retryCount: 0,
+      };
+
+      const maxRetriesNotif = {
+         id: "stale-retries",
+         user_id: mockUserId,
+         type: "CHALLENGE_INVITE",
+         title: "Exhausted retries",
+         message: "Retried 5 times",
+         created_at: new Date().toISOString(),
+         retryCount: 5,
+      };
+
+      const freshNotif = {
+         id: "fresh-1",
+         user_id: mockUserId,
+         type: "CHALLENGE_INVITE",
+         title: "Fresh Notification",
+         message: "Valid fresh invite",
+         created_at: new Date().toISOString(),
+         retryCount: 0,
+      };
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([staleNotif1, staleDmNotif, maxRetriesNotif, freshNotif]));
+
+      const mockInsert = vi.fn().mockResolvedValue({ error: null });
+      (supabase.from as any).mockReturnValue({ insert: mockInsert });
+
+      await flushNotificationQueue();
+
+      // Only the fresh notification should have been dispatched to Supabase!
+      expect(mockInsert).toHaveBeenCalledTimes(1);
+      expect(mockInsert).toHaveBeenCalledWith(
+         expect.objectContaining({
+            title: "Fresh Notification",
+         })
+      );
+      // Stale ones should be completely removed from localStorage
+      expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+   });
+
    it("helper sendWordUpInviteNotification formats payload correctly", async () => {
       const mockInsert = vi.fn().mockResolvedValue({ error: null });
       (supabase.from as any).mockReturnValue({ insert: mockInsert });

@@ -177,14 +177,14 @@ export const NotificationModal = memo(() => {
         } else if (n.type === 'NEW_COMMENT' || n.type === 'FOLLOWEE_STARTED_PLAYING' || n.type === 'FOLLOWEE_FINISHED_PLAYING') {
             window.dispatchEvent(new CustomEvent('open-stats-modal', { detail: { tab: 'leaderboard' } }));
             setIsNotificationsOpen(false);
-        } else if (n.type === 'DM_MESSAGE' || n.type === 'CHAT_MENTION') {
+        } else if (n.type === 'DM_MESSAGE' || n.type === 'DM_REMINDER' || n.type === 'CHAT_MENTION') {
             const groupId = n.data?.group_id;
             const groupType = n.data?.group_type;
-            const senderId = n.data?.sender_id;
+            const senderId = n.data?.sender_id || n.data?.senderId;
 
             const { setPendingChatGroupId, setPendingDMUserId } = useAppStore.getState();
 
-            if ((n.type === 'DM_MESSAGE' || groupType === 'dm') && senderId) {
+            if ((n.type === 'DM_MESSAGE' || n.type === 'DM_REMINDER' || groupType === 'dm') && senderId) {
                 setPendingDMUserId(senderId);
             } else if (groupId) {
                 setPendingChatGroupId(groupId);
@@ -278,6 +278,7 @@ export const NotificationModal = memo(() => {
                                     n.type === 'ADMIN_BROADCAST' ||
                                     n.type === 'LEADERBOARD_OVERTAKEN' ||
                                     n.type === 'DM_MESSAGE' ||
+                                    n.type === 'DM_REMINDER' ||
                                     n.type === 'CHAT_MENTION' ||
                                     n.type === 'NEW_FOLLOWER' ||
                                     n.type === 'NEW_COMMENT' ||

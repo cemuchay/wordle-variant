@@ -130,4 +130,37 @@ describe("Client-Side DM Push Notifications", () => {
       expect(queue).toHaveLength(1);
       expect(queue[0].user_id).toBe("other-user");
    });
+
+   it("sends DM_REMINDER notification type with correct parameters when recipient qualifies", async () => {
+      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      const mockInsert = vi.fn().mockResolvedValue({ error: null });
+      const { supabase } = await import("../lib/supabaseClient");
+      (supabase.from as any).mockReturnValue({ insert: mockInsert });
+
+      const result = await sendDirectMessagePushNotification({
+         senderId,
+         senderName: "Bob",
+         recipientId,
+         isRecipientOnline: false,
+         recipientLastSeenAt: tenMinutesAgo,
+         messageSnippet: "Hey Bob checking in!",
+         groupId,
+      });
+
+      expect(result).toBe(true);
+      expect(mockInsert).toHaveBeenCalledWith(
+         expect.objectContaining({
+            user_id: recipientId,
+            type: "DM_REMINDER",
+            title: "Message from Bob",
+            message: "Hey Bob checking in!",
+            data: expect.objectContaining({
+               mode: "chat_dm",
+               group_id: groupId,
+               senderId,
+               senderName: "Bob",
+            }),
+         })
+      );
+   });
 });
