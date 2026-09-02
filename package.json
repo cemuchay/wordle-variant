@@ -15,6 +15,7 @@
     "test:run": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "npx playwright test",
+    "generate:scrabble": "node --import tsx scripts/generate-scrabble-dict.ts",
     "sim:bot": "npx tsx scripts/gameSimulator.ts --mode bot",
     "sim:pvp": "npx tsx scripts/gameSimulator.ts --mode pvp --mock",
     "sim:stress": "npx tsx scripts/gameSimulator.ts --mode bot --runs 100 --report"

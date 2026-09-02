@@ -12,6 +12,9 @@ export interface PlayerColorScheme {
   glowShadow: string;
   badge: string;
   avatarBorder: string;
+  tileSurface: string;
+  tileText: string;
+  tileValueText: string;
 }
 
 const SCHEMES: Record<string, PlayerColorScheme> = {
@@ -24,6 +27,9 @@ const SCHEMES: Record<string, PlayerColorScheme> = {
     glowShadow: 'shadow-indigo-500/60',
     badge: 'bg-indigo-500 text-white',
     avatarBorder: 'border-indigo-400',
+    tileSurface: 'bg-linear-to-br from-indigo-500 via-indigo-600 to-indigo-700 border-2 border-indigo-200 ring-2 ring-indigo-400/80',
+    tileText: 'text-white drop-shadow-md',
+    tileValueText: 'text-indigo-200',
   },
   rose: {
     key: 'rose',
@@ -34,6 +40,9 @@ const SCHEMES: Record<string, PlayerColorScheme> = {
     glowShadow: 'shadow-rose-500/60',
     badge: 'bg-rose-500 text-white',
     avatarBorder: 'border-rose-400',
+    tileSurface: 'bg-linear-to-br from-rose-500 via-rose-600 to-rose-700 border-2 border-rose-200 ring-2 ring-rose-400/80',
+    tileText: 'text-white drop-shadow-md',
+    tileValueText: 'text-rose-200',
   },
   amber: {
     key: 'amber',
@@ -44,6 +53,9 @@ const SCHEMES: Record<string, PlayerColorScheme> = {
     glowShadow: 'shadow-amber-500/60',
     badge: 'bg-amber-500 text-slate-950',
     avatarBorder: 'border-amber-400',
+    tileSurface: 'bg-linear-to-br from-amber-400 via-amber-500 to-amber-600 border-2 border-amber-100 ring-2 ring-amber-300/80',
+    tileText: 'text-slate-950 font-black',
+    tileValueText: 'text-amber-950',
   },
   sky: {
     key: 'sky',
@@ -54,6 +66,9 @@ const SCHEMES: Record<string, PlayerColorScheme> = {
     glowShadow: 'shadow-sky-500/60',
     badge: 'bg-sky-500 text-white',
     avatarBorder: 'border-sky-400',
+    tileSurface: 'bg-linear-to-br from-sky-500 via-sky-600 to-sky-700 border-2 border-sky-200 ring-2 ring-sky-400/80',
+    tileText: 'text-white drop-shadow-md',
+    tileValueText: 'text-sky-200',
   },
   violet: {
     key: 'violet',
@@ -64,6 +79,9 @@ const SCHEMES: Record<string, PlayerColorScheme> = {
     glowShadow: 'shadow-violet-500/60',
     badge: 'bg-violet-500 text-white',
     avatarBorder: 'border-violet-400',
+    tileSurface: 'bg-linear-to-br from-violet-500 via-violet-600 to-violet-700 border-2 border-violet-200 ring-2 ring-violet-400/80',
+    tileText: 'text-white drop-shadow-md',
+    tileValueText: 'text-violet-200',
   },
   emerald: {
     key: 'emerald',
@@ -74,6 +92,9 @@ const SCHEMES: Record<string, PlayerColorScheme> = {
     glowShadow: 'shadow-emerald-500/60',
     badge: 'bg-emerald-500 text-slate-950',
     avatarBorder: 'border-emerald-400',
+    tileSurface: 'bg-linear-to-br from-emerald-500 via-emerald-600 to-emerald-700 border-2 border-emerald-200 ring-2 ring-emerald-400/80',
+    tileText: 'text-white drop-shadow-md',
+    tileValueText: 'text-emerald-200',
   },
 };
 

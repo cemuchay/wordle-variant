@@ -38,7 +38,6 @@ import { safeLocalStorage, safeSessionStorage } from "./utils/storage";
 import formatUsername from './utils/formatUsername';
 import { TIMEOUT } from './constants/game';
 import { motion, AnimatePresence } from "framer-motion";
-import { AlreadyPlayedScreen } from "./components/AlreadyPlayedScreen";
 import { FreePlayModal } from "./components/freeplay/FreePlayModal";
 import MoreGamesList from "./components/MoreGamesList";
 import AppLoadingSkeleton from "./components/app/AppLoadingSkeleton";
@@ -288,10 +287,6 @@ function MainApp() {
   const [isFreePlayOpen, setIsFreePlayOpen] = useState(false);
   const [freePlayMode, setFreePlayMode] = useState<'guest' | 'archive'>('archive');
 
-  const [dismissedAlreadyPlayed, setDismissedAlreadyPlayed] = useState(() => {
-    return safeSessionStorage.getItem("wordle_already_played_dismissed") === "true";
-  });
-
   const isAlreadyPlayedTodayOnLoad = useMemo(() => {
     if (!isHydrated || !date || !user) return false;
     const saved = safeLocalStorage.getItem(`wordle-${date}`);
@@ -316,8 +311,6 @@ function MainApp() {
           : isChallengeOpen
             ? "challenges"
             : "play";
-
-  const showAlreadyPlayedScreen = !!(activeNavigationItem === "play" && user && state.isGameOver && isAlreadyPlayedTodayOnLoad && !dismissedAlreadyPlayed);
 
   const tabRestoredRef = useRef(false);
 
@@ -952,11 +945,6 @@ function MainApp() {
       return;
     }
 
-    if (item !== "play") {
-      safeSessionStorage.setItem("wordle_already_played_dismissed", "true");
-      setDismissedAlreadyPlayed(true);
-    }
-
     setIsChatOpen(item === "chat");
     setIsChallengeOpen(item === "challenges");
     setIsStatsOpen(item === "leaderboard");
@@ -1042,7 +1030,7 @@ function MainApp() {
         ? "#0f172a"
         : "#121213";
 
-  const hideHeader = isPlayingChallenge || isBattlePlaying || isChatConversationOpen || !!selectedChallenge || activeNavigationItem === "leaderboard" || isTutorialOpen || isWordupTutorialOpen || showAlreadyPlayedScreen || (activeNavigationItem === "more" && moreGameMode === "wordgrid");
+  const hideHeader = isPlayingChallenge || isBattlePlaying || isChatConversationOpen || !!selectedChallenge || activeNavigationItem === "leaderboard" || isTutorialOpen || isWordupTutorialOpen || (activeNavigationItem === "more" && moreGameMode === "wordgrid");
 
   return (
     <AppLayout
@@ -1136,13 +1124,32 @@ function MainApp() {
           >
             {activeNavigationItem === "play" && (
               <main className="h-full flex flex-col bg-dark text-white p-2 sm:p-4">
-                {user && state.isGameOver && isAlreadyPlayedTodayOnLoad && !dismissedAlreadyPlayed ? (
-                  <AlreadyPlayedScreen
+                <div className="h-full flex flex-col relative min-h-0 w-full">
+                  <GameArea
+                    wordLength={config?.length ?? DEFAULT_WORD_LENGTH}
+                    maxAttempts={config?.maxAttempts ?? MAX_ATTEMPTS}
+                    guesses={state.guesses}
+                    currentGuess={state.currentGuess}
+                    cursorIndex={state.cursorIndex}
+                    editIndex={state.editIndex}
+                    letterStatuses={state.letterStatuses}
+                    hintRecord={state.hintRecord}
+                    isGameOver={state.isGameOver}
+                    isShake={state.isShake}
+                    isSaving={state.syncStatus === "syncing"}
+                    onChar={actions.onChar}
+                    onDelete={actions.onDelete}
+                    onEnter={actions.onEnter}
+                    onSetCursor={actions.onSetCursor}
+                    onSetEditIndex={actions.onSetEditIndex}
+                    isAlreadyPlayed={isAlreadyPlayedTodayOnLoad}
+                    onHint={actions.handleHint}
+                    usedHint={state.usedHint}
+                    canShowHint={!preferences.disableHints}
+                    isHintLocked={state.guesses.length < 2}
+                    gameMessage={state.gameMessage}
+                    targetWord={config?.word || ""}
                     onNavigate={handleNavigation}
-                    onAdmirePuzzle={() => {
-                      safeSessionStorage.setItem("wordle_already_played_dismissed", "true");
-                      setDismissedAlreadyPlayed(true);
-                    }}
                     onOpenFreePlay={(selectedMode) => {
                       setFreePlayMode(selectedMode);
                       setIsFreePlayOpen(true);
@@ -1153,34 +1160,7 @@ function MainApp() {
                     setSelectedChallengeId={setSelectedChallengeId}
                     setIsChallengeOpen={setIsChallengeOpen}
                   />
-                ) : (
-                  <div className="h-full flex flex-col relative min-h-0 w-full">
-                    <GameArea
-                      wordLength={config?.length ?? DEFAULT_WORD_LENGTH}
-                      maxAttempts={config?.maxAttempts ?? MAX_ATTEMPTS}
-                      guesses={state.guesses}
-                      currentGuess={state.currentGuess}
-                      cursorIndex={state.cursorIndex}
-                      editIndex={state.editIndex}
-                      letterStatuses={state.letterStatuses}
-                      hintRecord={state.hintRecord}
-                      isGameOver={state.isGameOver}
-                      isShake={state.isShake}
-                      isSaving={state.syncStatus === "syncing"}
-                      onChar={actions.onChar}
-                      onDelete={actions.onDelete}
-                      onEnter={actions.onEnter}
-                      onSetCursor={actions.onSetCursor}
-                      onSetEditIndex={actions.onSetEditIndex}
-                      isAlreadyPlayed={isAlreadyPlayedTodayOnLoad}
-                      onHint={actions.handleHint}
-                      usedHint={state.usedHint}
-                      canShowHint={!preferences.disableHints}
-                      isHintLocked={state.guesses.length < 2}
-                      gameMessage={state.gameMessage}
-                    />
-                  </div>
-                )}
+                </div>
               </main>
             )}
 

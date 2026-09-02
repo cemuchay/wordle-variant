@@ -2068,15 +2068,25 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                                 : "bg-white/10 text-white rounded-tl-xs"
                                                 }`}>
                                                 {/* Replied message preview */}
-                                                {msg.reply_to && (
-                                                   <div
-                                                      onClick={() => handleJumpToMessage(msg.reply_to.id)}
-                                                      className="mb-1 p-1.5 bg-black/20 border-l-2 border-indigo-400 rounded text-[10px] opacity-80 cursor-pointer hover:opacity-100"
-                                                   >
-                                                      <div className="font-bold">{msg.reply_to.author || "User"}</div>
-                                                      <div className="truncate">{msg.reply_to.text}</div>
-                                                   </div>
-                                                )}
+                                                {msg.reply_to && !msg.is_deleted && (() => {
+                                                   const replyToId = typeof msg.reply_to === "object" ? msg.reply_to.id : msg.reply_to;
+                                                   const replyToMsg = allRoomMessages.find((m: any) => m.id === replyToId);
+                                                   if (!replyToMsg) return null;
+                                                   return (
+                                                      <div
+                                                         onClick={() => handleJumpToMessage(replyToId)}
+                                                         className="mb-1.5 p-1.5 bg-black/25 border-l-2 border-indigo-400 rounded text-[10px] opacity-85 cursor-pointer hover:opacity-100 flex items-center gap-1.5"
+                                                      >
+                                                         <Reply size={10} className="text-indigo-400 shrink-0" />
+                                                         <span className="truncate">
+                                                            <strong className="text-white">{replyToMsg.profiles?.username || "User"}: </strong>
+                                                            <span className="text-gray-300">
+                                                               {replyToMsg.voice_url ? "🎤 Voice note" : replyToMsg.image_url ? "📷 Image" : getDecryptedContent(replyToMsg)}
+                                                            </span>
+                                                         </span>
+                                                      </div>
+                                                   );
+                                                })()}
 
                                                 {/* Message Content */}
                                                 {isEditing ? (

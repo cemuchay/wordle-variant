@@ -313,7 +313,16 @@ export function purgeStaleStorage(): number {
         }
       }
 
-      // 3. Stale view states & temporary caches
+      // 3. Stale word definitions from previous days
+      if (key.startsWith('wordle_def_')) {
+        const defDate = key.replace('wordle_def_', '');
+        const todayStr = new Date().toISOString().split('T')[0];
+        if (defDate !== todayStr) {
+          keysToRemove.push(key);
+        }
+      }
+
+      // 4. Stale view states & temporary caches
       if (
         key.startsWith('challenge-view-state-') ||
         key === 'wordup_cached_history_matches' ||
