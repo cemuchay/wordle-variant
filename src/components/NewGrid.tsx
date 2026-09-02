@@ -1,6 +1,6 @@
 import React, { memo, useState, useEffect, useCallback, useRef } from 'react';
 import type { GuessResult } from '../types/game';
-import { HelpCircle, X, Calendar, Sparkles, ChevronRight, Share2, Check, Loader2, Lightbulb } from 'lucide-react';
+import { HelpCircle, X, Calendar, Sparkles, ChevronRight, Share2, Check, Loader2, Lightbulb, Maximize2, Minimize2 } from 'lucide-react';
 import { ANIMATION_DURATION } from '../constants/ui';
 import { LAYOUT } from '../constants/game';
 import returnAnimationTime from '../utils/returnAnimationTime';
@@ -118,6 +118,8 @@ interface NewGridProps {
   canShowHint?: boolean;
   isHintLocked?: boolean;
   gameMessage?: string;
+  isBoardCollapsed?: boolean;
+  onToggleBoardCollapse?: () => void;
 }
 
 const LONG_PRESS_MS = 500;
@@ -147,6 +149,8 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
   canShowHint,
   isHintLocked,
   gameMessage,
+  isBoardCollapsed = false,
+  onToggleBoardCollapse,
 }) => {
   const { isDesktop } = useIsResponsive();
   const { stats, triggerToast, date, profile } = useApp();
@@ -154,7 +158,15 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
   const isHeaderMenuOpen = useAppStore((s) => s.isHeaderMenuOpen);
   const isChallenge = gameplayType === 'challenge' || isChallengeMode;
   const isArchiveOrGuest = gameplayType === 'archive' || gameplayType === 'guest';
-  const shouldHideNavButtons = isChallenge || isArchiveOrGuest || isHeaderMenuOpen;
+
+  const isWonInitial = guesses.some(g => g.length === wordLength && g.every(res => res.status === 'correct'));
+  const isLostInitial = !isWonInitial && guesses.length === maxAttempts;
+  const isGameOverInitial = isWonInitial || isLostInitial;
+  const shouldHideNavButtons = isChallenge || isArchiveOrGuest || isHeaderMenuOpen || isGameOverInitial;
+
+  const displayedRowCount = (isGameOverInitial && isBoardCollapsed)
+    ? Math.max(1, guesses.length)
+    : maxAttempts;
 
   let cellSizePx: number | null = null;
   if (maxGridWidth && maxGridHeight) {
@@ -164,18 +176,19 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
     const topButtonsHeight = shouldHideNavButtons ? 0 : 36;
 
     const usableWidth = maxGridWidth - padding - extraWidth;
-
-    const cellWidthLimit = Math.max(20, (usableWidth - (wordLength - 1) * gapSize) / wordLength);
+    const cellWidthLimit = Math.max(24, (usableWidth - (wordLength - 1) * gapSize) / wordLength);
 
     if (maxAttempts > LAYOUT.COMPACT_GRID_THRESHOLD) {
       cellSizePx = Math.floor(cellWidthLimit);
     } else {
       const usableHeight = maxGridHeight - padding - topButtonsHeight;
-      const cellHeightLimit = (usableHeight - (maxAttempts - 1) * gapSize) / maxAttempts;
-      cellSizePx = Math.floor(Math.max(10, Math.min(cellWidthLimit, cellHeightLimit)));
+      const cellHeightLimit = (usableHeight - (displayedRowCount - 1) * gapSize) / displayedRowCount;
+      // Provide generous sizing while bounding to standard maximum
+      const maxTileBound = isDesktop ? 64 : 56;
+      cellSizePx = Math.floor(Math.max(20, Math.min(cellWidthLimit, cellHeightLimit, maxTileBound)));
     }
 
-    // On desktop in challenge mode, apply the resize scale
+    // On desktop in challenge mode, apply resize scale
     if (isDesktop && isChallenge) {
       const resizeScale = maxAttempts > LAYOUT.COMPACT_GRID_THRESHOLD ? 0.35 : LAYOUT.GRID_RESIZE_SCALE;
       cellSizePx = Math.floor(cellSizePx * resizeScale);
@@ -230,14 +243,14 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
 
   const isCurrentRevealing = guesses.length > revealedRowsCount;
   const revealingRowIndex = isCurrentRevealing ? guesses.length - 1 : null;
-  const empties = Math.max(0, maxAttempts - guesses.length - (revealingRowIndex !== null ? 0 : 1));
-
-  // Mascot Face Reactions
   const attemptsCount = guesses.length;
   const isOneAttemptLeft = attemptsCount === maxAttempts - 1 && revealingRowIndex === null;
   const isWon = guesses.some(g => g.length === wordLength && g.every(res => res.status === 'correct'));
   const isLost = !isWon && attemptsCount === maxAttempts && revealingRowIndex === null;
   const isGameOver = isWon || isLost;
+  const empties = (isGameOver && isBoardCollapsed)
+    ? 0
+    : Math.max(0, maxAttempts - guesses.length - (revealingRowIndex !== null ? 0 : 1));
 
   const lastGuess = guesses[guesses.length - 1];
   let hasRepeatedLetters = false;
@@ -410,6 +423,26 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
             currentStreak={stats?.currentStreak ?? 0}
             maxStreak={stats?.maxStreak ?? 0}
           />
+
+          {isGameOver && onToggleBoardCollapse && (
+            <button
+              onClick={onToggleBoardCollapse}
+              className="shrink-0 px-2.5 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg bg-white/10 hover:bg-white/20 text-white/90 border border-white/20 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs"
+              title={isBoardCollapsed ? "View Full Board (6 rows)" : "Collapse Completed Board"}
+            >
+              {isBoardCollapsed ? (
+                <>
+                  <Maximize2 size={12} className="text-white shrink-0" />
+                  <span>view full board</span>
+                </>
+              ) : (
+                <>
+                  <Minimize2 size={12} className="text-white shrink-0" />
+                  <span>compact board</span>
+                </>
+              )}
+            </button>
+          )}
 
           {isGameOver && (
             <button

@@ -1,12 +1,16 @@
 import { getServerDate } from "@/lib/time";
 import { useState, useEffect } from "react";
 
-const CountDown = ({ isOpen }: { isOpen: boolean }) => {
+interface CountDownProps {
+    isOpen: boolean;
+    compact?: boolean;
+}
+
+const CountDown = ({ isOpen, compact = false }: CountDownProps) => {
     const [countdown, setCountdown] = useState("");
 
     useEffect(() => {
         if (!isOpen) return;
-        // This works in both browser (returns a number) and Node (returns a Timeout object)
         let timer: ReturnType<typeof setInterval> | undefined;
 
         const initCountdown = async () => {
@@ -47,6 +51,16 @@ const CountDown = ({ isOpen }: { isOpen: boolean }) => {
             if (timer) clearInterval(timer);
         };
     }, [isOpen]);
+
+    if (compact) {
+        return (
+            <div className="text-right flex flex-col">
+                <span className="text-[9px] font-black uppercase tracking-wider text-gray-400 leading-tight">Next Word</span>
+                <span className="text-xs font-mono font-bold text-indigo-300 tracking-tight leading-tight">{countdown || "--:--:--"}</span>
+            </div>
+        );
+    }
+
     return (
         <div className="text-center">
             <p className="text-[12px] font-bold uppercase tracking-widest text-white">
@@ -56,7 +70,7 @@ const CountDown = ({ isOpen }: { isOpen: boolean }) => {
                 {countdown || "--:--:--"}
             </p>
         </div>
-    )
-}
+    );
+};
 
-export default CountDown
+export default CountDown;
