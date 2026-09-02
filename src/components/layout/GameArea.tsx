@@ -78,7 +78,7 @@ export const GameArea = ({
     const containerRef = useRef<HTMLDivElement>(null);
     const keyboardRef = useRef<HTMLDivElement>(null);
     const wasGameOverOnMount = useRef(isGameOver || isAlreadyPlayed);
-    
+
     // Instantaneous game over state resolution
     const [hideKeyboard, setHideKeyboard] = useState(wasGameOverOnMount.current);
     const [isBoardCollapsed, setIsBoardCollapsed] = useState(true);
@@ -161,7 +161,6 @@ export const GameArea = ({
 
     const [keyboardStatuses, setKeyboardStatuses] = useState(letterStatuses);
     const [showHelp, setShowHelp] = useState(false);
-    const helpRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (guesses.length === 0) {

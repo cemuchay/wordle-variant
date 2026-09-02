@@ -1,5 +1,5 @@
 import React from "react";
-import { Flame, Trophy, Award, TrendingUp, BarChart2 } from "lucide-react";
+import { Flame, Trophy, BarChart2 } from "lucide-react";
 import type { GameStats, GuessResult } from "../../types/game";
 
 interface StreakMilestoneCardProps {
@@ -127,9 +127,8 @@ export const StreakMilestoneCard: React.FC<StreakMilestoneCardProps> = ({
                   <div className="flex-1 h-3.5 bg-black/40 rounded-sm overflow-hidden flex items-center">
                     <div
                       style={{ width: `${barWidth}%` }}
-                      className={`h-full flex items-center justify-end px-1.5 text-[9px] font-bold text-white transition-all duration-700 ${
-                        isCurrent ? "bg-emerald-500 shadow-xs shadow-emerald-500/50 font-black" : "bg-gray-700"
-                      }`}
+                      className={`h-full flex items-center justify-end px-1.5 text-[9px] font-bold text-white transition-all duration-700 ${isCurrent ? "bg-emerald-500 shadow-xs shadow-emerald-500/50 font-black" : "bg-gray-700"
+                        }`}
                     >
                       {val}
                     </div>

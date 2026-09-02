@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Trophy, ChevronRight, Loader2, User } from "lucide-react";
+import { Trophy, ChevronRight, Loader2, } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { supabase } from "../../lib/supabaseClient";
 import type { LeaderboardEntry } from "../../types/game";
@@ -93,17 +93,16 @@ export const MiniLeaderboardSnapshot: React.FC<MiniLeaderboardSnapshotProps> = (
             return (
               <div
                 key={entry.user_id || idx}
-                className={`flex items-center justify-between p-2 rounded-xl border transition-all ${
-                  isSelf
+                className={`flex items-center justify-between p-2 rounded-xl border transition-all ${isSelf
                     ? "bg-amber-500/10 border-amber-500/30"
                     : "bg-black/20 border-white/5"
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-xs font-bold w-4 text-center shrink-0">{rankMedal}</span>
                   <ProtectedAvatar
-                    avatarUrl={entry.avatar_url}
-                    size="sm"
+                    src={entry.avatar_url}
+
                     className="w-5 h-5 rounded-full"
                   />
                   <span className={`text-xs font-bold truncate ${isSelf ? "text-amber-300" : "text-white"}`}>
@@ -112,7 +111,7 @@ export const MiniLeaderboardSnapshot: React.FC<MiniLeaderboardSnapshotProps> = (
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="text-xs font-black text-white">{entry.score} pts</span>
+                  <span className="text-xs font-black text-white">{entry.total_score} pts</span>
                   <span className="text-[9px] text-gray-400">({entry.attempts} tries)</span>
                 </div>
               </div>

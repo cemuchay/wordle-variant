@@ -19,7 +19,7 @@ export const WordTriviaCard: React.FC<WordTriviaCardProps> = ({
 }) => {
   const [definitionData, setDefinitionData] = useState<DictionaryDefinition | null>(null);
   const [phonetic, setPhonetic] = useState<string>("");
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export const WordTriviaCard: React.FC<WordTriviaCardProps> = ({
   const playPronunciation = () => {
     if (audioUrl) {
       const audio = new Audio(audioUrl);
-      audio.play().catch(() => {});
+      audio.play().catch(() => { });
     } else if ("speechSynthesis" in window) {
       const utterance = new SpeechSynthesisUtterance(word);
       utterance.rate = 0.85;
