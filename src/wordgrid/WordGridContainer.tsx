@@ -589,72 +589,77 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
             onPlaceTile={handlePlaceTile}
             onPickLetterForCell={handlePickLetterForCell}
             onRecallTile={handleRecallTile}
-          />
-
-          {/* Action panel: Play Word vs Swap Tiles vs Skip Turn directly attached to the Grid for maximum ergonomics */}
-          {isMyTurn && (
-            <div className="w-full max-w-[480px] grid grid-cols-12 gap-2 animate-in fade-in duration-200 px-1">
-              {/* Play Word button: primary action (takes 6 cols) */}
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={placedTiles.length === 0 || isValidatingWord}
-                className={`col-span-6 py-3.5 px-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95 ${isValidatingWord
-                  ? 'bg-indigo-700 text-white animate-pulse border border-indigo-500'
-                  : placedTiles.length > 0
-                    ? 'bg-linear-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white shadow-indigo-600/30 border border-indigo-400'
-                    : 'bg-[#0c121e] text-slate-600 border border-slate-800 cursor-not-allowed opacity-50'
-                  }`}
-              >
-                {isValidatingWord ? (
-                  <>
-                    <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
-                    <span className="truncate">Playing...</span>
-                  </>
-                ) : (
-                  <div className="flex items-center gap-1.5 truncate">
-                    <span>Play Word</span>
-                    {potentialScore !== null && potentialScore.score > 0 ? (
-                      <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-lg text-[10px] font-black tracking-normal">
-                        +{potentialScore.score} pts{potentialScore.isBingo ? ' 🎉' : ''}
-                      </span>
+            topBarActions={
+              isMyTurn ? (
+                <div className="flex items-center gap-1.5 w-full">
+                  {/* Play Word button: primary action */}
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={placedTiles.length === 0 || isValidatingWord}
+                    className={`flex-1 min-w-0 py-1.5 px-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md active:scale-95 ${isValidatingWord
+                      ? 'bg-indigo-700 text-white animate-pulse border border-indigo-500'
+                      : placedTiles.length > 0
+                        ? 'bg-linear-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white shadow-indigo-600/30 border border-indigo-400'
+                        : 'bg-[#0c121e] text-slate-600 border border-slate-800 cursor-not-allowed opacity-50'
+                      }`}
+                  >
+                    {isValidatingWord ? (
+                      <>
+                        <div className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                        <span className="truncate">Playing...</span>
+                      </>
                     ) : (
-                      placedTiles.length > 0 && (
-                        <span className="text-[10px] opacity-75 font-bold">
-                          ({placedTiles.length})
-                        </span>
-                      )
+                      <div className="flex items-center gap-1 truncate">
+                        <span className="truncate">Play</span>
+                        {potentialScore !== null && potentialScore.score > 0 ? (
+                          <span className="px-1.5 py-0.2 bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 rounded-md text-[9px] font-black tracking-normal">
+                            +{potentialScore.score}{potentialScore.isBingo ? ' 🎉' : ''}
+                          </span>
+                        ) : (
+                          placedTiles.length > 0 && (
+                            <span className="text-[9px] opacity-75 font-bold">
+                              ({placedTiles.length})
+                            </span>
+                          )
+                        )}
+                      </div>
                     )}
-                  </div>
-                )}
-              </button>
+                  </button>
 
-              {/* Swap Tiles: disabled when tileBag is empty (takes 3 cols) */}
-              <button
-                type="button"
-                onClick={handleOpenExchange}
-                disabled={(tileBag?.length ?? 0) === 0}
-                title={(tileBag?.length ?? 0) === 0 ? "Tile bag is empty - swap unavailable" : "Swap tiles from your rack"}
-                className={`col-span-3 py-3.5 px-2 rounded-2xl text-[11px] font-black uppercase tracking-wider border transition-all flex items-center justify-center gap-1 shadow-lg ${
-                  (tileBag?.length ?? 0) === 0
-                    ? 'bg-slate-950 text-slate-600 border-slate-800/80 cursor-not-allowed opacity-40'
-                    : 'bg-slate-900/90 hover:bg-slate-800 text-amber-300 border-amber-500/30 hover:border-amber-400 active:scale-95 cursor-pointer'
-                }`}
-              >
-                <span className="truncate">🔄 {(tileBag?.length ?? 0) === 0 ? 'No Bag' : 'Swap'}</span>
-              </button>
+                  {/* Swap Tiles: disabled when tileBag is empty */}
+                  <button
+                    type="button"
+                    onClick={handleOpenExchange}
+                    disabled={(tileBag?.length ?? 0) === 0}
+                    title={(tileBag?.length ?? 0) === 0 ? "Tile bag is empty - swap unavailable" : "Swap tiles from your rack"}
+                    className={`shrink-0 py-1.5 px-2 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all flex items-center justify-center gap-1 shadow-md ${
+                      (tileBag?.length ?? 0) === 0
+                        ? 'bg-slate-950 text-slate-600 border-slate-800/80 cursor-not-allowed opacity-40'
+                        : 'bg-slate-900 hover:bg-slate-800 text-amber-300 border-amber-500/30 hover:border-amber-400 active:scale-95 cursor-pointer'
+                    }`}
+                  >
+                    <span>🔄 {(tileBag?.length ?? 0) === 0 ? 'Empty' : 'Swap'}</span>
+                  </button>
 
-              {/* Skip Turn: passes turn without changing rack (takes 3 cols) */}
-              <button
-                type="button"
-                onClick={handleOpenSkip}
-                className="col-span-3 py-3.5 px-2 bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white rounded-2xl text-[11px] font-black uppercase tracking-wider border border-slate-700/60 hover:border-slate-500 transition-all active:scale-95 cursor-pointer shadow-lg flex items-center justify-center gap-1"
-                title="Skip your turn without playing tiles"
-              >
-                <span className="truncate">⏭ Skip</span>
-              </button>
-            </div>
-          )}
+                  {/* Skip Turn: passes turn without changing rack */}
+                  <button
+                    type="button"
+                    onClick={handleOpenSkip}
+                    className="shrink-0 py-1.5 px-2 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-wider border border-slate-700/60 hover:border-slate-500 transition-all active:scale-95 cursor-pointer shadow-md flex items-center justify-center gap-1"
+                    title="Skip your turn without playing tiles"
+                  >
+                    <span>⏭ Skip</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                  <span className="w-2 h-2 rounded-full bg-slate-600 animate-pulse" />
+                  <span>Waiting for opponent...</span>
+                </div>
+              )
+            }
+          />
         </div>
 
         {/* Tile Rack & Bot Status (Mobile: 3rd, Desktop: 2nd block of left column) */}
