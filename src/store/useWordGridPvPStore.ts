@@ -214,6 +214,14 @@ interface WordGridPvPState {
       triggerToast: (msg: string, duration?: number, isLarge?: boolean) => void,
    ) => Promise<boolean>;
    hydrateLocalDraft: () => void;
+   skipTurn: (
+      userId: string,
+      triggerToast?: (
+         msg: string,
+         duration?: number,
+         isLarge?: boolean,
+      ) => void,
+   ) => Promise<void>;
    exchangeTiles: (
       userId: string,
       lettersToExchange: string[],
@@ -820,6 +828,89 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => {
          });
 
       // Notify opponent that it is their turn after exchange
+      const nextTurnUserId = updatedState.currentTurn;
+      const currentPlayer = state.players.find((p) => p.id === userId);
+      const rawPlayerName =
+         currentPlayer?.username ||
+         resolveCachedUsername(userId) ||
+         "Your opponent";
+      const playerName = formatUsername(rawPlayerName) || "Your opponent";
+
+      if (
+         nextTurnUserId &&
+         isUuid(nextTurnUserId) &&
+         nextTurnUserId !== userId
+      ) {
+         const moveCount = updatedState.moves?.length || 0;
+         sendWordGridTurnNotification(
+            nextTurnUserId,
+            playerName,
+            state.matchId,
+            false,
+            true,
+            moveCount,
+         );
+      }
+   },
+
+   skipTurn: async (userId, triggerToast) => {
+      const state = get();
+      if (!state.matchId || state.currentTurn !== userId) return;
+
+      const skipRes = WordGridPvPEngine.processSkipTurn(
+         {
+            matchId: state.matchId,
+            gridSize: state.gridSize,
+            maxPlayers: state.maxPlayers,
+            status: state.status,
+            board: state.board,
+            tileBag: state.tileBag,
+            players: state.players,
+            currentTurnIndex: state.currentTurnIndex,
+            currentTurn: state.currentTurn,
+            moves: state.moves,
+         },
+         userId,
+      );
+
+      if (!skipRes.success || !skipRes.updatedState || !skipRes.payloadToSave) return;
+
+      // Recall any placed tiles back to rack
+      const recalledRack = [...state.rack, ...state.placedTiles.map((t) => t.letter)];
+      const updatedState = {
+         ...state,
+         ...skipRes.updatedState,
+         placedTiles: [],
+         rack: recalledRack,
+         conflictCoords: [],
+      };
+
+      set(updatedState);
+      savePvPSnapshot(state.matchId, updatedState);
+      clearWordGridDraft(state.matchId);
+
+      const safePayload = {
+         ...skipRes.payloadToSave,
+         current_turn: isUuid(skipRes.payloadToSave?.current_turn)
+            ? skipRes.payloadToSave.current_turn
+            : null,
+      };
+
+      supabase
+         .from("wordgrid_matches")
+         .update(safePayload)
+         .eq("id", state.matchId)
+         .then(({ error }) => {
+            if (error) {
+               console.warn("[WordGridPvP] Async DB skip turn error:", error);
+               triggerToast?.(
+                  `Cloud sync warning: ${error.message || "Failed to skip turn"}`,
+                  4000,
+               );
+            }
+         });
+
+      // Notify opponent that it is their turn after skip
       const nextTurnUserId = updatedState.currentTurn;
       const currentPlayer = state.players.find((p) => p.id === userId);
       const rawPlayerName =

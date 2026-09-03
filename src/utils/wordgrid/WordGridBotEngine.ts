@@ -220,8 +220,18 @@ export class WordGridBotEngine {
 
     const isBagEmpty = updatedBag.length === 0;
     const isBotHandEmpty = (updatedPlayers[activeBotIdx]?.rack?.length ?? 0) === 0;
-    const lastConsecutiveZeroMoves = updatedMoves.slice(-4);
-    const isDeadlock = isBagEmpty && lastConsecutiveZeroMoves.length >= 4 && lastConsecutiveZeroMoves.every((m) => m.score === 0);
+    
+    // Check consecutive pass deadlock (> 2 consecutive passes)
+    const consecutiveZeroMoves = [];
+    for (let i = updatedMoves.length - 1; i >= 0; i--) {
+      const m = updatedMoves[i];
+      if (m.score === 0 && (m.word === 'PASSED' || m.word?.startsWith('[Bot Swapped') || m.word?.startsWith('[Swapped'))) {
+        consecutiveZeroMoves.push(m);
+      } else {
+        break;
+      }
+    }
+    const isDeadlock = (isBagEmpty && consecutiveZeroMoves.length >= 2) || consecutiveZeroMoves.length > 2;
     const newStatus = (isBagEmpty && isBotHandEmpty) || isDeadlock ? "completed" : state.status;
 
     return {
@@ -243,6 +253,142 @@ export class WordGridBotEngine {
         score: 0,
         placedTiles: [],
       },
+    };
+  }
+
+  /**
+   * Processes a human player skip against the bot.
+   * No tiles are swapped or modified.
+   */
+  static processHumanSkip(
+    state: WordGridBotState,
+    userId: string,
+  ): {
+    success: boolean;
+    updatedState?: Partial<WordGridBotState>;
+    botShouldPlay?: boolean;
+  } {
+    const { players, currentTurn, moves } = state;
+    if (currentTurn !== userId && currentTurn === "bot") {
+      return { success: false };
+    }
+
+    const newMove = {
+      player_id: userId,
+      word: "PASSED",
+      score: 0,
+      created_at: new Date().toISOString(),
+    };
+
+    const newMoves = [...moves, newMove];
+
+    // Check consecutive passes > 2
+    const consecutiveZeroMoves = [];
+    for (let i = newMoves.length - 1; i >= 0; i--) {
+      const m = newMoves[i];
+      if (m.score === 0 && (m.word === 'PASSED' || m.word?.startsWith('[Bot Swapped') || m.word?.startsWith('[Swapped'))) {
+        consecutiveZeroMoves.push(m);
+      } else {
+        break;
+      }
+    }
+    const isDeadlock = consecutiveZeroMoves.length > 2;
+    const newStatus = isDeadlock ? "completed" : state.status;
+
+    return {
+      success: true,
+      updatedState: {
+        currentTurnIndex: 1,
+        currentTurn: "bot",
+        moves: newMoves,
+        status: newStatus,
+      },
+      botShouldPlay: newStatus !== "completed",
+    };
+  }
+
+  /**
+   * Processes a human player tile exchange against the bot.
+   * Swap is only available when there are tiles in the bag.
+   */
+  static processHumanExchange(
+    state: WordGridBotState,
+    userId: string,
+    lettersToExchange: string[],
+  ): {
+    success: boolean;
+    updatedState?: Partial<WordGridBotState>;
+    botShouldPlay?: boolean;
+  } {
+    const { players, currentTurn, tileBag, moves } = state;
+    if (currentTurn !== userId && currentTurn === "bot") {
+      return { success: false };
+    }
+    if (!tileBag || tileBag.length === 0 || lettersToExchange.length === 0) {
+      return { success: false };
+    }
+
+    const humanIdx = players.findIndex((p) => p.id === userId || p.id !== "bot");
+    if (humanIdx === -1) return { success: false };
+
+    const currentRack = [...players[humanIdx].rack];
+    lettersToExchange.forEach((letter) => {
+      const idx = currentRack.indexOf(letter);
+      if (idx !== -1) currentRack.splice(idx, 1);
+    });
+
+    const pool = [...tileBag];
+    const drawn: string[] = [];
+    for (let i = 0; i < lettersToExchange.length; i++) {
+      if (pool.length === 0) break;
+      const randIdx = Math.floor(Math.random() * pool.length);
+      drawn.push(pool.splice(randIdx, 1)[0]);
+    }
+
+    const newBag = [...pool, ...lettersToExchange];
+    const newRack = [...currentRack, ...drawn];
+
+    const updatedPlayers = [...players];
+    updatedPlayers[humanIdx] = {
+      ...updatedPlayers[humanIdx],
+      rack: newRack,
+    };
+
+    const newMove = {
+      player_id: userId,
+      word: `[Swapped ${lettersToExchange.length} tiles]`,
+      score: 0,
+      created_at: new Date().toISOString(),
+    };
+
+    const newMoves = [...moves, newMove];
+
+    const isBagEmpty = newBag.length === 0;
+    const isHandEmpty = newRack.length === 0;
+
+    const consecutiveZeroMoves = [];
+    for (let i = newMoves.length - 1; i >= 0; i--) {
+      const m = newMoves[i];
+      if (m.score === 0 && (m.word === 'PASSED' || m.word?.startsWith('[Bot Swapped') || m.word?.startsWith('[Swapped'))) {
+        consecutiveZeroMoves.push(m);
+      } else {
+        break;
+      }
+    }
+    const isDeadlock = (isBagEmpty && consecutiveZeroMoves.length >= 2) || consecutiveZeroMoves.length > 2;
+    const newStatus = (isBagEmpty && isHandEmpty) || isDeadlock ? "completed" : state.status;
+
+    return {
+      success: true,
+      updatedState: {
+        tileBag: newBag,
+        players: updatedPlayers,
+        currentTurnIndex: 1,
+        currentTurn: "bot",
+        moves: newMoves,
+        status: newStatus,
+      },
+      botShouldPlay: newStatus !== "completed",
     };
   }
 }

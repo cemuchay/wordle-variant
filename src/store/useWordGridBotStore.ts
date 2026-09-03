@@ -206,6 +206,15 @@ interface WordGridBotState {
       userId: string,
       triggerToast: (msg: string, duration?: number, isLarge?: boolean) => void,
    ) => Promise<boolean>;
+   skipTurn: (
+      userId: string,
+      triggerToast?: (msg: string, duration?: number) => void,
+   ) => Promise<void>;
+   exchangeTiles: (
+      userId: string,
+      lettersToExchange: string[],
+      triggerToast?: (msg: string, duration?: number) => void,
+   ) => Promise<void>;
    triggerBotTurn: (
       triggerToast?: (msg: string, duration?: number) => void,
    ) => Promise<void>;
@@ -819,6 +828,134 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => {
                4000,
             );
             return false;
+         }
+      },
+
+      skipTurn: async (userId, triggerToast) => {
+         const state = get();
+         if (!state.matchId || state.status === "completed" || state.currentTurn === "bot") {
+            return;
+         }
+
+         const skipRes = WordGridBotEngine.processHumanSkip(
+            {
+               matchId: state.matchId,
+               gridSize: state.gridSize,
+               status: state.status,
+               board: state.board,
+               tileBag: state.tileBag,
+               players: state.players,
+               currentTurnIndex: state.currentTurnIndex,
+               currentTurn: state.currentTurn,
+               moves: state.moves,
+               botDifficulty: state.botDifficulty,
+            },
+            userId,
+         );
+
+         if (!skipRes.success || !skipRes.updatedState) return;
+
+         // Recall placed tiles back to rack
+         const recalledRack = [...state.rack, ...state.placedTiles.map((t) => t.letter)];
+         const updatedState = {
+            ...state,
+            ...skipRes.updatedState,
+            placedTiles: [],
+            rack: recalledRack,
+            conflictCoords: [],
+         };
+
+         set(updatedState);
+         saveBotSnapshot(state.matchId, updatedState);
+         clearWordGridDraft(state.matchId);
+
+         const dbTurn = toDbUuid(updatedState.currentTurn);
+         supabase
+            .from("wordgrid_matches")
+            .update({
+               current_turn: dbTurn,
+               current_turn_index: 1,
+               moves: updatedState.moves,
+               status: updatedState.status,
+            })
+            .eq("id", state.matchId)
+            .then(({ error }) => {
+               if (error) {
+                  console.warn("[WordGridBot] Async DB skip update error:", error);
+               }
+            });
+
+         if (skipRes.botShouldPlay) {
+            setTimeout(() => {
+               get().triggerBotTurn(triggerToast);
+            }, 600);
+         }
+      },
+
+      exchangeTiles: async (userId, lettersToExchange, triggerToast) => {
+         const state = get();
+         if (!state.matchId || state.status === "completed" || state.currentTurn === "bot") {
+            return;
+         }
+
+         const exRes = WordGridBotEngine.processHumanExchange(
+            {
+               matchId: state.matchId,
+               gridSize: state.gridSize,
+               status: state.status,
+               board: state.board,
+               tileBag: state.tileBag,
+               players: state.players,
+               currentTurnIndex: state.currentTurnIndex,
+               currentTurn: state.currentTurn,
+               moves: state.moves,
+               botDifficulty: state.botDifficulty,
+            },
+            userId,
+            lettersToExchange,
+         );
+
+         if (!exRes.success || !exRes.updatedState) return;
+
+         const humanPlayer = exRes.updatedState.players?.find(
+            (p) => p.id === userId || p.id !== "bot",
+         );
+         const updatedState = {
+            ...state,
+            ...exRes.updatedState,
+            placedTiles: [],
+            rack: humanPlayer?.rack || state.rack,
+            conflictCoords: [],
+         };
+
+         set(updatedState);
+         saveBotSnapshot(state.matchId, updatedState);
+         clearWordGridDraft(state.matchId);
+
+         const dbTurn = toDbUuid(updatedState.currentTurn);
+         supabase
+            .from("wordgrid_matches")
+            .update({
+               tile_bag: updatedState.tileBag,
+               players_data: updatedState.players,
+               p1_rack: updatedState.players[0]?.rack || [],
+               p2_rack: updatedState.players[1]?.rack || [],
+               current_turn: dbTurn,
+               current_turn_index: 1,
+               moves: updatedState.moves,
+               status: updatedState.status,
+            })
+            .eq("id", state.matchId)
+            .then(({ error }) => {
+               if (error) {
+                  console.warn("[WordGridBot] Async DB exchange update error:", error);
+               }
+            });
+
+         if (exRes.botShouldPlay) {
+            setTimeout(() => {
+               get().triggerBotTurn(triggerToast);
+            }, 600);
          }
       },
 

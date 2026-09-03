@@ -54,6 +54,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     recallAllTiles,
     shuffleRack,
     submitMove,
+    skipTurn,
     exchangeTiles,
     resignMatch,
   } = useWordGridStore();
@@ -72,6 +73,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
   const [selectedRackIdx, setSelectedRackIdx] = useState<number | null>(null);
   const [pickerCell, setPickerCell] = useState<{ x: number; y: number } | null>(null);
   const [showExchangeModal, setShowExchangeModal] = useState(false);
+  const [showSkipModal, setShowSkipModal] = useState(false);
   const [exchangeSelections, setExchangeSelections] = useState<boolean[]>([]);
   const [showTutorial, setShowTutorial] = useState(() => {
     return !localStorage.getItem('wordgrid_tutorial_completed');
@@ -309,6 +311,16 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
       if (timer) clearTimeout(timer);
     };
   }, []);
+
+  const handleOpenSkip = () => {
+    recallAllTiles();
+    setShowSkipModal(true);
+  };
+
+  const handleConfirmSkip = async () => {
+    setShowSkipModal(false);
+    await skipTurn(effectiveUserId, triggerToast);
+  };
 
   const handleConfirmExchange = async () => {
     // Current working rack after recalling all placed tiles
@@ -579,13 +591,15 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
             onRecallTile={handleRecallTile}
           />
 
-          {/* Action panel: Play Word vs Swap Tiles directly attached to the Grid for maximum ergonomics */}
+          {/* Action panel: Play Word vs Swap Tiles vs Skip Turn directly attached to the Grid for maximum ergonomics */}
           {isMyTurn && (
-            <div className="w-full max-w-[480px] grid grid-cols-2 gap-2.5 animate-in fade-in duration-200 px-1">
+            <div className="w-full max-w-[480px] grid grid-cols-12 gap-2 animate-in fade-in duration-200 px-1">
+              {/* Play Word button: primary action (takes 6 cols) */}
               <button
+                type="button"
                 onClick={handleSubmit}
                 disabled={placedTiles.length === 0 || isValidatingWord}
-                className={`py-3.5 px-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95 ${isValidatingWord
+                className={`col-span-6 py-3.5 px-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95 ${isValidatingWord
                   ? 'bg-indigo-700 text-white animate-pulse border border-indigo-500'
                   : placedTiles.length > 0
                     ? 'bg-linear-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white shadow-indigo-600/30 border border-indigo-400'
@@ -614,11 +628,30 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
                   </div>
                 )}
               </button>
+
+              {/* Swap Tiles: disabled when tileBag is empty (takes 3 cols) */}
               <button
+                type="button"
                 onClick={handleOpenExchange}
-                className="py-3.5 px-3 bg-slate-900/90 hover:bg-slate-800 text-amber-300 rounded-2xl text-xs font-black uppercase tracking-wider border border-amber-500/30 hover:border-amber-400 transition-all active:scale-95 cursor-pointer shadow-lg flex items-center justify-center gap-1.5"
+                disabled={(tileBag?.length ?? 0) === 0}
+                title={(tileBag?.length ?? 0) === 0 ? "Tile bag is empty - swap unavailable" : "Swap tiles from your rack"}
+                className={`col-span-3 py-3.5 px-2 rounded-2xl text-[11px] font-black uppercase tracking-wider border transition-all flex items-center justify-center gap-1 shadow-lg ${
+                  (tileBag?.length ?? 0) === 0
+                    ? 'bg-slate-950 text-slate-600 border-slate-800/80 cursor-not-allowed opacity-40'
+                    : 'bg-slate-900/90 hover:bg-slate-800 text-amber-300 border-amber-500/30 hover:border-amber-400 active:scale-95 cursor-pointer'
+                }`}
               >
-                <span>🔄 Swap Tiles</span>
+                <span className="truncate">🔄 {(tileBag?.length ?? 0) === 0 ? 'No Bag' : 'Swap'}</span>
+              </button>
+
+              {/* Skip Turn: passes turn without changing rack (takes 3 cols) */}
+              <button
+                type="button"
+                onClick={handleOpenSkip}
+                className="col-span-3 py-3.5 px-2 bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white rounded-2xl text-[11px] font-black uppercase tracking-wider border border-slate-700/60 hover:border-slate-500 transition-all active:scale-95 cursor-pointer shadow-lg flex items-center justify-center gap-1"
+                title="Skip your turn without playing tiles"
+              >
+                <span className="truncate">⏭ Skip</span>
               </button>
             </div>
           )}
@@ -709,6 +742,40 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
                 className="py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-lg"
               >
                 Confirm Swap
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Skip Turn Confirmation Modal */}
+      {showSkipModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0c121e] border border-slate-800 rounded-3xl p-6 max-w-xs w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150 text-center">
+            <div>
+              <h4 className="text-base font-black uppercase text-white tracking-wider">Skip Your Turn?</h4>
+              <p className="text-[11px] text-slate-300 font-bold tracking-normal mt-1 leading-relaxed">
+                You will pass your turn without playing or swapping any tiles.
+              </p>
+              <p className="text-[10px] text-amber-400 font-black uppercase tracking-wider mt-2 bg-amber-950/40 border border-amber-800/40 rounded-xl py-1.5 px-2">
+                ⚠️ Consecutive passes will end the match!
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowSkipModal(false)}
+                className="py-3 rounded-2xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-[10px] font-black uppercase text-white transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSkip}
+                className="py-3 bg-amber-600 hover:bg-amber-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-lg"
+              >
+                Confirm Skip
               </button>
             </div>
           </div>
