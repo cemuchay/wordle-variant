@@ -2319,6 +2319,7 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                               {replyText.trim() === "" ? (
                                  isRecording ? (
                                     <button
+                                       type="button"
                                        onClick={stopRecording}
                                        className="bg-red-600 text-white p-2.5 rounded-xl cursor-pointer relative"
                                        title="Stop and send"
@@ -2328,8 +2329,9 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                     </button>
                                  ) : (
                                     <button
+                                       type="button"
                                        onClick={startRecording}
-                                       className="bg-correct text-black p-2.5 rounded-xl cursor-pointer hover:scale-105 active:scale-95 transition-all"
+                                       className="bg-correct text-black p-2.5 rounded-xl cursor-pointer hover:scale-105 active:scale-95 transition-all select-none"
                                        title="Record voice note"
                                     >
                                        <Mic className="w-4 h-4" />
@@ -3359,7 +3361,7 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                              handleSendReply();
                                           }
                                           if (e.key === 'Escape') {
-                                             setMentionState(null);
+                                                                      setMentionState(null);
                                           }
                                        }}
                                        className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500/50 transition-colors resize-none overflow-hidden"
@@ -3369,6 +3371,7 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                  {replyText.trim() === "" ? (
                                     isRecording ? (
                                        <button
+                                          type="button"
                                           onClick={stopRecording}
                                           className="bg-red-600 text-white p-2.5 rounded-xl cursor-pointer relative"
                                           title="Stop and send"
@@ -3378,6 +3381,7 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                        </button>
                                     ) : (
                                        <button
+                                          type="button"
                                           onClick={startRecording}
                                           className="bg-correct text-black p-2.5 rounded-xl cursor-pointer hover:scale-105 active:scale-95 transition-all"
                                           title="Record voice note"

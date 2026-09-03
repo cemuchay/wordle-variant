@@ -42,31 +42,15 @@ describe("Client-Side DM Push Notifications", () => {
       expect(localStorage.getItem("variant_client_push_queue_v1")).toBeNull();
    });
 
-   it("skips push notification when recipient was active less than 2 minutes ago", async () => {
-      const oneMinuteAgo = new Date(Date.now() - 1 * 60 * 1000).toISOString();
+   it("sends push notification immediately when recipient is not currently online (even if active moments ago)", async () => {
+      const thirtySecondsAgo = new Date(Date.now() - 30 * 1000).toISOString();
       const result = await sendDirectMessagePushNotification({
          senderId,
          senderName: "Alice",
          recipientId,
          isRecipientOnline: false,
-         recipientLastSeenAt: oneMinuteAgo,
+         recipientLastSeenAt: thirtySecondsAgo,
          messageSnippet: "Are you there?",
-         groupId,
-      });
-
-      expect(result).toBe(false);
-      expect(localStorage.getItem("variant_client_push_queue_v1")).toBeNull();
-   });
-
-   it("sends push notification when recipient has been away for more than 2 minutes", async () => {
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-      const result = await sendDirectMessagePushNotification({
-         senderId,
-         senderName: "Alice",
-         recipientId,
-         isRecipientOnline: false,
-         recipientLastSeenAt: fiveMinutesAgo,
-         messageSnippet: "Checking in!",
          groupId,
       });
 

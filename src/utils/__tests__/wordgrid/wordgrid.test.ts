@@ -257,3 +257,156 @@ describe('WordGrid Blank Tiles', () => {
   });
 });
 
+import { WordGridPvPEngine, WordGridPvPState } from '../../wordgrid/WordGridPvPEngine';
+import { WordGridBotEngine, WordGridBotState } from '../../wordgrid/WordGridBotEngine';
+
+describe('WordGrid Turn Actions - Skip & Swap', () => {
+  const basePvPState: WordGridPvPState = {
+    matchId: 'match-123',
+    gridSize: 7,
+    maxPlayers: 2,
+    status: 'active',
+    board: [],
+    tileBag: ['A', 'B', 'C', 'D', 'E'],
+    players: [
+      { id: 'player-1', username: 'Alice', score: 10, rack: ['H', 'E', 'L', 'L', 'O'] },
+      { id: 'player-2', username: 'Bob', score: 20, rack: ['W', 'O', 'R', 'L', 'D'] },
+    ],
+    currentTurnIndex: 0,
+    currentTurn: 'player-1',
+    moves: [],
+  };
+
+  describe('PvP Skip Turn', () => {
+    test('skipTurn advances the turn without altering the rack or tile bag', () => {
+      const res = WordGridPvPEngine.processSkipTurn(basePvPState, 'player-1');
+      expect(res.success).toBe(true);
+      expect(res.updatedState?.currentTurnIndex).toBe(1);
+      expect(res.updatedState?.currentTurn).toBe('player-2');
+      expect(res.updatedState?.moves).toHaveLength(1);
+      expect(res.updatedState?.moves?.[0].word).toBe('PASSED');
+      expect(res.updatedState?.moves?.[0].score).toBe(0);
+      expect(res.updatedState?.status).toBe('active');
+    });
+
+    test('fails if not the player turn', () => {
+      const res = WordGridPvPEngine.processSkipTurn(basePvPState, 'player-2');
+      expect(res.success).toBe(false);
+    });
+
+    test('game ends as completed when more than 2 consecutive skips occur', () => {
+      const stateWithTwoPasses: WordGridPvPState = {
+        ...basePvPState,
+        moves: [
+          { player_id: 'player-2', word: 'PASSED', score: 0, created_at: new Date().toISOString() },
+          { player_id: 'player-1', word: 'PASSED', score: 0, created_at: new Date().toISOString() },
+        ],
+      };
+
+      const res = WordGridPvPEngine.processSkipTurn(stateWithTwoPasses, 'player-1');
+      expect(res.success).toBe(true);
+      expect(res.updatedState?.status).toBe('completed');
+    });
+
+    test('game does NOT end if a scoring move happened between skips', () => {
+      const stateWithInterruptedPasses: WordGridPvPState = {
+        ...basePvPState,
+        moves: [
+          { player_id: 'player-1', word: 'PASSED', score: 0, created_at: new Date().toISOString() },
+          { player_id: 'player-2', word: 'CAT', score: 12, created_at: new Date().toISOString() },
+          { player_id: 'player-1', word: 'PASSED', score: 0, created_at: new Date().toISOString() },
+        ],
+      };
+
+      const res = WordGridPvPEngine.processSkipTurn(stateWithInterruptedPasses, 'player-1');
+      expect(res.success).toBe(true);
+      expect(res.updatedState?.status).toBe('active');
+    });
+  });
+
+  describe('PvP Swap Tiles', () => {
+    test('swaps selected tiles when bag has tiles', async () => {
+      const res = await WordGridPvPEngine.processTileExchange(basePvPState, 'player-1', ['H', 'E']);
+      expect(res.success).toBe(true);
+      expect(res.updatedState?.currentTurnIndex).toBe(1);
+      expect(res.updatedState?.currentTurn).toBe('player-2');
+      expect(res.updatedState?.moves?.[0].word).toBe('[Swapped 2 tiles]');
+      expect(res.updatedState?.moves?.[0].score).toBe(0);
+
+      const p1 = res.updatedState?.players?.find(p => p.id === 'player-1');
+      expect(p1?.rack).toHaveLength(5);
+      expect(res.updatedState?.tileBag).toHaveLength(5);
+    });
+
+    test('swap fails when tile bag is empty (0 tiles)', async () => {
+      const emptyBagState: WordGridPvPState = {
+        ...basePvPState,
+        tileBag: [],
+      };
+
+      const res = await WordGridPvPEngine.processTileExchange(emptyBagState, 'player-1', ['H']);
+      expect(res.success).toBe(false);
+    });
+  });
+
+  describe('Bot Mode Skip & Swap', () => {
+    const baseBotState: WordGridBotState = {
+      matchId: 'bot-123',
+      gridSize: 7,
+      status: 'active',
+      board: [],
+      tileBag: ['X', 'Y', 'Z'],
+      players: [
+        { id: 'player-1', username: 'Alice', score: 5, rack: ['A', 'B', 'C'] },
+        { id: 'bot', username: 'AI Bot', score: 5, rack: ['D', 'E', 'F'] },
+      ],
+      currentTurnIndex: 0,
+      currentTurn: 'player-1',
+      moves: [],
+      botDifficulty: 'normal',
+    };
+
+    test('human skip passes turn to bot', () => {
+      const res = WordGridBotEngine.processHumanSkip(baseBotState, 'player-1');
+      expect(res.success).toBe(true);
+      expect(res.updatedState?.currentTurn).toBe('bot');
+      expect(res.updatedState?.moves?.[0].word).toBe('PASSED');
+      expect(res.botShouldPlay).toBe(true);
+    });
+
+    test('consecutive passes (> 2) against bot end match as completed', () => {
+      const stateWithTwoPasses: WordGridBotState = {
+        ...baseBotState,
+        moves: [
+          { player_id: 'bot', word: '[Bot Swapped Tiles]', score: 0, created_at: new Date().toISOString() },
+          { player_id: 'player-1', word: 'PASSED', score: 0, created_at: new Date().toISOString() },
+        ],
+      };
+
+      const res = WordGridBotEngine.processHumanSkip(stateWithTwoPasses, 'player-1');
+      expect(res.success).toBe(true);
+      expect(res.updatedState?.status).toBe('completed');
+      expect(res.botShouldPlay).toBe(false);
+    });
+
+    test('human swap against bot is rejected when tile bag is empty', () => {
+      const emptyBagState: WordGridBotState = {
+        ...baseBotState,
+        tileBag: [],
+      };
+
+      const res = WordGridBotEngine.processHumanExchange(emptyBagState, 'player-1', ['A']);
+      expect(res.success).toBe(false);
+    });
+
+    test('human swap against bot succeeds when tile bag has tiles', () => {
+      const res = WordGridBotEngine.processHumanExchange(baseBotState, 'player-1', ['A']);
+      expect(res.success).toBe(true);
+      expect(res.updatedState?.currentTurn).toBe('bot');
+      expect(res.updatedState?.moves?.[0].word).toBe('[Swapped 1 tiles]');
+      expect(res.botShouldPlay).toBe(true);
+    });
+  });
+});
+
+

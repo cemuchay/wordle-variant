@@ -151,6 +151,7 @@ export class WordGridPvPEngine {
 
   /**
    * Handles tile exchange for PvP player.
+   * Swap is only available when there are tiles in the bag.
    */
   static async processTileExchange(
     state: WordGridPvPState,
@@ -163,6 +164,9 @@ export class WordGridPvPEngine {
   }> {
     const { matchId, players, currentTurn, tileBag, moves } = state;
     if (!matchId || currentTurn !== userId) return { success: false };
+    if (!tileBag || tileBag.length === 0 || lettersToExchange.length === 0) {
+      return { success: false };
+    }
 
     const activeIdx = players.findIndex((p) => p.id === userId);
     if (activeIdx === -1) return { success: false };
@@ -208,12 +212,13 @@ export class WordGridPvPEngine {
 
     // Check game completion condition:
     // 1. Tile bag is empty and hand is empty
-    // 2. OR tile bag is empty and all active players pass/swap consecutively (no one can play a move)
+    // 2. OR all active players skip/swap consecutively (> 2 consecutive skips/passes across both players)
     const isBagEmpty = newBag.length === 0;
     const isHandEmpty = newRack.length === 0;
-    const consecutivePassLimit = updatedPlayers.length * 2;
+    const consecutivePassLimit = Math.max(3, updatedPlayers.length * 2);
     const lastConsecutiveZeroMoves = newMoves.slice(-consecutivePassLimit);
-    const isDeadlock = isBagEmpty && lastConsecutiveZeroMoves.length >= consecutivePassLimit && lastConsecutiveZeroMoves.every((m) => m.score === 0);
+    const isDeadlock = (isBagEmpty && lastConsecutiveZeroMoves.length >= consecutivePassLimit && lastConsecutiveZeroMoves.every((m) => m.score === 0))
+      || (lastConsecutiveZeroMoves.length >= consecutivePassLimit && lastConsecutiveZeroMoves.every((m) => m.score === 0 && (m.word === 'PASSED' || m.word?.startsWith('[Swapped'))));
     const newStatus = (isBagEmpty && isHandEmpty) || isDeadlock ? "completed" : state.status;
 
     const payloadToSave: Record<string, any> = {
@@ -232,6 +237,71 @@ export class WordGridPvPEngine {
       updatedState: {
         tileBag: newBag,
         players: updatedPlayers,
+        currentTurnIndex: nextTurnIndex,
+        currentTurn: nextTurnUserId,
+        moves: newMoves,
+        status: newStatus,
+      },
+      payloadToSave,
+    };
+  }
+
+  /**
+   * Handles skipping a turn for PvP player.
+   * No tiles are swapped or modified.
+   * If consecutive passes exceed threshold (> 2 consecutive passes in game), game ends.
+   */
+  static processSkipTurn(
+    state: WordGridPvPState,
+    userId: string,
+  ): {
+    success: boolean;
+    updatedState?: Partial<WordGridPvPState>;
+    payloadToSave?: Record<string, any>;
+  } {
+    const { matchId, players, currentTurn, moves } = state;
+    if (!matchId || currentTurn !== userId) return { success: false };
+
+    const activeIdx = players.findIndex((p) => p.id === userId);
+    if (activeIdx === -1) return { success: false };
+
+    const nextTurnIndex = (state.currentTurnIndex + 1) % players.length;
+    const nextTurnUserId = players[nextTurnIndex].id;
+
+    const newMove = {
+      player_id: userId,
+      word: "PASSED",
+      score: 0,
+      created_at: new Date().toISOString(),
+    };
+
+    const newMoves = [...moves, newMove];
+
+    // Scrabble end rule: when more than 2 consecutive passes occur (e.g. 3 or more scoreless passes), game ends.
+    // Specifically, if last consecutive passes > 2 (i.e. >= 3 consecutive passes) or each player passed consecutively (2 rounds = 4 passes).
+    const consecutiveZeroMoves = [];
+    for (let i = newMoves.length - 1; i >= 0; i--) {
+      const m = newMoves[i];
+      if (m.score === 0 && (m.word === 'PASSED' || m.word?.startsWith('[Swapped'))) {
+        consecutiveZeroMoves.push(m);
+      } else {
+        break;
+      }
+    }
+
+    const isConsecutivePassDeadlock = consecutiveZeroMoves.length > 2;
+    const newStatus = isConsecutivePassDeadlock ? "completed" : state.status;
+
+    const payloadToSave: Record<string, any> = {
+      current_turn_index: nextTurnIndex,
+      current_turn: nextTurnUserId,
+      moves: newMoves,
+      status: newStatus,
+    };
+
+    return {
+      success: true,
+      updatedState: {
         currentTurnIndex: nextTurnIndex,
         currentTurn: nextTurnUserId,
         moves: newMoves,

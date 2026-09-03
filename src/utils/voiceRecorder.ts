@@ -50,30 +50,47 @@ export class VoiceRecorder {
    private options: VoiceRecorderOptions = {};
 
    async start(options: VoiceRecorderOptions = {}) {
-      if (this.ctx) return;
+      if (this.ctx && this.ctx.state !== "closed" && !this.stopped) return;
       this.options = options;
       this.chunks = [];
       this.staging = [];
       this.stagingSamples = 0;
       this.stopped = false;
 
-      this.stream = await navigator.mediaDevices.getUserMedia({
-         audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-         },
-      });
+      // 1. Acquire MediaStream with fallback for iOS Safari
+      let stream: MediaStream;
+      try {
+         stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+               echoCancellation: true,
+               noiseSuppression: true,
+               autoGainControl: true,
+            },
+         });
+      } catch (firstErr) {
+         console.warn("[VoiceRecorder] Initial getUserMedia failed, retrying with minimal constraints for iOS/Safari:", firstErr);
+         // Fallback to basic audio constraint (iOS Safari often rejects dictionary constraints on subsequent runs)
+         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
 
+      // Ensure all tracks are enabled
+      stream.getAudioTracks().forEach((track) => {
+         track.enabled = true;
+      });
+      this.stream = stream;
+
+      // 2. Initialize or Resume AudioContext
       const Ctor = window.AudioContext
          ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!Ctor) throw new Error("Web Audio API unavailable");
+
       let ctx: AudioContext;
       try {
          ctx = new Ctor({ sampleRate: 16000 });
       } catch {
          ctx = new Ctor();
       }
+
       if (ctx.state === "suspended") {
          await ctx.resume().catch(() => { /* gesture handling upstream */ });
       }
@@ -226,9 +243,24 @@ export class VoiceRecorder {
       try { this.worklet?.disconnect(); } catch { /* noop */ }
       try { this.processor?.disconnect(); } catch { /* noop */ }
       try { this.silentGain?.disconnect(); } catch { /* noop */ }
-      try { this.stream?.getTracks().forEach((t) => t.stop()); } catch { /* noop */ }
-      try { this.ctx?.close(); } catch { /* noop */ }
-      if (this.workletUrl) URL.revokeObjectURL(this.workletUrl);
+
+      // Stop all tracks so the browser recording indicator turns off
+      try {
+         this.stream?.getTracks().forEach((t) => {
+            try { t.stop(); } catch { /* noop */ }
+         });
+      } catch { /* noop */ }
+
+      // Safely close the AudioContext so subsequent instances start fresh without device lock
+      try {
+         if (this.ctx && this.ctx.state !== "closed") {
+            void this.ctx.close().catch(() => {});
+         }
+      } catch { /* noop */ }
+
+      if (this.workletUrl) {
+         try { URL.revokeObjectURL(this.workletUrl); } catch { /* noop */ }
+      }
       this.source = null;
       this.worklet = null;
       this.processor = null;

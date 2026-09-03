@@ -26,6 +26,7 @@ interface BoardGridProps {
   onPlaceTile: (x: number, y: number, rackIdx: number) => void;
   onPickLetterForCell?: (x: number, y: number) => void;
   onRecallTile: (x: number, y: number) => void;
+  topBarActions?: React.ReactNode;
 }
 
 export const BoardGrid = ({
@@ -41,6 +42,7 @@ export const BoardGrid = ({
   onPlaceTile,
   onPickLetterForCell,
   onRecallTile,
+  topBarActions,
 }: BoardGridProps) => {
   const [zoomIdx, setZoomIdx] = useState(0);
   const premiumCells = getPremiumCellsForGrid(gridSize);
@@ -243,42 +245,49 @@ export const BoardGrid = ({
 
   return (
     <div className="w-full max-w-[480px] p-3 bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl flex flex-col items-center justify-center select-none mx-auto animate-in fade-in duration-300 relative">
-      {/* Zoom controls */}
-      <div className="absolute top-2 right-2 z-20 flex items-center gap-1 bg-[#0c121e]/90 border border-slate-700 rounded-xl p-1 shadow-lg">
-        <button
-          type="button"
-          onClick={() => canZoomIn && setZoomIdx((i) => Math.min(i + 1, ZOOM_STEPS.length - 1))}
-          disabled={!canZoomIn}
-          title="Zoom in"
-          className={`w-7 h-7 rounded-lg text-sm font-black flex items-center justify-center transition-all ${canZoomIn ? 'bg-slate-800 hover:bg-slate-700 text-white cursor-pointer active:scale-90' : 'bg-slate-900 text-slate-600 cursor-not-allowed'}`}
-        >
-          +
-        </button>
-        <span className="text-[8px] font-black uppercase tracking-wider text-slate-400 w-7 text-center tabular-nums">
-          {Math.round(zoom * 100)}%
-        </span>
-        <button
-          type="button"
-          onClick={() => canZoomOut && setZoomIdx((i) => Math.max(i - 1, 0))}
-          disabled={!canZoomOut}
-          title="Zoom out"
-          className={`w-7 h-7 rounded-lg text-sm font-black flex items-center justify-center transition-all ${canZoomOut ? 'bg-slate-800 hover:bg-slate-700 text-white cursor-pointer active:scale-90' : 'bg-slate-900 text-slate-600 cursor-not-allowed'}`}
-        >
-          −
-        </button>
-        <button
-          type="button"
-          onClick={() => setZoomIdx(0)}
-          disabled={zoomIdx === 0}
-          title="Reset zoom"
-          className={`w-7 h-7 rounded-lg text-xs font-black flex items-center justify-center transition-all ${zoomIdx !== 0 ? 'bg-slate-800 hover:bg-slate-700 text-white cursor-pointer active:scale-90' : 'bg-slate-900 text-slate-600 cursor-not-allowed'}`}
-        >
-          ⟳
-        </button>
+      {/* Top Controls Bar: Action buttons on left / Zoom controls on right */}
+      <div className="w-full flex items-center justify-between gap-2 mb-2 z-20 min-h-[38px]">
+        <div className="flex-1 min-w-0">
+          {topBarActions}
+        </div>
+
+        {/* Zoom controls */}
+        <div className="flex items-center gap-1 bg-[#0c121e]/95 border border-slate-700 rounded-xl p-1 shadow-lg shrink-0">
+          <button
+            type="button"
+            onClick={() => canZoomIn && setZoomIdx((i) => Math.min(i + 1, ZOOM_STEPS.length - 1))}
+            disabled={!canZoomIn}
+            title="Zoom in"
+            className={`w-7 h-7 rounded-lg text-sm font-black flex items-center justify-center transition-all ${canZoomIn ? 'bg-slate-800 hover:bg-slate-700 text-white cursor-pointer active:scale-90' : 'bg-slate-900 text-slate-600 cursor-not-allowed'}`}
+          >
+            +
+          </button>
+          <span className="text-[8px] font-black uppercase tracking-wider text-slate-400 w-7 text-center tabular-nums">
+            {Math.round(zoom * 100)}%
+          </span>
+          <button
+            type="button"
+            onClick={() => canZoomOut && setZoomIdx((i) => Math.max(i - 1, 0))}
+            disabled={!canZoomOut}
+            title="Zoom out"
+            className={`w-7 h-7 rounded-lg text-sm font-black flex items-center justify-center transition-all ${canZoomOut ? 'bg-slate-800 hover:bg-slate-700 text-white cursor-pointer active:scale-90' : 'bg-slate-900 text-slate-600 cursor-not-allowed'}`}
+          >
+            −
+          </button>
+          <button
+            type="button"
+            onClick={() => setZoomIdx(0)}
+            disabled={zoomIdx === 0}
+            title="Reset zoom"
+            className={`w-7 h-7 rounded-lg text-xs font-black flex items-center justify-center transition-all ${zoomIdx !== 0 ? 'bg-slate-800 hover:bg-slate-700 text-white cursor-pointer active:scale-90' : 'bg-slate-900 text-slate-600 cursor-not-allowed'}`}
+          >
+            ⟳
+          </button>
+        </div>
       </div>
 
       {/* Scrollable map-style viewport */}
-      <div className="w-full mt-7 overflow-auto scrollbar-hide">
+      <div className="w-full overflow-auto scrollbar-hide">
         <div style={{ width: `${zoom * 100}%` }} className="select-none">
           <div style={gridStyle}>
             {Array.from({ length: gridSize }).map((_, y) =>
