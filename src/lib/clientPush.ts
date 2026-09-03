@@ -380,7 +380,6 @@ export async function sendWordGridTurnNotification(
 // Direct Message Client Push Notification Helpers
 // ==========================================
 
-const DM_OFFLINE_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes
 const DM_BURST_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes cooldown per string of messages
 const DM_NOTIFICATION_TRACKER_KEY = "variant_dm_push_tracker_v1";
 
@@ -434,8 +433,8 @@ export function pruneQueueForUser(userId: string): void {
 }
 
 /**
- * Evaluates whether recipient qualifies as offline (>= 2 mins) and dispatches a single
- * consolidated push notification per string of messages.
+ * Sends a push notification immediately if the recipient is not currently online (presence inactive),
+ * rate-limited to 1 push notification per 15-minute burst.
  */
 export async function sendDirectMessagePushNotification({
    senderId,
@@ -465,17 +464,7 @@ export async function sendDirectMessagePushNotification({
       return false;
    }
 
-   // 2. Offline check: verify recipient has been away for >= 2 minutes from message time
-   const messageTimeMs = new Date(sentAt).getTime();
-   if (recipientLastSeenAt) {
-      const lastSeenMs = new Date(recipientLastSeenAt).getTime();
-      const elapsedSinceSeen = messageTimeMs - lastSeenMs;
-      if (elapsedSinceSeen < DM_OFFLINE_THRESHOLD_MS) {
-         return false; // User was active less than 2 minutes ago
-      }
-   }
-
-   // 3. String-of-messages deduplication: only 1 push notification per 15-minute burst
+   // 2. String-of-messages deduplication: only 1 push notification per 15-minute burst
    const now = Date.now();
    const timeBucket = Math.floor(now / DM_BURST_COOLDOWN_MS);
    const trackerKey = `${recipientId}_${senderId}`;

@@ -301,7 +301,8 @@ export const useGameEngine = (
                         ) {
                            const mergedPayload = {
                               ...cloudPayload,
-                              usedHint: cloudPayload.usedHint || payload.usedHint,
+                              usedHint:
+                                 cloudPayload.usedHint || payload.usedHint,
                               hintRecord:
                                  cloudPayload.hintRecord || payload.hintRecord,
                            };
@@ -326,26 +327,43 @@ export const useGameEngine = (
                         ) {
                            const mergedPayload = {
                               ...payload,
-                              usedHint: payload.usedHint || cloudPayload.usedHint,
+                              usedHint:
+                                 payload.usedHint || cloudPayload.usedHint,
                               hintRecord:
                                  payload.hintRecord || cloudPayload.hintRecord,
                            };
-                           dispatch({ type: "LOAD_STATE", payload: mergedPayload });
+                           dispatch({
+                              type: "LOAD_STATE",
+                              payload: mergedPayload,
+                           });
                            performSync(mergedPayload);
                         } else {
                            // Equal and coherent
-                           const localTs = payload.guessTimestamps || payload.guess_timestamps || [];
-                           const cloudTs = cloudPayload.guessTimestamps || cloudPayload.guess_timestamps || [];
-                           const mergedTimestamps = cloudTs.length >= localTs.length ? cloudTs : localTs;
+                           const localTs =
+                              payload.guessTimestamps ||
+                              payload.guess_timestamps ||
+                              [];
+                           const cloudTs =
+                              cloudPayload.guessTimestamps ||
+                              cloudPayload.guess_timestamps ||
+                              [];
+                           const mergedTimestamps =
+                              cloudTs.length >= localTs.length
+                                 ? cloudTs
+                                 : localTs;
 
                            const mergedPayload = {
                               ...payload,
                               guessTimestamps: mergedTimestamps,
-                              usedHint: payload.usedHint || cloudPayload.usedHint,
+                              usedHint:
+                                 payload.usedHint || cloudPayload.usedHint,
                               hintRecord:
                                  payload.hintRecord || cloudPayload.hintRecord,
                            };
-                           dispatch({ type: "LOAD_STATE", payload: mergedPayload });
+                           dispatch({
+                              type: "LOAD_STATE",
+                              payload: mergedPayload,
+                           });
                         }
                      } else {
                         // Conflict/tampering: overwrite local with cloud data (cloud is authoritative)
@@ -364,7 +382,9 @@ export const useGameEngine = (
 
                         // Get daily backup guesses if present to enrich admin logs
                         let backupData = null;
-                        const backupRaw = safeLocalStorage.getItem(`wordle-${date}-backup`);
+                        const backupRaw = safeLocalStorage.getItem(
+                           `wordle-${date}-backup`,
+                        );
                         if (backupRaw) {
                            try {
                               backupData = JSON.parse(backupRaw);
@@ -373,29 +393,41 @@ export const useGameEngine = (
                            }
                         }
 
-                        triggerToast("Sync conflict resolved: restored from cloud.", TOAST_DURATION.VERY_LONG);
+                        triggerToast(
+                           "Sync conflict resolved: restored from cloud.",
+                           TOAST_DURATION.VERY_LONG,
+                        );
 
                         // Trigger admin email notification
-                        supabase.functions.invoke("send-error-email", {
-                           body: {
-                              record: {
-                                 level: "fatal",
-                                 message: `CONFLICT RESOLUTION: ${user.email || "User"} (${user.id})`,
-                                 context: {
-                                    reason: "Sync conflict: incoherent guesses between local storage and cloud. Cloud was restored as authoritative.",
-                                    localGuesses: payload.guesses,
-                                    cloudGuesses: cloudPayload.guesses,
-                                    backupGuesses: backupData?.guesses || null,
-                                    gameDate: date,
-                                    userId: user.id,
-                                    email: user.email,
+                        supabase.functions
+                           .invoke("send-error-email", {
+                              body: {
+                                 record: {
+                                    level: "fatal",
+                                    message: `CONFLICT RESOLUTION: ${user.email || "User"} (${user.id})`,
+                                    context: {
+                                       reason:
+                                          "Sync conflict: incoherent guesses between local storage and cloud. Cloud was restored as authoritative.",
+                                       localGuesses: payload.guesses,
+                                       cloudGuesses: cloudPayload.guesses,
+                                       backupGuesses:
+                                          backupData?.guesses || null,
+                                       gameDate: date,
+                                       userId: user.id,
+                                       email: user.email,
+                                    },
+                                    session_id: "conflict-monitor",
+                                    user_id: user.id,
+                                    created_at: new Date().toISOString(),
                                  },
-                                 session_id: "conflict-monitor",
-                                 user_id: user.id,
-                                 created_at: new Date().toISOString(),
                               },
-                           },
-                        }).catch(e => console.warn("[Sync] Admin email alert failed:", e));
+                           })
+                           .catch((e) =>
+                              console.warn(
+                                 "[Sync] Admin email alert failed:",
+                                 e,
+                              ),
+                           );
 
                         saveGameWithBackup(date, savedPayload);
                      }
