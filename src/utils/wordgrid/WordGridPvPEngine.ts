@@ -259,7 +259,7 @@ export class WordGridPvPEngine {
     updatedState?: Partial<WordGridPvPState>;
     payloadToSave?: Record<string, any>;
   } {
-    const { matchId, players, currentTurn, moves, tileBag } = state;
+    const { matchId, players, currentTurn, moves } = state;
     if (!matchId || currentTurn !== userId) return { success: false };
 
     const activeIdx = players.findIndex((p) => p.id === userId);

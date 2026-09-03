@@ -440,11 +440,11 @@ export async function sendDirectMessagePushNotification({
    senderId,
    senderName,
    recipientId,
-   recipientLastSeenAt,
+   recipientLastSeenAt: _recipientLastSeenAt,
    isRecipientOnline,
    messageSnippet,
    groupId,
-   sentAt = new Date().toISOString(),
+   sentAt: _sentAt = new Date().toISOString(),
 }: {
    senderId: string;
    senderName: string;

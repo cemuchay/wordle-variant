@@ -268,7 +268,7 @@ export class WordGridBotEngine {
     updatedState?: Partial<WordGridBotState>;
     botShouldPlay?: boolean;
   } {
-    const { players, currentTurn, moves } = state;
+    const { currentTurn, moves } = state;
     if (currentTurn !== userId && currentTurn === "bot") {
       return { success: false };
     }
