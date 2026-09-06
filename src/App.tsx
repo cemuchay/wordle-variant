@@ -45,8 +45,9 @@ import DisconnectedUI from "./components/app/DisconnectedUI";
 import { initTelemetry } from "./lib/telemetry";
 import { flushNotificationQueue } from "./lib/clientPush";
 import { useWordGridStore } from "./store/useWordGridStore";
+import { generateShareText } from "./lib/share";
 
-const StatsModal = safeLazy(() => import("./components/StatsModal").then(m => ({ default: m.StatsModal })));
+const StatsModal = safeLazy(() => import("./components/social-leaderboard").then(m => ({ default: m.SocialStatsModal })));
 const ChallengeModal = safeLazy(() => import("./components/ChallengeModal").then(m => ({ default: m.ChallengeModal })));
 const WordUpContainer = safeLazy(() => import("./wordup/WordUpContainer").then(m => ({ default: m.WordUpContainer })));
 const WordGridContainer = safeLazy(() => import("./wordgrid/WordGridContainer").then(m => ({ default: m.WordGridContainer })));
@@ -1047,7 +1048,46 @@ function MainApp() {
         moreGamesUnreadCount: moreGamesUnreadCount,
         onHint: actions.handleHint,
         onReset: () => window.location.reload(),
-        onShare: () => actions.setGameOverModalOpen(true),
+        onShare: async () => {
+          if (!date || !state.guesses || state.guesses.length === 0) return;
+          const shareText = generateShareText({
+            date,
+            guesses: state.guesses,
+            maxAttempts: config?.maxAttempts || 6,
+            won: state.guesses[state.guesses.length - 1]?.every((r) => r.status === "correct") ?? false,
+            usedHint: state.usedHint,
+            hintRecord: state.hintRecord,
+            gameMessage: state.gameMessage,
+            wordLength: config?.length || 5,
+            isAuthenticated: !!user,
+          });
+
+          if (navigator.share) {
+            try {
+              await navigator.share({ title: `Variant - ${date}`, text: shareText });
+              triggerToast("Result shared successfully!", TOAST_DURATION.DEFAULT);
+              return;
+            } catch (err: any) {
+              if (err.name === "AbortError") return;
+            }
+          }
+
+          try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              await navigator.clipboard.writeText(shareText);
+            } else {
+              const textArea = document.createElement("textarea");
+              textArea.value = shareText;
+              document.body.appendChild(textArea);
+              textArea.select();
+              document.execCommand("copy");
+              document.body.removeChild(textArea);
+            }
+            triggerToast("Result copied to clipboard! 📋", TOAST_DURATION.DEFAULT);
+          } catch {
+            triggerToast("Failed to copy results", TOAST_DURATION.DEFAULT);
+          }
+        },
         onRetrySync: actions.retrySync,
         isGameOver: state.isGameOver,
         isRevealing: state.isRevealing,
@@ -1271,7 +1311,6 @@ function MainApp() {
           isChallengeOpen,
           isNotificationsOpen: showNotifications,
           isAuthOpen,
-          isGameOverOpen: state.isGameOverModalOpen,
         }}
         actions={{
           setSettingsOpen: setIsSettingsOpen,
@@ -1285,7 +1324,6 @@ function MainApp() {
           },
           setNotificationsOpen: setIsNotificationsOpen,
           setAuthOpen: setIsAuthOpen,
-          setGameOverOpen: actions.setGameOverModalOpen,
         }}
         gameContext={{
           user: user as AppUser,
@@ -1297,7 +1335,6 @@ function MainApp() {
           gameMessage: state.gameMessage,
           stats,
           isGameOver: state.isGameOver,
-          isGameOverOpen: state.isGameOverModalOpen,
         }}
         statsActiveTab={statsActiveTab}
         onChallengeCreated={handleChallengeCreated}

@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Share2, Check, Copy, Sparkles, Clock, Loader2 } from "lucide-react";
+import { Share2, Check, Copy, Sparkles, Clock, Loader2, Flame } from "lucide-react";
 import type { GuessResult } from "../../types/game";
 import { generateShareText } from "../../lib/share";
 import { useApp } from "../../context/AppContext";
@@ -125,6 +125,23 @@ export const ShareCard: React.FC<ShareCardProps> = ({
           <CountDown isOpen={true} compact={true} />
         </div>
       </div>
+
+      {/* Roast / Game Message Callout */}
+      {gameMessage && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-2.5 flex items-start gap-2 text-left">
+          <div className="p-1 rounded-lg bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
+            <Flame size={14} className="fill-amber-400/20" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <span className="text-[8px] font-black uppercase tracking-widest text-amber-400 block mb-0.5">
+              The Verdict
+            </span>
+            <p className="text-xs text-amber-100/90 font-medium italic leading-relaxed">
+              "{gameMessage}"
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Center Emoji Grid Preview */}
       <div className="flex flex-col items-center justify-center py-1">

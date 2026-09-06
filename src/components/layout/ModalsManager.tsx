@@ -5,10 +5,9 @@ import { safeLazy } from '../../utils/safeLazy';
 import { TIMEOUT } from '../../constants/game';
 
 const ChallengeModal = safeLazy(() => import('../ChallengeModal').then(m => ({ default: m.ChallengeModal })));
-const GameOverModal = safeLazy(() => import('../GameOverModal').then(m => ({ default: m.GameOverModal })));
 const InfoModal = safeLazy(() => import('../InfoModal').then(m => ({ default: m.InfoModal })));
 const SettingsModal = safeLazy(() => import('../SettingsModal').then(m => ({ default: m.SettingsModal })));
-const StatsModal = safeLazy(() => import('../StatsModal').then(m => ({ default: m.StatsModal })));
+const StatsModal = safeLazy(() => import('../social-leaderboard').then(m => ({ default: m.SocialStatsModal })));
 const AnnouncementModal = safeLazy(() => import('../AnnouncementModal').then(m => ({ default: m.AnnouncementModal })));
 const NotificationModal = safeLazy(() => import('../notifications/NotificationModal').then(m => ({ default: m.NotificationModal })));
 const AuthModal = safeLazy(() => import('../AuthModal').then(m => ({ default: m.AuthModal })));
@@ -26,7 +25,6 @@ interface ModalsManagerProps {
         isChallengeOpen: boolean;
         isNotificationsOpen: boolean;
         isAuthOpen: boolean;
-        isGameOverOpen: boolean;
     };
     actions: {
         setSettingsOpen: (open: boolean) => void;
@@ -35,11 +33,9 @@ interface ModalsManagerProps {
         setChallengeOpen: (open: boolean) => void;
         setNotificationsOpen: (open: boolean) => void;
         setAuthOpen: (open: boolean) => void;
-        setGameOverOpen: (open: boolean) => void;
     };
     gameContext: {
         isGameOver: boolean;
-        isGameOverOpen: boolean;
         user: AppUser | null;
         date: string;
         guesses: GuessResult[][];
@@ -80,7 +76,6 @@ export const ModalsManager = ({
         else if (modals.isChallengeOpen) setActiveSection('challenge-modal');
         else if (modals.isNotificationsOpen) setActiveSection('notifications-modal');
         else if (modals.isAuthOpen) setActiveSection('auth-modal');
-        else if (modals.isGameOverOpen) setActiveSection('gameover-modal');
         else if (viewedProfileId) setActiveSection('user-profile-modal');
         else if (activeNavigationItem === 'more' && moreGameMode === 'wordgrid') setActiveSection('wordgrid');
         else if (activeNavigationItem === 'wordup' || (activeNavigationItem === 'more' && moreGameMode === 'wordup')) setActiveSection('wordup');
@@ -96,7 +91,6 @@ export const ModalsManager = ({
         modals.isChallengeOpen,
         modals.isNotificationsOpen,
         modals.isAuthOpen,
-        modals.isGameOverOpen,
         viewedProfileId,
         activeNavigationItem,
         moreGameMode,
@@ -169,21 +163,6 @@ export const ModalsManager = ({
                 <AuthModal
                     isOpen={modals.isAuthOpen}
                     onClose={() => actions.setAuthOpen(false)}
-                />
-            )}
-
-            {modals.isGameOverOpen && gameContext.guesses && gameContext.guesses.length > 0 && gameContext.config && (
-                <GameOverModal
-                    isOpen={modals.isGameOverOpen}
-                    onClose={() => actions.setGameOverOpen(false)}
-                    guesses={gameContext.guesses}
-                    date={gameContext.date}
-                    config={gameContext.config}
-                    usedHint={gameContext.usedHint}
-                    hintRecord={gameContext.hintRecord}
-                    gameMessage={gameContext.gameMessage}
-                    stats={gameContext.stats}
-                    isAuthenticated={gameContext.user ? true : false}
                 />
             )}
 

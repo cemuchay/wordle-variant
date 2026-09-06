@@ -298,13 +298,14 @@ export function purgeStaleStorage(): number {
         }
       }
 
-      // 2. Finished Challenge Progress keys
+      // 2. Challenge Progress keys: purge completed, or any update older than 7 days
       if (key.startsWith('challenge-prog-')) {
         const raw = originalLocalStorage.getItem(key);
         if (raw) {
           try {
             const parsed = JSON.parse(raw);
-            if (!parsed.needsSync && (parsed.status === 'completed' || parsed.status === 'timed_out')) {
+            const isOlderThan7Days = typeof parsed.timestamp === 'number' && (Date.now() - parsed.timestamp > 7 * 24 * 60 * 60 * 1000);
+            if (isOlderThan7Days || (!parsed.needsSync && (parsed.status === 'completed' || parsed.status === 'timed_out'))) {
               keysToRemove.push(key);
             }
           } catch {

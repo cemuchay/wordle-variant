@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Trophy, ChevronRight, Loader2, } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { supabase } from "../../lib/supabaseClient";
@@ -18,40 +18,47 @@ export const MiniLeaderboardSnapshot: React.FC<MiniLeaderboardSnapshotProps> = (
   const [loading, setLoading] = useState(false);
   const [userRank, setUserRank] = useState<number | null>(null);
 
-  useEffect(() => {
+  const fetchTopScores = useCallback(async (ignoreCache = false) => {
     if (!currentDate) return;
-    let isMounted = true;
+    setLoading(true);
+    try {
+      const { data: edgeRes, error } = await supabase.functions.invoke("redis-cache", {
+        body: { action: "get-leaderboard", timeframe: "today", date: currentDate, ignoreCache },
+      });
 
-    const fetchTopScores = async () => {
-      setLoading(true);
-      try {
-        const { data: edgeRes, error } = await supabase.functions.invoke("redis-cache", {
-          body: { action: "get-leaderboard", timeframe: "today", date: currentDate, ignoreCache: false },
-        });
+      if (!error && edgeRes?.data) {
+        const list: LeaderboardEntry[] = edgeRes.data;
+        setEntries(list.slice(0, 3));
 
-        if (!error && edgeRes?.data && isMounted) {
-          const list: LeaderboardEntry[] = edgeRes.data;
-          setEntries(list.slice(0, 3));
-
-          if (profile?.id) {
-            const index = list.findIndex((e) => e.user_id === profile.id);
-            if (index !== -1) {
-              setUserRank(index + 1);
-            }
+        if (profile?.id) {
+          const index = list.findIndex((e) => e.user_id === profile.id);
+          if (index !== -1) {
+            setUserRank(index + 1);
           }
         }
-      } catch {
-        // Silent fallback if leaderboard edge function is unreachable
-      } finally {
-        if (isMounted) setLoading(false);
       }
+    } catch {
+      // Silent fallback if leaderboard edge function is unreachable
+    } finally {
+      setLoading(false);
+    }
+  }, [currentDate, profile?.id]);
+
+  useEffect(() => {
+    fetchTopScores(false);
+  }, [fetchTopScores]);
+
+  // Listen to game completion & global score updates for real-time leaderboard refresh
+  useEffect(() => {
+    const handleScoresUpdated = () => {
+      fetchTopScores(true);
     };
 
-    fetchTopScores();
+    window.addEventListener("global-scores-updated", handleScoresUpdated);
     return () => {
-      isMounted = false;
+      window.removeEventListener("global-scores-updated", handleScoresUpdated);
     };
-  }, [currentDate, profile?.id]);
+  }, [fetchTopScores]);
 
   return (
     <div className="w-full bg-slate-900/80 border border-white/10 rounded-2xl p-3.5 sm:p-4 shadow-xl backdrop-blur-md space-y-3 text-left">
@@ -94,8 +101,8 @@ export const MiniLeaderboardSnapshot: React.FC<MiniLeaderboardSnapshotProps> = (
               <div
                 key={entry.user_id || idx}
                 className={`flex items-center justify-between p-2 rounded-xl border transition-all ${isSelf
-                    ? "bg-amber-500/10 border-amber-500/30"
-                    : "bg-black/20 border-white/5"
+                  ? "bg-amber-500/10 border-amber-500/30"
+                  : "bg-black/20 border-white/5"
                   }`}
               >
                 <div className="flex items-center gap-2 min-w-0">

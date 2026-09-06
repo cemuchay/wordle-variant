@@ -19,7 +19,6 @@ export interface GameEngineState {
     usedHint: boolean;
     hintRecord: any | null;
     gameMessage: string;
-    isGameOverModalOpen: boolean;
     syncStatus: "idle" | "syncing" | "synced" | "error";
     syncError: Error | null;
 }

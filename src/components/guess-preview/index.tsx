@@ -45,6 +45,10 @@ interface GuessPreviewModalProps {
     time_taken?: number | null;
     target_words?: string[];
   };
+  entries?: any[];
+  initialIndex?: number;
+  onNavigateIndex?: (newIndex: number) => void;
+  initialOpenAnalysis?: boolean;
 }
 
 const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
@@ -60,6 +64,10 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
   isShapeshifter,
   challenge: challengeProp,
   initialData,
+  entries,
+  initialIndex,
+  onNavigateIndex,
+  initialOpenAnalysis = false,
 }) => {
   // Attempt to get challenge from context if not passed as prop
   const context = useContext(ChallengeContext);
@@ -72,7 +80,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
   );
   const [showTargetWord, setShowTargetWord] = useState(false);
   const [showScoringInfo, setShowScoringInfo] = useState(false);
-  const [showGameAnalysis, setShowGameAnalysis] = useState(false);
+  const [showGameAnalysis, setShowGameAnalysis] = useState(initialOpenAnalysis);
 
   const marathonGames = useMemo(() => {
     if (!isMarathon) return [];
@@ -627,6 +635,30 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
     }, 300);
   };
 
+  // Keyboard navigation between players if in playlist mode
+  useEffect(() => {
+    if (!entries || entries.length <= 1 || initialIndex === undefined || !onNavigateIndex) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (showGameAnalysis) return; // let analysis modal handle its keys if open
+
+      if (e.key === "ArrowLeft" && initialIndex > 0) {
+        onNavigateIndex(initialIndex - 1);
+      } else if (e.key === "ArrowRight" && initialIndex < entries.length - 1) {
+        onNavigateIndex(initialIndex + 1);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [entries, initialIndex, onNavigateIndex, showGameAnalysis]);
+
+  const hasPrevPlayer = entries && initialIndex !== undefined && initialIndex > 0;
+  const hasNextPlayer = entries && initialIndex !== undefined && initialIndex < entries.length - 1;
+  const prevEntry = hasPrevPlayer ? entries[initialIndex - 1] : null;
+  const nextEntry = hasNextPlayer ? entries[initialIndex + 1] : null;
+
   return (
     <div
       className="bg-gray-900 border border-gray-700 w-full max-w-xl mx-auto rounded-2xl p-4 sm:p-6 shadow-2xl relative flex flex-col flex-1 min-h-0 h-full overflow-hidden"
@@ -639,6 +671,46 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
       >
         <X size={20} />
       </button>
+
+      {/* Continuous Player Browsing Bar if playlist entries exist */}
+      {entries && entries.length > 1 && initialIndex !== undefined && onNavigateIndex && (
+        <div className="flex items-center justify-between bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 mb-2.5 shrink-0 text-xs select-none">
+          <button
+            onClick={() => hasPrevPlayer && onNavigateIndex(initialIndex - 1)}
+            disabled={!hasPrevPlayer}
+            className={`flex items-center gap-1 font-black uppercase text-[10px] tracking-wider transition-all px-2 py-1 rounded-lg ${
+              hasPrevPlayer
+                ? "text-gray-300 hover:text-white hover:bg-white/10 cursor-pointer"
+                : "text-gray-600 opacity-40 cursor-not-allowed"
+            }`}
+            title={prevEntry ? `Previous: ${formatUsername(prevEntry.username)}` : "No previous player"}
+          >
+            <span>←</span>
+            <span className="hidden sm:inline font-mono">#{initialIndex}</span>
+            <span className="max-w-[80px] truncate">{prevEntry ? formatUsername(prevEntry.username) : "Prev"}</span>
+          </button>
+
+          <div className="flex items-center gap-1 text-[11px] font-black text-amber-400 font-mono">
+            <span>#{initialIndex + 1}</span>
+            <span className="text-gray-500 font-sans text-[10px]">of {entries.length}</span>
+          </div>
+
+          <button
+            onClick={() => hasNextPlayer && onNavigateIndex(initialIndex + 1)}
+            disabled={!hasNextPlayer}
+            className={`flex items-center gap-1 font-black uppercase text-[10px] tracking-wider transition-all px-2 py-1 rounded-lg ${
+              hasNextPlayer
+                ? "text-gray-300 hover:text-white hover:bg-white/10 cursor-pointer"
+                : "text-gray-600 opacity-40 cursor-not-allowed"
+            }`}
+            title={nextEntry ? `Next: ${formatUsername(nextEntry.username)}` : "No next player"}
+          >
+            <span className="max-w-[80px] truncate">{nextEntry ? formatUsername(nextEntry.username) : "Next"}</span>
+            <span className="hidden sm:inline font-mono">#{initialIndex + 2}</span>
+            <span>→</span>
+          </button>
+        </div>
+      )}
 
       <div className="flex items-center justify-center gap-2 mb-2 relative shrink-0">
         <p className="text-sm uppercase tracking-tighter text-gray-100 font-bold flex items-center gap-1.5">
