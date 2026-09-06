@@ -247,7 +247,7 @@ export const BoardGrid = ({
     <div className="w-full max-w-[480px] p-3 bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl flex flex-col items-center justify-center select-none mx-auto animate-in fade-in duration-300 relative">
       {/* Top Controls Bar: Action buttons on left / Zoom controls on right */}
       <div className="w-full flex items-center justify-between gap-2 mb-2 z-20 min-h-[38px]">
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 overflow-x-auto scrollbar-hide py-0.5">
           {topBarActions}
         </div>
 

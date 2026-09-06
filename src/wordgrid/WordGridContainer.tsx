@@ -591,13 +591,13 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
             onRecallTile={handleRecallTile}
             topBarActions={
               isMyTurn ? (
-                <div className="flex items-center gap-1.5 w-full">
+                <div className="flex items-center gap-1.5 w-full overflow-x-auto scrollbar-hide py-0.5 select-none touch-pan-x">
                   {/* Play Word button: primary action */}
                   <button
                     type="button"
                     onClick={handleSubmit}
                     disabled={placedTiles.length === 0 || isValidatingWord}
-                    className={`flex-1 min-w-0 py-1.5 px-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md active:scale-95 ${isValidatingWord
+                    className={`shrink-0 min-w-[72px] sm:flex-1 py-1.5 px-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md active:scale-95 ${isValidatingWord
                       ? 'bg-indigo-700 text-white animate-pulse border border-indigo-500'
                       : placedTiles.length > 0
                         ? 'bg-linear-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white shadow-indigo-600/30 border border-indigo-400'
