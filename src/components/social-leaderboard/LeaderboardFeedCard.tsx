@@ -15,6 +15,7 @@ interface LeaderboardFeedCardProps {
   gameDate: string;
   isCurrentUser: boolean;
   canViewGuesses: boolean;
+  hideGridWords?: boolean;
   onOpenPreview: (entry: LeaderboardEntry, openAnalysis?: boolean) => void;
 }
 
@@ -32,6 +33,7 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
   gameDate,
   isCurrentUser,
   canViewGuesses,
+  hideGridWords = false,
   onOpenPreview,
 }) => {
   const { user: currentUser } = useAuth();
@@ -41,6 +43,7 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
   const [topComment, setTopComment] = useState<{ content: string; author_username?: string } | null>(null);
   const [commentsCount, setCommentsCount] = useState(0);
   const [isCommentDrawerOpen, setIsCommentDrawerOpen] = useState(false);
+  const [playerGuesses, setPlayerGuesses] = useState<any[]>((entry as any).guesses || []);
 
   const targetUserId = entry.user_id;
   const attempts = entry.status === "lost" ? "X" : entry.attempts;
@@ -112,6 +115,20 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
         .eq("game_date", gameDate);
 
       if (count !== null) setCommentsCount(count);
+
+      // Fetch actual guesses if allowed and not already populated
+      if (canViewGuesses && (!playerGuesses || playerGuesses.length === 0)) {
+        const { data: scoreData } = await supabase
+          .from("scores")
+          .select("guesses")
+          .eq("user_id", targetUserId)
+          .eq("game_date", gameDate)
+          .maybeSingle();
+
+        if (scoreData?.guesses && Array.isArray(scoreData.guesses) && scoreData.guesses.length > 0) {
+          setPlayerGuesses(scoreData.guesses);
+        }
+      }
     } catch (err) {
       console.error("Error loading feed card social data:", err);
     }
@@ -176,7 +193,7 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
 
   // Build mini grid visualization
   const miniGrid = useMemo(() => {
-    const rawGuesses = (entry as any).guesses || [];
+    const rawGuesses = playerGuesses.length > 0 ? playerGuesses : ((entry as any).guesses || []);
     const wordLen = entry.word_length || 5;
     const guessCount = typeof entry.attempts === "number" ? entry.attempts : (rawGuesses.length || 4);
 
@@ -201,15 +218,19 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
             const status = cell.status;
             const bgClass =
               status === "correct"
-                ? "bg-emerald-500"
+                ? "bg-emerald-500 text-white"
                 : status === "present"
-                ? "bg-amber-400"
-                : "bg-gray-700";
+                ? "bg-amber-400 text-black"
+                : "bg-gray-700 text-white";
             return (
               <span
                 key={cIdx}
-                className={`w-4 h-4 sm:w-5 sm:h-5 rounded-xs shadow-xs ${bgClass} transition-all`}
-              />
+                className={`w-4 h-4 sm:w-5 sm:h-5 rounded-xs shadow-xs ${bgClass} flex items-center justify-center font-black uppercase text-[9px] sm:text-[10px] select-none transition-all ${
+                  hideGridWords ? "blur-[2px] opacity-40 select-none text-transparent" : ""
+                }`}
+              >
+                {!hideGridWords ? cell.letter || "" : ""}
+              </span>
             );
           })}
         </div>
@@ -236,7 +257,7 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
         </div>
       );
     });
-  }, [entry, canViewGuesses]);
+  }, [entry, canViewGuesses, playerGuesses, hideGridWords]);
 
   return (
     <>
@@ -469,6 +490,11 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
         targetUsername={entry.username || "Player"}
         gameDate={gameDate}
         canViewGuesses={canViewGuesses}
+        hideGridWords={hideGridWords}
+        rawGuesses={playerGuesses.length > 0 ? playerGuesses : (entry as any).guesses}
+        status={entry.status}
+        attempts={entry.attempts}
+        wordLength={entry.word_length || 5}
         onCommentAdded={loadSocialData}
       />
 

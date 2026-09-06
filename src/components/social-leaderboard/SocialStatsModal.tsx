@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Eye,
+  EyeOff,
   LayoutGrid,
   List,
   Loader2,
@@ -71,6 +72,7 @@ export const SocialStatsModal: React.FC<Props> = ({
     const saved = safeLocalStorage.getItem("wordle_social_lb_view_mode") as ViewMode | null;
     return saved === "table" ? "table" : "feed";
   });
+  const [hideGridWords, setHideGridWords] = useState(false);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedEntryIndex, setSelectedEntryIndex] = useState<number | null>(null);
@@ -490,10 +492,41 @@ export const SocialStatsModal: React.FC<Props> = ({
 
               {/* View Mode Toggle: [ Table | Feed ] for Today & Yesterday */}
               {supportsFeed && (
-                <div className="flex items-center justify-between mb-3 px-1 py-1 bg-black/30 border border-white/5 rounded-xl">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1.5">
-                    Display Style
-                  </span>
+                <div className="flex items-center justify-between mb-3 px-1.5 py-1 bg-black/30 border border-white/5 rounded-xl gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                      Display Style
+                    </span>
+                    {/* Hide / Blur Grid Words for Screenshot Privacy Toggle */}
+                    {canViewGuess && (
+                      <button
+                        type="button"
+                        onClick={() => setHideGridWords((prev) => !prev)}
+                        className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer border ${
+                          hideGridWords
+                            ? "bg-amber-400/20 text-amber-300 border-amber-400/50 shadow-xs"
+                            : "bg-white/5 text-gray-400 hover:text-white border-white/10 hover:bg-white/10"
+                        }`}
+                        title={
+                          hideGridWords
+                            ? "Grid words hidden (Privacy/Screenshot Mode ON) - Click to reveal"
+                            : "Click to hide/blur grid words for screenshots"
+                        }
+                      >
+                        {hideGridWords ? (
+                          <>
+                            <EyeOff size={11} className="text-amber-300" />
+                            <span>Hidden</span>
+                          </>
+                        ) : (
+                          <>
+                            <Eye size={11} />
+                            <span>Hide Words</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
                   <div className="flex gap-1">
                     <button
                       onClick={() => handleSetViewMode("table")}
@@ -545,6 +578,7 @@ export const SocialStatsModal: React.FC<Props> = ({
                       gameDate={targetLbDate}
                       isCurrentUser={entry.user_id === user?.id}
                       canViewGuesses={canViewGuess}
+                      hideGridWords={hideGridWords}
                       onOpenPreview={handleOpenPreview}
                     />
                   ))}
