@@ -113,6 +113,7 @@ export const usePersistence = ({ user, date, dispatch, config, triggerToast }: U
                      event: "score_submitted",
                      payload: {
                         userId: user.id,
+                        username: user.user_metadata?.username || user.username || undefined,
                         date,
                         status: gamePayload.status,
                      },

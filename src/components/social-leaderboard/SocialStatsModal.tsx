@@ -178,27 +178,21 @@ export const SocialStatsModal: React.FC<Props> = ({
   useEffect(() => {
     if (!isOpen || !currentDate) return;
 
-    const channelName = `social_scores_lb_sync_${currentDate}`;
-    const existing = supabase
-      .getChannels()
-      .find((c) => (c as any).topic === `realtime:${channelName}`);
-    if (existing) {
-      supabase.removeChannel(existing);
-    }
-
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const handleScoreUpdate = (status: string | null) => {
+    const handleScoreUpdate = async (status: string | null, username?: string) => {
       const isGameOverUpdate = status === "won" || status === "lost";
       const currentTF = timeframeRef.current;
 
-      if (status === "playing") {
+      try {
         safeSessionStorage.removeItem(`wordle_global_leaderboard_today_${currentDate}`);
-      } else if (isGameOverUpdate) {
-        safeSessionStorage.removeItem(`wordle_global_leaderboard_today_${currentDate}`);
-        safeSessionStorage.removeItem(`wordle_global_leaderboard_yesterday_${currentDate}`);
-        safeSessionStorage.removeItem(`wordle_global_leaderboard_weekly_${currentDate}`);
-        safeSessionStorage.removeItem(`wordle_global_leaderboard_monthly_${currentDate}`);
+        if (isGameOverUpdate) {
+          safeSessionStorage.removeItem(`wordle_global_leaderboard_yesterday_${currentDate}`);
+          safeSessionStorage.removeItem(`wordle_global_leaderboard_weekly_${currentDate}`);
+          safeSessionStorage.removeItem(`wordle_global_leaderboard_monthly_${currentDate}`);
+        }
+      } catch (e) {
+        console.error("Failed to clear sessionStorage on score update:", e);
       }
 
       let shouldRefresh = false;
@@ -213,14 +207,33 @@ export const SocialStatsModal: React.FC<Props> = ({
 
       if (shouldRefresh) {
         if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-          fetchLeaderboard(true, true);
+        debounceTimer = setTimeout(async () => {
+          await fetchLeaderboard(true, true);
+          const toastMsg = username
+            ? `New guess by @${formatUsername(username)}!`
+            : isGameOverUpdate
+            ? "A player just finished their game!"
+            : "Leaderboard updated with latest live guesses!";
+          triggerToast(toastMsg, TOAST_DURATION.SHORT);
         }, TIMEOUT.LEADERBOARD_REFRESH);
       }
     };
 
-    const channel = supabase
-      .channel(channelName)
+    // 1. Listen to broadcast sync channel used by usePersistence
+    const broadcastChannelName = "global_scores_leaderboard_sync";
+    const broadcastChannel = supabase
+      .channel(broadcastChannelName)
+      .on("broadcast", { event: "score_submitted" }, (payload: any) => {
+        const payloadData = payload.payload || {};
+        const status = payloadData.status || null;
+        handleScoreUpdate(status, payloadData.username);
+      })
+      .subscribe();
+
+    // 2. Listen to direct Postgres changes on the scores table for currentDate
+    const pgChannelName = `social_scores_lb_sync_${currentDate}`;
+    const pgChannel = supabase
+      .channel(pgChannelName)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "scores", filter: `game_date=eq.${currentDate}` },
@@ -229,19 +242,16 @@ export const SocialStatsModal: React.FC<Props> = ({
           handleScoreUpdate(status);
         }
       )
-      .on("broadcast", { event: "score_submitted" }, (payload: any) => {
-        const status = payload.payload ? payload.payload.status : null;
-        handleScoreUpdate(status);
-      })
       .subscribe();
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
-      supabase.removeChannel(channel);
+      supabase.removeChannel(broadcastChannel);
+      supabase.removeChannel(pgChannel);
     };
-  }, [isOpen, currentDate, fetchLeaderboard]);
+  }, [isOpen, currentDate, fetchLeaderboard, triggerToast]);
 
-  // Global scores custom event
+  // Global scores custom event (fired when local user makes guesses or finishes)
   useEffect(() => {
     if (!isOpen) return;
 
@@ -255,11 +265,15 @@ export const SocialStatsModal: React.FC<Props> = ({
       const isGameOverUpdate = customEvent.detail?.isGameOver ?? false;
       const currentTF = timeframeRef.current;
 
-      if (isGameOverUpdate) {
+      try {
         safeSessionStorage.removeItem(`wordle_global_leaderboard_today_${currentDate}`);
-        safeSessionStorage.removeItem(`wordle_global_leaderboard_yesterday_${currentDate}`);
-        safeSessionStorage.removeItem(`wordle_global_leaderboard_weekly_${currentDate}`);
-        safeSessionStorage.removeItem(`wordle_global_leaderboard_monthly_${currentDate}`);
+        if (isGameOverUpdate) {
+          safeSessionStorage.removeItem(`wordle_global_leaderboard_yesterday_${currentDate}`);
+          safeSessionStorage.removeItem(`wordle_global_leaderboard_weekly_${currentDate}`);
+          safeSessionStorage.removeItem(`wordle_global_leaderboard_monthly_${currentDate}`);
+        }
+      } catch (err) {
+        console.error("Failed to clear sessionStorage on global score update:", err);
       }
 
       let shouldRefresh = false;
@@ -273,8 +287,9 @@ export const SocialStatsModal: React.FC<Props> = ({
       }
 
       if (shouldRefresh) {
-        debounceTimer = setTimeout(() => {
-          fetchLeaderboard(true, isBackground);
+        debounceTimer = setTimeout(async () => {
+          await fetchLeaderboard(true, isBackground);
+          triggerToast("Leaderboard updated with latest scores!", TOAST_DURATION.SHORT);
         }, TIMEOUT.LEADERBOARD_REFRESH);
       }
     };
@@ -284,7 +299,7 @@ export const SocialStatsModal: React.FC<Props> = ({
       if (debounceTimer) clearTimeout(debounceTimer);
       window.removeEventListener("global-scores-updated", handleGlobalUpdate);
     };
-  }, [isOpen, currentDate, fetchLeaderboard]);
+  }, [isOpen, currentDate, fetchLeaderboard, triggerToast]);
 
   const maxGuesses = useMemo(() => {
     return Math.max(...Object.values(stats.guesses), 1);
