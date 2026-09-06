@@ -4,6 +4,7 @@ import { logger } from '../../lib/logger';
 import { TOAST_DURATION } from '../../constants/ui';
 import { safeLocalStorage } from '../../utils/storage';
 import { encryptGuesses } from '../../lib/game-logic';
+import { pruneStaleChallengeQueue } from '../../utils/challengeQueueManager';
 import type { NetworkLog } from './types';
 
 interface UsePersistenceProps {
@@ -25,6 +26,8 @@ export const usePersistence = ({
    submitChallengeResult,
    triggerToast,
 }: UsePersistenceProps) => {
+   // Prune any stale queue updates older than 7 days
+   useRef(pruneStaleChallengeQueue());
    const [isSaving, setIsSaving] = useState(false);
    const [syncFailed, setSyncFailed] = useState(false);
    const [retryCount, setRetryCount] = useState(0);
