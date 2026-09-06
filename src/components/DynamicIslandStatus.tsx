@@ -12,6 +12,7 @@ import { useAppStore } from '../store/useAppStore';
 import { WordUpMascot } from '../wordup/shared/WordUpMascot';
 import type { MascotExpression } from '../wordup/shared/WordUpMascot';
 import formatUsername from '../utils/formatUsername';
+import { SignalBar } from './common/SignalBar';
 import { Z_INDEX, TOAST_DURATION } from '../constants/ui';
 import { TIMEOUT } from '../constants/game';
 
@@ -392,8 +393,8 @@ export const DynamicIslandStatus = () => {
         if (user && otherOnlineUsers.length === 1) return '180px';
         if (user && otherOnlineUsers.length > 1) return '195px';
 
-        // Persistent default state (Smiley + Time)
-        return '150px';
+        // Persistent default state (Mascot/User + Time + Signal)
+        return '164px';
     };
 
     return (
@@ -611,8 +612,13 @@ export const DynamicIslandStatus = () => {
                                             <span className={`${isAttentionState ? 'text-xs' : 'text-[8px]'} uppercase font-black tracking-[0.08em] text-white/90 truncate max-w-36 select-none transition-all`}>{mascot.label}</span>
                                         </div>
                                     ) : (
-                                        <div className="flex items-center gap-1.5 px-2.5 h-full w-full justify-center">
+                                        <div className="flex items-center gap-2 px-2 h-full w-full justify-center">
                                             <span className={`${isAttentionState ? 'text-xs' : 'text-[8.5px]'} font-black tracking-[0.08em] text-white/85 tabular-nums select-none transition-all`}>{localTime}</span>
+                                            <SignalBar
+                                                height={isAttentionState ? 13 : 9}
+                                                barWidth={isAttentionState ? 2.5 : 2}
+                                                className="shrink-0 opacity-90 hover:opacity-100 transition-opacity"
+                                            />
                                         </div>
                                     )}
                                 </AnimatePresence>
@@ -753,12 +759,17 @@ export const DynamicIslandStatus = () => {
                                     <Users size={16} className="text-emerald-400" />
                                     Community
                                 </h2>
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); setIsExpanded(false); }}
-                                    className="text-gray-500 hover:text-white transition-colors"
-                                >
-                                    <span className="text-[10px] font-black">CLOSE</span>
-                                </button>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
+                                        <SignalBar height={10} barWidth={2.5} showLabel />
+                                    </div>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setIsExpanded(false); }}
+                                        className="text-gray-500 hover:text-white transition-colors cursor-pointer"
+                                    >
+                                        <span className="text-[10px] font-black">CLOSE</span>
+                                    </button>
+                                </div>
                             </div>
 
                             {!user ? (
