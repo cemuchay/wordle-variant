@@ -42,6 +42,8 @@ export const DynamicIslandStatus = () => {
     const [mascot, setMascot] = useState<{ expression: MascotExpression; label: string } | null>(null);
     const [showRainbowBorder, setShowRainbowBorder] = useState(false);
     const [scaleMultiplier, setScaleMultiplier] = useState(1);
+    const [isAttentionState, setIsAttentionState] = useState(false);
+    const attentionTimerRef = useRef<number>(null);
     const toastTimerRef = useRef<number>(null);
     const prevMascotKeyRef = useRef<string>('');
     const mascotRainbowTimerRef = useRef<number>(null);
@@ -107,22 +109,30 @@ export const DynamicIslandStatus = () => {
         lastFetchRef.current = Date.now();
     }, []);
 
-    // Force re-render on resume to fix PWA layout bugs + background refresh
+    // Force re-render on resume to fix PWA layout bugs + immediately refetch online list on returning to tab
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
                 setResumeKey(prev => prev + 1);
-                if (Date.now() - lastFetchRef.current > REFRESH_INTERVAL_MS) {
-                    lastFetchRef.current = Date.now();
-                    refreshProfiles();
-                }
+                lastFetchRef.current = Date.now();
+                refreshProfiles();
             }
         };
         window.addEventListener('visibilitychange', handleVisibilityChange);
         window.addEventListener('focus', handleVisibilityChange);
+
+        // Keep periodic background refresh active every REFRESH_INTERVAL_MS
+        const intervalId = setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                lastFetchRef.current = Date.now();
+                refreshProfiles();
+            }
+        }, REFRESH_INTERVAL_MS);
+
         return () => {
             window.removeEventListener('visibilitychange', handleVisibilityChange);
             window.removeEventListener('focus', handleVisibilityChange);
+            clearInterval(intervalId);
         };
     }, [refreshProfiles]);
 
@@ -217,10 +227,11 @@ export const DynamicIslandStatus = () => {
         return () => window.removeEventListener('mascot-changed', handleMascot);
     }, []);
 
-    // Clean up rainbow timer on unmount
+    // Clean up rainbow & attention timer on unmount
     useEffect(() => {
         return () => {
             if (mascotRainbowTimerRef.current) clearTimeout(mascotRainbowTimerRef.current);
+            if (attentionTimerRef.current) clearTimeout(attentionTimerRef.current);
         };
     }, []);
 
@@ -249,7 +260,7 @@ export const DynamicIslandStatus = () => {
         return 'default';
     }, [isExpanded, toast.show, toast.message, activeCall, currentVoiceSession, mascot, otherOnlineUsers.length]);
 
-    // Watch status changes to trigger rainbow lightup & micro-expansion/scale animation
+    // Watch status changes to trigger rainbow lightup, toast-like size expansion, and scale animation
     useEffect(() => {
         const key = getStatusKey();
         if (isFirstRender.current) {
@@ -265,6 +276,13 @@ export const DynamicIslandStatus = () => {
             mascotRainbowTimerRef.current = setTimeout(() => {
                 setShowRainbowBorder(false);
             }, 3000); // 3 seconds of rainbow lightup
+
+            // Trigger attention expansion (increases height, width, font size like a toast)
+            setIsAttentionState(true);
+            if (attentionTimerRef.current) clearTimeout(attentionTimerRef.current);
+            attentionTimerRef.current = setTimeout(() => {
+                setIsAttentionState(false);
+            }, 3200);
 
             // Brief scale-up animation/pop whenever status changes
             setScaleMultiplier(1.08);
@@ -345,12 +363,22 @@ export const DynamicIslandStatus = () => {
 
     const isConnected = audioChat.isConnected;
 
-    // Dynamically calculate pill width based on current call status
+    const isToastActive = toast.show || isAttentionState;
+
+    // Dynamically calculate pill width based on current status and attention state
     const getPillWidth = () => {
         if (isExpanded) return 'min(95vw, 340px)';
         if (toast.show) {
             // Temporarily stretch width to 90% to call user's attention
             return 'min(90vw, 440px)';
+        }
+        if (isAttentionState) {
+            // Expanded width like a toast on island update
+            if (activeCall) return 'min(90vw, 290px)';
+            if (currentVoiceSession) return 'min(90vw, 250px)';
+            if (mascot) return 'min(90vw, 260px)';
+            if (otherOnlineUsers.length > 0) return 'min(90vw, 240px)';
+            return 'min(90vw, 210px)';
         }
         if (user && activeCall) {
             if (activeCall.status === 'ringing') return '250px';
@@ -379,11 +407,11 @@ export const DynamicIslandStatus = () => {
                     y: isExpanded ? 8 : 0,
                 }}
                 style={{
-                    borderRadius: isExpanded ? '32px' : '22px',
+                    borderRadius: isExpanded ? '32px' : isToastActive ? '26px' : '22px',
                     width: getPillWidth(),
-                    height: isExpanded ? 'min(75vh, 480px)' : toast.show ? '46px' : '32px',
-                    minHeight: toast.show ? '46px' : '32px',
-                    padding: toast.show ? '6px 14px' : '0'
+                    height: isExpanded ? 'min(75vh, 480px)' : isToastActive ? '46px' : '32px',
+                    minHeight: isToastActive ? '46px' : '32px',
+                    padding: isToastActive ? '6px 14px' : '0'
                 }}
                 transition={{
                     layout: {
@@ -466,7 +494,7 @@ export const DynamicIslandStatus = () => {
                                                 userId={otherOnlineUsers[0].id}
                                                 src={otherOnlineUsers[0].avatar_url}
                                                 username={otherOnlineUsers[0].username}
-                                                className="w-4 h-4 rounded-full border border-white/20 shrink-0"
+                                                className={`${isAttentionState ? 'w-5 h-5' : 'w-4 h-4'} rounded-full border border-white/20 shrink-0 transition-all`}
                                             />
                                         </div>
                                     ) : (
@@ -478,21 +506,21 @@ export const DynamicIslandStatus = () => {
                                                         userId={u.id}
                                                         src={u.avatar_url}
                                                         username={u.username}
-                                                        className="w-3.5 h-3.5 rounded-full border border-black shrink-0"
+                                                        className={`${isAttentionState ? 'w-4.5 h-4.5' : 'w-3.5 h-3.5'} rounded-full border border-black shrink-0 transition-all`}
                                                     />
                                                 ))}
                                             </div>
-                                            <span className="text-[7px] font-black text-emerald-400">
+                                            <span className={`${isAttentionState ? 'text-[8.5px]' : 'text-[7px]'} font-black text-emerald-400 transition-all`}>
                                                 +{otherOnlineUsers.length}
                                             </span>
                                         </div>
                                     )}
-                                    <div className="w-1 h-3 border-r border-white/10 mx-1.5 shrink-0" />
+                                    <div className={`${isAttentionState ? 'h-4' : 'h-3'} w-1 border-r border-white/10 mx-1.5 shrink-0 transition-all`} />
                                 </div>
                             ) : (
                                 <div className="flex items-center shrink-0">
-                                    <WordUpMascot expression={mascot?.expression || "idle"} size={13} />
-                                    <div className="w-1 h-3 border-r border-white/10 mx-1.5 shrink-0" />
+                                    <WordUpMascot expression={mascot?.expression || "idle"} size={isAttentionState ? 17 : 13} />
+                                    <div className={`${isAttentionState ? 'h-4' : 'h-3'} w-1 border-r border-white/10 mx-1.5 shrink-0 transition-all`} />
                                 </div>
                             )}
 
@@ -520,9 +548,9 @@ export const DynamicIslandStatus = () => {
                                                         userId={activeCall.targetUser?.id}
                                                         src={activeCall.targetUser?.avatar_url}
                                                         username={activeCall.targetUser?.username || ''}
-                                                        className="w-4 h-4 rounded-full border border-white/20 shrink-0"
+                                                        className={`${isAttentionState ? 'w-6 h-6' : 'w-4 h-4'} rounded-full border border-white/20 shrink-0 transition-all`}
                                                     />
-                                                    <span className="text-[8px] font-bold text-white truncate max-w-20">
+                                                    <span className={`${isAttentionState ? 'text-xs' : 'text-[8px]'} font-bold text-white truncate max-w-28 transition-all`}>
                                                         {activeCall.targetUser?.username} calls
                                                     </span>
                                                 </div>
@@ -531,21 +559,21 @@ export const DynamicIslandStatus = () => {
                                                         onClick={acceptCall}
                                                         className="p-1 bg-emerald-500 hover:bg-emerald-600 text-black rounded-full transition-transform active:scale-95"
                                                     >
-                                                        <Check size={10} strokeWidth={3} />
+                                                        <Check size={isAttentionState ? 13 : 10} strokeWidth={3} />
                                                     </button>
                                                     <button
                                                         onClick={rejectCall}
                                                         className="p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-transform active:scale-95 cursor-pointer"
                                                     >
-                                                        <X size={10} strokeWidth={3} />
+                                                        <X size={isAttentionState ? 13 : 10} strokeWidth={3} />
                                                     </button>
                                                 </div>
                                             </div>
                                         ) : activeCall.status === 'calling' ? (
                                             <div className="flex items-center justify-between w-full" onClick={(e) => e.stopPropagation()}>
                                                 <div className="flex items-center gap-1.5 min-w-0">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
-                                                    <span className="text-[8px] font-bold text-zinc-400 truncate max-w-22.5">
+                                                    <div className={`${isAttentionState ? 'w-2.5 h-2.5' : 'w-1.5 h-1.5'} rounded-full bg-emerald-500 animate-ping shrink-0`} />
+                                                    <span className={`${isAttentionState ? 'text-xs' : 'text-[8px]'} font-bold text-zinc-300 truncate max-w-32 transition-all`}>
                                                         Calling {activeCall.targetUser?.username}...
                                                     </span>
                                                 </div>
@@ -553,14 +581,14 @@ export const DynamicIslandStatus = () => {
                                                     onClick={hangUpCall}
                                                     className="p-1 bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-white rounded-full transition-all"
                                                 >
-                                                    <PhoneOff size={10} />
+                                                    <PhoneOff size={isAttentionState ? 13 : 10} />
                                                 </button>
                                             </div>
                                         ) : (
                                             <div className="flex items-center gap-2">
-                                                <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-yellow-500'} animate-pulse`} />
-                                                <Phone size={10} className={`${isConnected ? 'text-emerald-500' : 'text-yellow-500'} animate-bounce`} />
-                                                <span className="text-[8.5px] font-black text-white uppercase tracking-tighter">
+                                                <div className={`${isAttentionState ? 'w-2 h-2' : 'w-1.5 h-1.5'} rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-yellow-500'} animate-pulse`} />
+                                                <Phone size={isAttentionState ? 14 : 10} className={`${isConnected ? 'text-emerald-500' : 'text-yellow-500'} animate-bounce`} />
+                                                <span className={`${isAttentionState ? 'text-xs' : 'text-[8.5px]'} font-black text-white uppercase tracking-tighter transition-all`}>
                                                     {isConnected ? 'On Call' : 'Connecting...'}
                                                 </span>
                                             </div>
@@ -571,20 +599,20 @@ export const DynamicIslandStatus = () => {
                                                 userId={currentVoiceSession.user.id}
                                                 src={currentVoiceSession.user.avatar_url}
                                                 username={currentVoiceSession.user.username}
-                                                className="w-4 h-4 rounded-full border border-white/20 shrink-0"
+                                                className={`${isAttentionState ? 'w-6 h-6' : 'w-4 h-4'} rounded-full border border-white/20 shrink-0 transition-all`}
                                             />
-                                            <span className="text-[8.5px] font-black text-white uppercase tracking-tighter">
+                                            <span className={`${isAttentionState ? 'text-xs' : 'text-[8.5px]'} font-black text-white uppercase tracking-tighter transition-all`}>
                                                 {currentVoiceSession.user.username} in Voice
                                             </span>
-                                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                                            <div className={`${isAttentionState ? 'w-2 h-2' : 'w-1.5 h-1.5'} bg-emerald-500 rounded-full animate-pulse`} />
                                         </div>
                                     ) : mascot ? (
                                         <div className="flex items-center gap-1.5 px-2.5 h-full w-full justify-center">
-                                            <span className="text-[8px] uppercase font-black tracking-[0.08em] text-white/90 truncate max-w-27.5 select-none">{mascot.label}</span>
+                                            <span className={`${isAttentionState ? 'text-xs' : 'text-[8px]'} uppercase font-black tracking-[0.08em] text-white/90 truncate max-w-36 select-none transition-all`}>{mascot.label}</span>
                                         </div>
                                     ) : (
                                         <div className="flex items-center gap-1.5 px-2.5 h-full w-full justify-center">
-                                            <span className="text-[8.5px] font-black tracking-[0.08em] text-white/85 tabular-nums select-none">{localTime}</span>
+                                            <span className={`${isAttentionState ? 'text-xs' : 'text-[8.5px]'} font-black tracking-[0.08em] text-white/85 tabular-nums select-none transition-all`}>{localTime}</span>
                                         </div>
                                     )}
                                 </AnimatePresence>
