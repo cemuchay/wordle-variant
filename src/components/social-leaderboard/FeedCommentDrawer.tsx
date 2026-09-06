@@ -98,7 +98,7 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
     setLoading(true);
     try {
       // Parallel fetch comments and player guesses if not present
-      const promises: Promise<any>[] = [
+      const promises: PromiseLike<any>[] = [
         supabase
           .from("guess_comments")
           .select("id, content, created_at, author_id, guess_index, parent_id, is_edited, is_deleted")

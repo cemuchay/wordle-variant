@@ -325,7 +325,12 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
    }, [isOverlayOpen, isDesktop, computePanelPosition, clampPanelPosition]);
 
    const [groups, setGroups] = useState<any[]>([]);
+   const [groupsRefreshTrigger, setGroupsRefreshTrigger] = useState(0);
    const [hasPlayedToday, setHasPlayedToday] = useState(false);
+
+   // In-memory memoization cache for decrypted messages and DM partner IDs to prevent flickers
+   const decryptedCacheRef = useRef<Map<string, string>>(new Map());
+   const dmPartnersByGroupIdRef = useRef<Map<string, string>>(new Map());
 
 
 
@@ -784,8 +789,16 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
       try {
          const cached = localStorage.getItem(`chat_groups_${user.id}`);
          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed)) {
+               parsed.forEach((g: any) => {
+                  if (g?.id && g?.dm_partner?.id) {
+                     dmPartnersByGroupIdRef.current.set(g.id, g.dm_partner.id);
+                  }
+               });
+            }
             // eslint-disable-next-line react-hooks/set-state-in-effect
-            setGroups(JSON.parse(cached));
+            setGroups(parsed);
          }
          // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (e) { /* empty */ }
@@ -822,6 +835,7 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                         last_seen_at: p.last_seen_at,
                      };
                      groupName = p.username;
+                     dmPartnersByGroupIdRef.current.set(cg.id, partner.user_id);
                   }
                }
                return {
@@ -851,6 +865,9 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
             });
 
             setGroups(deduped);
+            try {
+               localStorage.setItem(`chat_groups_${user.id}`, JSON.stringify(deduped));
+            } catch (e) { /* ignore quota/storage issues */ }
          }
 
          // Fetch group invites
@@ -886,7 +903,7 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
       };
 
       fetchGroupsData();
-   }, [user?.id, globalMessages]);
+   }, [user?.id, groupsRefreshTrigger]);
 
    // Handle starting a 1-on-1 DM
    const handleStartDM = async (partnerId: string) => {
@@ -910,10 +927,12 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
             return;
          }
 
+         dmPartnersByGroupIdRef.current.set(groupId, partnerId);
          useAppStore.getState().setJoinedGroupIds([...useAppStore.getState().joinedGroupIds, groupId]);
          setSelectedGroupId(groupId);
          setIsCreatingDM(false);
          setDmSearchQuery("");
+         setGroupsRefreshTrigger(prev => prev + 1);
       } catch (e) {
          console.error("Error starting DM:", e);
          triggerToast("Could not start DM.", TOAST_DURATION.SHORT);
@@ -962,6 +981,7 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
          setIsCreatingGroup(false);
          setNewGroupName("");
          setSelectedGroupUsers([]);
+         setGroupsRefreshTrigger(prev => prev + 1);
          triggerToast(`Group "${newGroup.name}" created!`, TOAST_DURATION.SHORT);
       } catch (e) {
          console.error("Error creating group:", e);
@@ -982,6 +1002,7 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
          setInvites((prev) => prev.filter((i) => i.id !== groupId));
          useAppStore.getState().setJoinedGroupIds([...useAppStore.getState().joinedGroupIds, groupId]);
          setSelectedGroupId(groupId);
+         setGroupsRefreshTrigger(prev => prev + 1);
          triggerToast("Group invite accepted!", TOAST_DURATION.SHORT);
       }
    };
@@ -1192,17 +1213,63 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
    const getDecryptedContent = (m: any) => {
       if (!m) return "";
       if (!user?.id) return m.content;
-      if (m.content && m.content.startsWith("e2ee:")) {
-         if (m.user_id === user.id) {
-            // Own message — find DM partner from group for correct key
-            const group = groups.find(g => g.id === m.group_id);
-            const partnerId = group?.dm_partner?.id;
-            if (!partnerId) return m.content;
-            const key = getDMRoomKey(user.id, partnerId);
-            return decryptDM(m.content, key);
+      if (typeof m.content === "string" && m.content.startsWith("e2ee:")) {
+         // Check in-memory memoization cache first (by message ID or ciphertext)
+         if (m.id && decryptedCacheRef.current.has(m.id)) {
+            return decryptedCacheRef.current.get(m.id)!;
          }
+         if (decryptedCacheRef.current.has(m.content)) {
+            return decryptedCacheRef.current.get(m.content)!;
+         }
+
+         let partnerId: string | undefined = undefined;
+
+         if (m.user_id === user.id) {
+            // Own message — resolve partnerId using multiple robust sources:
+            // 1. dmPartnersByGroupIdRef map
+            partnerId = dmPartnersByGroupIdRef.current.get(m.group_id);
+
+            // 2. groups list dm_partner
+            if (!partnerId) {
+               const group = groups.find(g => g.id === m.group_id);
+               partnerId = group?.dm_partner?.id;
+            }
+
+            // 3. Currently selected group if it matches
+            if (!partnerId && selectedGroupId === m.group_id) {
+               const currentGroup = groups.find(g => g.id === selectedGroupId);
+               partnerId = currentGroup?.dm_partner?.id;
+            }
+
+            // 4. Any other message in the same DM group sent by the other user
+            if (!partnerId) {
+               const otherMsg = globalMessages.find((msg: any) => msg.group_id === m.group_id && msg.user_id && msg.user_id !== user.id);
+               if (otherMsg?.user_id) {
+                  partnerId = otherMsg.user_id;
+               }
+            }
+
+            // Cache discovered partnerId for fast lookups
+            if (partnerId) {
+               dmPartnersByGroupIdRef.current.set(m.group_id, partnerId);
+            } else {
+               return m.content;
+            }
+
+            const key = getDMRoomKey(user.id, partnerId);
+            const decrypted = decryptDM(m.content, key);
+            if (m.id) decryptedCacheRef.current.set(m.id, decrypted);
+            decryptedCacheRef.current.set(m.content, decrypted);
+            return decrypted;
+         }
+
+         // Message from other user
          const key = getDMRoomKey(user.id, m.user_id);
-         return decryptDM(m.content, key);
+         const decrypted = decryptDM(m.content, key);
+         if (m.id) decryptedCacheRef.current.set(m.id, decrypted);
+         decryptedCacheRef.current.set(m.content, decrypted);
+         if (m.group_id) dmPartnersByGroupIdRef.current.set(m.group_id, m.user_id);
+         return decrypted;
       }
       return m.content;
    };
@@ -1217,12 +1284,18 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
       const isDM = group?.type === "dm";
       let finalContent = replyText;
 
-      if (isDM && group?.dm_partner) {
-         const key = getDMRoomKey(user.id, group.dm_partner.id);
+      const partnerId = group?.dm_partner?.id || dmPartnersByGroupIdRef.current.get(selectedGroupId);
+      if (isDM && partnerId) {
+         const key = getDMRoomKey(user.id, partnerId);
          finalContent = encryptDM(replyText, key);
       }
 
       const tempId = crypto.randomUUID();
+      // Cache optimistic plaintext immediately so neither Realtime broadcast nor re-render flickers
+      decryptedCacheRef.current.set(tempId, replyText);
+      if (finalContent.startsWith("e2ee:")) {
+         decryptedCacheRef.current.set(finalContent, replyText);
+      }
       const mentions: string[] = [];
       profilesList.forEach(u => {
          if (replyText.includes(`@${u.username}`)) {
@@ -1274,6 +1347,12 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
 
    const deliverTextMessage = async (payload: any, plainTextForRestore?: string) => {
       if (!user?.id) return;
+      if (plainTextForRestore) {
+         decryptedCacheRef.current.set(payload.id, plainTextForRestore);
+         if (payload.content && payload.content.startsWith("e2ee:")) {
+            decryptedCacheRef.current.set(payload.content, plainTextForRestore);
+         }
+      }
       try {
          const { error } = await supabase.from("messages").insert([payload]);
          if (error) throw error;

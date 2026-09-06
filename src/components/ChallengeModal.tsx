@@ -422,25 +422,28 @@ const AuthenticatedChallengeContent = memo(
 
           {/* Right Side Action Shell Panel */}
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-            {!isPlaying && !selectedChallenge && (
+            {!isPlaying && (
               <>
                 <button
                   onClick={() => setIsResetConfirmOpen(true)}
                   disabled={isResettingData}
-                  className="p-1.5 sm:p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white cursor-pointer disabled:opacity-40"
-                  title="Clear Local Challenge Data & Reload from Server"
+                  className="p-1.5 sm:p-2 bg-white/5 hover:bg-red-500/20 text-gray-300 hover:text-red-400 border border-white/10 hover:border-red-500/30 rounded-xl transition-all cursor-pointer disabled:opacity-40 flex items-center justify-center shrink-0"
+                  title="Clear Local Cache & Reload"
+                  aria-label="Clear Local Challenge Cache"
                 >
-                  <RotateCcw className={`w-[17px] h-[17px] sm:w-4 sm:h-4 ${isResettingData ? 'animate-spin text-correct' : ''}`} />
+                  <RotateCcw className={`w-4 h-4 sm:w-[18px] sm:h-[18px] ${isResettingData ? 'animate-spin text-red-400' : ''}`} />
                 </button>
-                <button
-                  onClick={() => {
-                    setActiveTab("my");
-                    setIsCreatingChallenge(true);
-                  }}
-                  className="bg-correct hover:bg-correct/90 text-black px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider flex items-center gap-1 transition-all hover:scale-[1.02] active:scale-[0.98] mr-1 sm:mr-2"
-                >
-                  <Plus className="w-6 h-6" strokeWidth={3} />
-                </button>
+                {!selectedChallenge && (
+                  <button
+                    onClick={() => {
+                      setActiveTab("my");
+                      setIsCreatingChallenge(true);
+                    }}
+                    className="bg-correct hover:bg-correct/90 text-black px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider flex items-center gap-1 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  >
+                    <Plus className="w-6 h-6" strokeWidth={3} />
+                  </button>
+                )}
               </>
             )}
             <button
@@ -557,12 +560,23 @@ const AuthenticatedChallengeContent = memo(
                               className="overflow-hidden space-y-4 pt-1"
                             >
                               <div className="space-y-4 bg-white/2 p-4 rounded-2xl border border-white/5 relative">
-                                <button
-                                  onClick={clearFilters}
-                                  className="absolute top-4 right-4 text-[9px] font-black uppercase text-correct hover:text-white transition-colors"
-                                >
-                                  Clear All
-                                </button>
+                                <div className="flex items-center gap-3 absolute top-4 right-4">
+                                  <button
+                                    onClick={() => setIsResetConfirmOpen(true)}
+                                    disabled={isResettingData}
+                                    className="text-[9px] font-black uppercase text-red-400 hover:text-red-300 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-40"
+                                    title="Clear Local Cache & Reload from Server"
+                                  >
+                                    <RotateCcw size={10} className={isResettingData ? "animate-spin" : ""} />
+                                    Clear Cache
+                                  </button>
+                                  <button
+                                    onClick={clearFilters}
+                                    className="text-[9px] font-black uppercase text-correct hover:text-white transition-colors cursor-pointer"
+                                  >
+                                    Clear Filters
+                                  </button>
+                                </div>
 
                                 <div className="flex flex-wrap items-center gap-2">
                                   <span className="text-[9px] font-black uppercase text-white w-10 shrink-0">
