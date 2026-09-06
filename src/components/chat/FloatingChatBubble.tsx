@@ -2793,9 +2793,18 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                        const userLastSeenAt = userProfile?.last_seen_at || group?.dm_partner?.last_seen_at;
 
                                        return (
-                                          <button
+                                          <div
                                              key={group.id}
+                                             role="button"
+                                             tabIndex={0}
                                              onClick={() => { visitedGroupsRef.current.add(group.id); setSelectedGroupId(group.id); }}
+                                             onKeyDown={(e) => {
+                                                if (e.key === "Enter" || e.key === " ") {
+                                                   e.preventDefault();
+                                                   visitedGroupsRef.current.add(group.id);
+                                                   setSelectedGroupId(group.id);
+                                                }
+                                             }}
                                              className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer text-left border border-transparent hover:border-white/5"
                                           >
                                              {isDM ? (
@@ -2878,7 +2887,7 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                                    )}
                                                 </p>
                                              </div>
-                                          </button>
+                                          </div>
                                        );
                                     })
                                  )}
