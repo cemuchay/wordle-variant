@@ -180,6 +180,24 @@ export const useActions = ({
             const updatedStats = updateStats(won, newGuesses.length);
             updateOptimistically(updatedStats);
             refresh();
+
+            // Clear cached leaderboard in sessionStorage so today's leaderboard refreshes immediately
+            try {
+               safeSessionStorage.removeItem(`wordle_global_leaderboard_today_${date}`);
+               safeSessionStorage.removeItem(`wordle_global_leaderboard_yesterday_${date}`);
+               safeSessionStorage.removeItem(`wordle_global_leaderboard_weekly_${date}`);
+               safeSessionStorage.removeItem(`wordle_global_leaderboard_monthly_${date}`);
+            } catch (e) {
+               console.warn("Session cache clear failed:", e);
+            }
+
+            // Immediately notify leaderboard snapshots & stats modal to refresh without waiting for cloud sync
+            window.dispatchEvent(
+               new CustomEvent("global-scores-updated", {
+                  detail: { isBackground: false, isGameOver: true },
+               }),
+            );
+
             try {
                // Record game completion in daily telemetry
                import("../../lib/telemetry").then(({ trackGameCompleted }) => {
@@ -202,7 +220,7 @@ export const useActions = ({
             });
          }
 
-         // 5. Handle game over modal and reveal timing
+         // 5. Handle reveal timing (GameOverModal sunsetted - user stays on the rich Play screen)
          const revealDelay =
             returnAnimationTime(config.length) + ANIMATION.REVEAL_BUFFER;
 
@@ -216,7 +234,6 @@ export const useActions = ({
 
             setTimeout(() => {
                dispatch({ type: "STOP_REVEALING" });
-               dispatch({ type: "SET_GAME_OVER_MODAL", isOpen: true });
 
                if (won) {
                   triggerToast(
@@ -318,13 +335,6 @@ export const useActions = ({
       dispatch,
    ]);
 
-   const setGameOverModalOpen = useCallback(
-      (isOpen: boolean) => {
-         dispatch({ type: "SET_GAME_OVER_MODAL", isOpen });
-      },
-      [dispatch],
-   );
-
    const loadState = useCallback(
       (payload: any) => {
          dispatch({ type: "LOAD_STATE", payload });
@@ -337,7 +347,6 @@ export const useActions = ({
       onDelete,
       onEnter,
       handleHint,
-      setGameOverModalOpen,
       loadState,
       onSetCursor,
       onSetEditIndex,

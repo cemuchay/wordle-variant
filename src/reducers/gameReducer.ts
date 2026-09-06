@@ -12,7 +12,6 @@ export interface GameState {
     hintRecord: { letter: string; index: number; row?: number } | null;
     gameMessage: string;
     isGameOver: boolean;
-    isGameOverModalOpen: boolean;
     isRevealing: boolean;
     isShake: boolean;
     syncStatus: 'idle' | 'syncing' | 'synced' | 'error';
@@ -27,7 +26,6 @@ export type GameAction =
     | { type: 'SET_CURSOR'; index: number }
     | { type: 'SET_EDIT_INDEX'; index: number | null }
     | { type: 'LOAD_STATE'; payload: Partial<GameState> & { guess_timestamps?: number[] } }
-    | { type: 'SET_GAME_OVER_MODAL'; isOpen: boolean }
     | { type: 'RESET_CURRENT_GUESS' }
     | { type: 'SET_SYNC_STATUS'; status: 'idle' | 'syncing' | 'synced' | 'error'; error?: unknown }
     | { type: 'SHAKE_GUESS' }
@@ -45,7 +43,6 @@ export const initialState: GameState = {
     hintRecord: null,
     gameMessage: '',
     isGameOver: false,
-    isGameOverModalOpen: false,
     isRevealing: false,
     isShake: false,
     syncStatus: 'idle',
@@ -132,7 +129,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                 status: newStatus,
                 isGameOver: isFinished,
                 isRevealing: true,
-                isGameOverModalOpen: false, // Delay modal until animation finishes
                 gameMessage: action.message,
             };
         }
@@ -159,12 +155,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                 isGameOver: action.payload.status === 'won' || action.payload.status === 'lost',
             };
         }
-
-        case 'SET_GAME_OVER_MODAL':
-            return {
-                ...state,
-                isGameOverModalOpen: action.isOpen,
-            };
 
         case 'RESET_CURRENT_GUESS':
             return {
