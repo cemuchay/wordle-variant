@@ -1,5 +1,5 @@
-import React, { memo } from 'react';
-import { CloudUpload, Loader2, AlertCircle } from 'lucide-react';
+import { CloudUpload, Loader2 } from 'lucide-react';
+import { memo } from 'react';
 import type { PendingChallengeGame } from '../../utils/challengeQueueManager';
 
 interface ChallengeSyncBannerProps {

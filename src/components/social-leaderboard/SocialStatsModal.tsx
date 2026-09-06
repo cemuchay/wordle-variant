@@ -1,18 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Eye,
-  Flame,
   LayoutGrid,
   List,
   Loader2,
-  MessageCircle,
   RotateCw,
   Trophy,
   User,
   X,
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MAX_ATTEMPTS, TIMEOUT } from "../../constants/game";
+import { TIMEOUT } from "../../constants/game";
 import { TOAST_DURATION } from "../../constants/ui";
 import { useApp } from "../../context/AppContext";
 import { supabase } from "../../lib/supabaseClient";
@@ -70,7 +68,8 @@ export const SocialStatsModal: React.FC<Props> = ({
 
   const [timeframe, setTimeframe] = useState<Timeframe>("today");
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    return (safeLocalStorage.getItem("wordle_social_lb_view_mode") as ViewMode) || "feed";
+    const saved = safeLocalStorage.getItem("wordle_social_lb_view_mode") as ViewMode | null;
+    return saved === "table" ? "table" : "feed";
   });
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -324,11 +323,10 @@ export const SocialStatsModal: React.FC<Props> = ({
 
   return (
     <div
-      className={`${
-        inline
+      className={`${inline
           ? "w-full h-full"
           : "fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200"
-      }`}
+        }`}
       onClick={inline ? undefined : onClose}
     >
       <div
@@ -379,21 +377,19 @@ export const SocialStatsModal: React.FC<Props> = ({
         <div className="flex bg-gray-800/80 p-1 rounded-xl mb-3 border border-gray-700/50 shrink-0">
           <button
             onClick={() => setActiveTab("stats")}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-              activeTab === "stats"
+            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${activeTab === "stats"
                 ? "bg-gray-700 text-white shadow-sm"
                 : "text-gray-400 hover:text-white"
-            }`}
+              }`}
           >
             <User size={12} /> Stats
           </button>
           <button
             onClick={() => setActiveTab("leaderboard")}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-              activeTab === "leaderboard"
+            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${activeTab === "leaderboard"
                 ? "bg-amber-400 text-black shadow-md font-black"
                 : "text-gray-400 hover:text-white"
-            }`}
+              }`}
           >
             <Trophy size={12} /> Global Feed
           </button>
@@ -415,11 +411,10 @@ export const SocialStatsModal: React.FC<Props> = ({
                 <div className="flex justify-around text-center bg-black/20 p-4 rounded-2xl border border-white/5">
                   <StatItem value={stats.gamesPlayed} label="Played" />
                   <StatItem
-                    value={`${
-                      stats.gamesPlayed
+                    value={`${stats.gamesPlayed
                         ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100)
                         : 0
-                    }%`}
+                      }%`}
                     label="Win %"
                   />
                 </div>
@@ -440,9 +435,8 @@ export const SocialStatsModal: React.FC<Props> = ({
                         <span className="w-2.5 font-bold text-gray-400">{attempt}</span>
                         <div className="flex-1 bg-gray-800 rounded-sm overflow-hidden h-5">
                           <div
-                            className={`${
-                              attempt === "X" ? "bg-rose-500" : "bg-emerald-500"
-                            } h-full px-2 text-right flex items-center justify-end font-bold text-[10px] text-white transition-all duration-1000 min-w-[24px]`}
+                            className={`${attempt === "X" ? "bg-rose-500" : "bg-emerald-500"
+                              } h-full px-2 text-right flex items-center justify-end font-bold text-[10px] text-white transition-all duration-1000 min-w-[24px]`}
                             style={{ width: `${Math.max((count / maxGuesses) * 100, 10)}%` }}
                           >
                             {count}
@@ -484,11 +478,10 @@ export const SocialStatsModal: React.FC<Props> = ({
                   <button
                     key={t}
                     onClick={() => setTimeframe(t)}
-                    className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider border transition-all cursor-pointer ${
-                      timeframe === t
+                    className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider border transition-all cursor-pointer ${timeframe === t
                         ? "bg-white text-black border-white shadow-sm"
                         : "border-gray-800 text-gray-400 hover:text-white bg-gray-800/40"
-                    }`}
+                      }`}
                   >
                     {t === "today" ? "🔥 Today" : t === "yesterday" ? "Yesterday" : t}
                   </button>
@@ -504,21 +497,19 @@ export const SocialStatsModal: React.FC<Props> = ({
                   <div className="flex gap-1">
                     <button
                       onClick={() => handleSetViewMode("table")}
-                      className={`flex items-center gap-1 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                        viewMode === "table"
+                      className={`flex items-center gap-1 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${viewMode === "table"
                           ? "bg-gray-700 text-white shadow-sm"
                           : "text-gray-400 hover:text-white"
-                      }`}
+                        }`}
                     >
                       <List size={12} /> Table
                     </button>
                     <button
                       onClick={() => handleSetViewMode("feed")}
-                      className={`flex items-center gap-1 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                        viewMode === "feed"
+                      className={`flex items-center gap-1 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${viewMode === "feed"
                           ? "bg-amber-400 text-black shadow-sm"
                           : "text-gray-400 hover:text-white"
-                      }`}
+                        }`}
                     >
                       <LayoutGrid size={12} /> Social Feed
                     </button>
@@ -582,19 +573,17 @@ export const SocialStatsModal: React.FC<Props> = ({
                             );
                           }
                         }}
-                        className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer hover:border-gray-600 ${
-                          isFirst
+                        className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer hover:border-gray-600 ${isFirst
                             ? "bg-yellow-500/10 border-yellow-500/40"
                             : entry.user_id === user?.id
-                            ? "bg-emerald-500/10 border-emerald-500/40"
-                            : "bg-gray-800/40 border-gray-800"
-                        }`}
+                              ? "bg-emerald-500/10 border-emerald-500/40"
+                              : "bg-gray-800/40 border-gray-800"
+                          }`}
                       >
                         <div className="flex items-center gap-3">
                           <span
-                            className={`text-xs font-black font-mono w-5 text-center ${
-                              isFirst ? "text-yellow-400" : "text-gray-400"
-                            }`}
+                            className={`text-xs font-black font-mono w-5 text-center ${isFirst ? "text-yellow-400" : "text-gray-400"
+                              }`}
                           >
                             {currentRank}
                           </span>
@@ -602,18 +591,20 @@ export const SocialStatsModal: React.FC<Props> = ({
                             userId={entry.user_id}
                             src={entry.avatar_url}
                             username={entry.username}
-                            className={`w-7 h-7 rounded-full border ${
-                              isFirst ? "border-yellow-400" : "border-gray-700"
-                            }`}
+                            className={`w-7 h-7 rounded-full border ${isFirst ? "border-yellow-400" : "border-gray-700"
+                              }`}
                           />
                           <div>
-                            <span
-                              className={`text-xs font-bold truncate max-w-[120px] block ${
-                                isFirst ? "text-yellow-200" : "text-white"
-                              }`}
-                            >
-                              {formatUsername(entry.username)}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`text-xs font-bold truncate max-w-[120px] block ${isFirst ? "text-yellow-200" : "text-white"
+                                  }`}
+                              >
+                                {formatUsername(entry.username)}
+                              </span>
+                              {entry.user_id && <ReigningBadge userId={entry.user_id} type="weekly" />}
+                              {entry.user_id && <ReigningBadge userId={entry.user_id} type="bot_marathon" />}
+                            </div>
                             {canViewGuess && (
                               <span className="text-[9px] text-gray-400 font-semibold flex items-center gap-1">
                                 <Eye size={10} /> Tap to preview
@@ -627,7 +618,7 @@ export const SocialStatsModal: React.FC<Props> = ({
                             {entry.total_score} pts
                           </div>
                           <div className="text-[9px] text-gray-400 font-bold uppercase">
-                            {entry.status === "lost" ? "X/6" : `${entry.guesses_count || "?"}/6`}
+                            {entry.status === "lost" ? "X/6" : `${entry.attempts || "?"}/6`}
                           </div>
                         </div>
                       </div>

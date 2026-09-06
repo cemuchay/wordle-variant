@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useMemo } from "react";
-import { MessageCircle, Eye, Sparkles, User, Flame } from "lucide-react";
+import { MessageCircle, Eye, Sparkles, User, Flame, X } from "lucide-react";
 import { ProtectedAvatar } from "../chat/ProtectedAvatar";
 import { ReigningBadge } from "../common/ReigningBadge";
 import formatUsername from "../../utils/formatUsername";
@@ -36,12 +36,14 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
 }) => {
   const { user: currentUser } = useAuth();
   const [reactions, setReactions] = useState<{ reaction: string; user_id: string }[]>([]);
+  const [reactionUsernames, setReactionUsernames] = useState<{ reaction: string; username: string }[]>([]);
+  const [showReactionsViewer, setShowReactionsViewer] = useState(false);
   const [topComment, setTopComment] = useState<{ content: string; author_username?: string } | null>(null);
   const [commentsCount, setCommentsCount] = useState(0);
   const [isCommentDrawerOpen, setIsCommentDrawerOpen] = useState(false);
 
   const targetUserId = entry.user_id;
-  const attempts = entry.status === "lost" ? "X" : entry.guesses_count;
+  const attempts = entry.status === "lost" ? "X" : entry.attempts;
   const isFirst = rank === 1;
 
   // Load reactions & top comment
@@ -66,6 +68,24 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
 
       if (rxRes.data) {
         setReactions(rxRes.data);
+        const uIds = Array.from(new Set(rxRes.data.map((r) => r.user_id)));
+        if (uIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("id, username")
+            .in("id", uIds);
+          const pMap = new Map(profiles?.map((p) => [p.id, p.username]));
+          setReactionUsernames(
+            rxRes.data.map((r) => ({
+              reaction: r.reaction,
+              username: pMap.get(r.user_id) || "Someone",
+            }))
+          );
+        } else {
+          setReactionUsernames([]);
+        }
+      } else {
+        setReactionUsernames([]);
       }
 
       if (cmRes.data && cmRes.data.length > 0) {
@@ -158,7 +178,7 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
   const miniGrid = useMemo(() => {
     const rawGuesses = (entry as any).guesses || [];
     const wordLen = entry.word_length || 5;
-    const guessCount = typeof entry.guesses_count === "number" ? entry.guesses_count : (rawGuesses.length || 4);
+    const guessCount = typeof entry.attempts === "number" ? entry.attempts : (rawGuesses.length || 4);
 
     if (!canViewGuesses) {
       // Masked spoiler preview (squares with blurred mystery colors)
@@ -357,15 +377,38 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
             })}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            {/* Reactions Viewer Trigger */}
+            {reactions.length > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowReactionsViewer(true);
+                }}
+                className="flex items-center gap-0.5 px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/5 transition-all text-xs cursor-pointer"
+                title="View who reacted"
+              >
+                <div className="flex -space-x-1">
+                  {Array.from(new Set(reactions.map((r) => r.reaction)))
+                    .slice(0, 3)
+                    .map((emoji, idx) => (
+                      <span key={idx} className="scale-90">
+                        {emoji}
+                      </span>
+                    ))}
+                </div>
+                <span className="text-[10px] font-bold font-mono ml-1">{reactions.length}</span>
+              </button>
+            )}
+
             {/* Comment Drawer Trigger */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 setIsCommentDrawerOpen(true);
               }}
-              className="flex items-center gap-1 text-gray-400 hover:text-amber-300 text-xs px-2.5 py-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
-              title="Comments & Banter"
+              className="flex items-center gap-1 text-gray-400 hover:text-amber-300 text-xs px-2 py-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+              title={canViewGuesses ? "Comments & Banter" : "Play game to unlock comments"}
             >
               <MessageCircle size={14} />
               <span className="text-[10px] font-bold font-mono">{commentsCount}</span>
@@ -373,8 +416,8 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
           </div>
         </div>
 
-        {/* Top Comment Preview Bubble */}
-        {topComment && (
+        {/* Top Comment Preview Bubble - only visible if user has completed today's game */}
+        {canViewGuesses && topComment && (
           <div
             onClick={(e) => {
               e.stopPropagation();
@@ -425,8 +468,57 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
         targetUserId={targetUserId || ""}
         targetUsername={entry.username || "Player"}
         gameDate={gameDate}
+        canViewGuesses={canViewGuesses}
         onCommentAdded={loadSocialData}
       />
+
+      {/* Modal to see who and who reacted and their reactions */}
+      {showReactionsViewer && (
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowReactionsViewer(false);
+          }}
+          className="fixed inset-0 bg-black/80 z-[250] flex items-center justify-center p-4 animate-in fade-in duration-150 cursor-default"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-gray-900 border border-gray-700 rounded-2xl p-4 w-full max-w-xs shadow-2xl relative flex flex-col animate-in zoom-in-95 duration-150"
+          >
+            <div className="flex items-center justify-between border-b border-gray-800 pb-2 mb-3">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs">❤️</span>
+                <span className="text-[11px] uppercase font-black tracking-wider text-white">
+                  Reactions ({reactionUsernames.length})
+                </span>
+              </div>
+              <button
+                onClick={() => setShowReactionsViewer(false)}
+                className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-white/5 transition-colors cursor-pointer"
+              >
+                <X size={15} />
+              </button>
+            </div>
+            <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin py-1">
+              {reactionUsernames.length === 0 ? (
+                <p className="text-[10px] text-gray-500 uppercase text-center py-6 font-bold">
+                  No reactions yet
+                </p>
+              ) : (
+                reactionUsernames.map((ru, idx) => (
+                  <div
+                    key={idx}
+                    className="flex justify-between items-center text-xs bg-white/5 py-2 px-3 rounded-xl border border-white/5"
+                  >
+                    <span className="font-bold text-gray-200">@{formatUsername(ru.username)}</span>
+                    <span className="text-base">{ru.reaction}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

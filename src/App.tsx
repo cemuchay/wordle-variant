@@ -47,7 +47,7 @@ import { flushNotificationQueue } from "./lib/clientPush";
 import { useWordGridStore } from "./store/useWordGridStore";
 import { generateShareText } from "./lib/share";
 
-const StatsModal = safeLazy(() => import("./components/StatsModal").then(m => ({ default: m.StatsModal })));
+const StatsModal = safeLazy(() => import("./components/social-leaderboard").then(m => ({ default: m.SocialStatsModal })));
 const ChallengeModal = safeLazy(() => import("./components/ChallengeModal").then(m => ({ default: m.ChallengeModal })));
 const WordUpContainer = safeLazy(() => import("./wordup/WordUpContainer").then(m => ({ default: m.WordUpContainer })));
 const WordGridContainer = safeLazy(() => import("./wordgrid/WordGridContainer").then(m => ({ default: m.WordGridContainer })));

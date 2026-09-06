@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { memo, useState, useMemo, useEffect, useRef } from "react";
+import { memo, useState, useMemo, useEffect, useRef, useCallback } from "react";
 import {
   X,
   Trophy,
@@ -171,6 +171,35 @@ const AuthenticatedChallengeContent = memo(
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+    const {
+      setActiveTab,
+      isPlaying,
+      setIsPlaying,
+      selectedChallenge,
+      setSelectedChallenge,
+      myParticipation,
+      myChallenges,
+      handleViewChallenge,
+      loadMyChallenges,
+      loading,
+      error,
+      previewParticipant,
+      setPreviewParticipant,
+      setPreviewMarathonLength,
+      previewMarathonGameIndex,
+      setPreviewMarathonGameIndex,
+      backAction,
+      isEditingChallenge,
+      setIsEditingChallenge,
+      listColumn,
+      setListColumn,
+      isBackgroundFetching,
+      dailyMarathonChallenges,
+      initialChallengeId,
+      activeGameLength,
+      bootstrappingMessage,
+    } = useChallengeContext();
+
     // Refresh and prune pending queue whenever challenges are opened
     const refreshPendingUploads = useCallback(() => {
       // 1. Auto-prune any queued updates older than 7 days
@@ -240,35 +269,6 @@ const AuthenticatedChallengeContent = memo(
         setIsResettingData(false);
       }
     }, [queryClient, loadMyChallenges, refreshProfile, refreshPendingUploads, triggerToast]);
-
-    const {
-      setActiveTab,
-      isPlaying,
-      setIsPlaying,
-      selectedChallenge,
-      setSelectedChallenge,
-      myParticipation,
-      myChallenges,
-      handleViewChallenge,
-      loadMyChallenges,
-      loading,
-      error,
-      previewParticipant,
-      setPreviewParticipant,
-      setPreviewMarathonLength,
-      previewMarathonGameIndex,
-      setPreviewMarathonGameIndex,
-      backAction,
-      isEditingChallenge,
-      setIsEditingChallenge,
-      listColumn,
-      setListColumn,
-      isBackgroundFetching,
-      dailyMarathonChallenges,
-      initialChallengeId,
-      activeGameLength,
-      bootstrappingMessage,
-    } = useChallengeContext();
 
     const {
       searchQuery,

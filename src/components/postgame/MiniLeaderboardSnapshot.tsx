@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Trophy, ChevronRight, Loader2, } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { supabase } from "../../lib/supabaseClient";
@@ -101,8 +101,8 @@ export const MiniLeaderboardSnapshot: React.FC<MiniLeaderboardSnapshotProps> = (
               <div
                 key={entry.user_id || idx}
                 className={`flex items-center justify-between p-2 rounded-xl border transition-all ${isSelf
-                    ? "bg-amber-500/10 border-amber-500/30"
-                    : "bg-black/20 border-white/5"
+                  ? "bg-amber-500/10 border-amber-500/30"
+                  : "bg-black/20 border-white/5"
                   }`}
               >
                 <div className="flex items-center gap-2 min-w-0">

@@ -14,6 +14,7 @@ import returnAnimationTime from "../../utils/returnAnimationTime";
 import { TOAST_DURATION, ANIMATION_DURATION } from "../../constants/ui";
 import { ANIMATION, DEFAULT_WORD_LENGTH } from "../../constants/game";
 import { getLocalSalt, saveGameWithBackup } from "./utils";
+import { safeSessionStorage } from "@/utils/storage";
 
 interface UseActionsProps {
    state: any;
@@ -46,7 +47,11 @@ export const useActions = ({
 
    const onChar = useCallback(
       (char: string) => {
-         dispatch({ type: "ADD_LETTER", char, maxLength: config?.length || DEFAULT_WORD_LENGTH });
+         dispatch({
+            type: "ADD_LETTER",
+            char,
+            maxLength: config?.length || DEFAULT_WORD_LENGTH,
+         });
       },
       [dispatch, config?.length],
    );
@@ -125,7 +130,10 @@ export const useActions = ({
          const lost = state.guesses.length + 1 === config.maxAttempts;
 
          const newGuesses = [...state.guesses, result];
-         const newTimestamps = [...(state.guessTimestamps || []), submitTimestamp];
+         const newTimestamps = [
+            ...(state.guessTimestamps || []),
+            submitTimestamp,
+         ];
          const newStatus = won ? "won" : lost ? "lost" : "playing";
 
          const message =
@@ -183,10 +191,18 @@ export const useActions = ({
 
             // Clear cached leaderboard in sessionStorage so today's leaderboard refreshes immediately
             try {
-               safeSessionStorage.removeItem(`wordle_global_leaderboard_today_${date}`);
-               safeSessionStorage.removeItem(`wordle_global_leaderboard_yesterday_${date}`);
-               safeSessionStorage.removeItem(`wordle_global_leaderboard_weekly_${date}`);
-               safeSessionStorage.removeItem(`wordle_global_leaderboard_monthly_${date}`);
+               safeSessionStorage.removeItem(
+                  `wordle_global_leaderboard_today_${date}`,
+               );
+               safeSessionStorage.removeItem(
+                  `wordle_global_leaderboard_yesterday_${date}`,
+               );
+               safeSessionStorage.removeItem(
+                  `wordle_global_leaderboard_weekly_${date}`,
+               );
+               safeSessionStorage.removeItem(
+                  `wordle_global_leaderboard_monthly_${date}`,
+               );
             } catch (e) {
                console.warn("Session cache clear failed:", e);
             }

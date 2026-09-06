@@ -11,6 +11,7 @@ interface FeedCommentDrawerProps {
   targetUserId: string;
   targetUsername: string;
   gameDate: string;
+  canViewGuesses?: boolean;
   onCommentAdded?: () => void;
 }
 
@@ -30,6 +31,7 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
   targetUserId,
   targetUsername,
   gameDate,
+  canViewGuesses = true,
   onCommentAdded,
 }) => {
   const { user: currentUser } = useAuth();
@@ -194,11 +196,11 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="bg-gray-900 border border-gray-700 w-full max-w-lg rounded-t-2xl sm:rounded-2xl p-4 shadow-2xl flex flex-col max-h-[85vh] h-[550px] relative overflow-hidden"
+        className="bg-gray-900 border border-gray-700 w-full max-w-lg rounded-t-3xl sm:rounded-2xl p-4 sm:p-5 shadow-2xl flex flex-col max-h-[90vh] sm:max-h-[85vh] h-[600px] relative overflow-hidden pb-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] sm:pb-5"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -225,7 +227,17 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
 
         {/* Comment list */}
         <div className="flex-1 overflow-y-auto py-3 space-y-2.5 scrollbar-thin">
-          {loading ? (
+          {!canViewGuesses ? (
+            <div className="py-16 flex flex-col items-center justify-center gap-2 text-center px-4">
+              <span className="text-2xl">🔒</span>
+              <p className="text-xs font-black uppercase tracking-wider text-amber-400">
+                Comments Locked
+              </p>
+              <p className="text-[11px] text-gray-400 font-medium max-w-xs leading-relaxed">
+                Play today's game first to unlock the community banter and view what players are saying!
+              </p>
+            </div>
+          ) : loading ? (
             <div className="py-12 flex flex-col items-center justify-center gap-2 text-gray-500">
               <Loader2 className="animate-spin text-amber-400" size={20} />
               <span className="text-[10px] font-black uppercase tracking-widest">Loading comments...</span>
@@ -316,25 +328,33 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
         </div>
 
         {/* Form input */}
-        <form onSubmit={handleSubmit} className="pt-2 border-t border-gray-800 shrink-0 flex gap-2">
-          <input
-            ref={inputRef}
-            type="text"
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            placeholder={currentUser ? "Drop a reaction or roast..." : "Log in to join the banter"}
-            disabled={!currentUser || submitting}
-            maxLength={280}
-            className="flex-1 bg-black/50 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-400 transition-colors"
-          />
-          <button
-            type="submit"
-            disabled={!currentUser || !newComment.trim() || submitting}
-            className="bg-amber-400 hover:bg-amber-300 text-black px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 cursor-pointer"
-          >
-            {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-          </button>
-        </form>
+        {canViewGuesses ? (
+          <form onSubmit={handleSubmit} className="pt-2.5 border-t border-gray-800 shrink-0 flex gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder={currentUser ? "Drop a reaction or roast..." : "Log in to join the banter"}
+              disabled={!currentUser || submitting}
+              maxLength={280}
+              className="flex-1 bg-black/50 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-400 transition-colors"
+            />
+            <button
+              type="submit"
+              disabled={!currentUser || !newComment.trim() || submitting}
+              className="bg-amber-400 hover:bg-amber-300 text-black px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 cursor-pointer"
+            >
+              {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+            </button>
+          </form>
+        ) : (
+          <div className="pt-2.5 border-t border-gray-800 text-center py-1 shrink-0">
+            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+              Finish your daily game to post comments
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

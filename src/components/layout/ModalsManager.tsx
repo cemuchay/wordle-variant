@@ -7,7 +7,7 @@ import { TIMEOUT } from '../../constants/game';
 const ChallengeModal = safeLazy(() => import('../ChallengeModal').then(m => ({ default: m.ChallengeModal })));
 const InfoModal = safeLazy(() => import('../InfoModal').then(m => ({ default: m.InfoModal })));
 const SettingsModal = safeLazy(() => import('../SettingsModal').then(m => ({ default: m.SettingsModal })));
-const StatsModal = safeLazy(() => import('../StatsModal').then(m => ({ default: m.StatsModal })));
+const StatsModal = safeLazy(() => import('../social-leaderboard').then(m => ({ default: m.SocialStatsModal })));
 const AnnouncementModal = safeLazy(() => import('../AnnouncementModal').then(m => ({ default: m.AnnouncementModal })));
 const NotificationModal = safeLazy(() => import('../notifications/NotificationModal').then(m => ({ default: m.NotificationModal })));
 const AuthModal = safeLazy(() => import('../AuthModal').then(m => ({ default: m.AuthModal })));
