@@ -15,6 +15,7 @@ import { TOAST_DURATION, ANIMATION_DURATION } from "../../constants/ui";
 import { ANIMATION, DEFAULT_WORD_LENGTH } from "../../constants/game";
 import { getLocalSalt, saveGameWithBackup } from "./utils";
 import { safeSessionStorage } from "@/utils/storage";
+import { recordSocialActivity } from "../../services/socialActivityService";
 
 interface UseActionsProps {
    state: any;
@@ -224,7 +225,7 @@ export const useActions = ({
             }
          }
 
-         // 4. Sync to cloud in background (not awaited)
+         // 4. Sync to cloud in background (not awaited) and emit real-time social activity
          if (user) {
             performSync(payload).then((success) => {
                if (!success) {
@@ -234,6 +235,49 @@ export const useActions = ({
                   );
                }
             });
+
+            // Record real-time guess or game_started activity
+            const guessIdx = newGuesses.length - 1;
+            if (guessIdx === 0) {
+               recordSocialActivity({
+                  userId: user.id,
+                  gameDate: date,
+                  category: "daily_game",
+                  activityType: "game_started",
+                  guessIndex: 0,
+                  payload: {
+                     guess_result: result,
+                     all_guesses: newGuesses,
+                     guess_number: 1,
+                     total_attempts: config.maxAttempts || 6,
+                     status: "playing",
+                  },
+                  metadata: {
+                     word_length: config.length,
+                  },
+               });
+            }
+
+            // If won or lost, record game completion activity (with score and attached guesses)
+            if (won || lost) {
+               recordSocialActivity({
+                  userId: user.id,
+                  gameDate: date,
+                  category: "daily_game",
+                  activityType: won ? "game_won" : "game_lost",
+                  guessIndex: guessIdx,
+                  payload: {
+                     guess_result: result,
+                     attempts: newGuesses.length,
+                     all_guesses: newGuesses,
+                     hints_used: state.usedHint,
+                     status: newStatus,
+                  },
+                  metadata: {
+                     word_length: config.length,
+                  },
+               });
+            }
          }
 
          // 5. Handle reveal timing (GameOverModal sunsetted - user stays on the rich Play screen)
@@ -330,12 +374,30 @@ export const useActions = ({
          dispatch({ type: "SET_HINT", hint: hintWithRow });
 
          if (user) {
-            const success = await performSync(payload);
-            if (!success) {
-               triggerToast(
-                  "Sync failed after 3 attempts. Hint saved locally.",
-               );
-            }
+            performSync(payload).then((success) => {
+               if (!success) {
+                  triggerToast(
+                     "Sync failed after 3 attempts. Hint saved locally.",
+                  );
+               }
+            });
+
+            // Record real-time hint activity with letter and position
+            recordSocialActivity({
+               userId: user.id,
+               gameDate: date,
+               category: "daily_game",
+               activityType: "hint_used",
+               guessIndex: null,
+               payload: {
+                  hint_record: hintWithRow,
+                  letter: hint.letter,
+                  position: hint.index + 1,
+               },
+               metadata: {
+                  word_length: config.length,
+               },
+            });
          }
          triggerToast(`Hint: "${hint.letter}" at position ${hint.index + 1}.`);
       }

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
+  Activity,
   Eye,
   EyeOff,
   LayoutGrid,
@@ -9,6 +10,7 @@ import {
   Trophy,
   User,
   X,
+  Zap,
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TIMEOUT } from "../../constants/game";
@@ -24,9 +26,11 @@ import { LeaderboardSkeleton } from "../common/Skeletons";
 import GuessPreviewModal from "../guess-preview";
 import { StreakCounter } from "../StreakCounter";
 import { LeaderboardFeedCard } from "./LeaderboardFeedCard";
+import { SocialActivityCard } from "./SocialActivityCard";
+import { fetchSocialActivities, type SocialActivityItem } from "../../services/socialActivityService";
 
 type Timeframe = "today" | "yesterday" | "weekly" | "monthly";
-type ViewMode = "table" | "feed";
+type ViewMode = "table" | "feed" | "newsfeed";
 
 interface GameStats {
   gamesPlayed: number;
@@ -70,7 +74,8 @@ export const SocialStatsModal: React.FC<Props> = ({
   const [timeframe, setTimeframe] = useState<Timeframe>("today");
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = safeLocalStorage.getItem("wordle_social_lb_view_mode") as ViewMode | null;
-    return saved === "table" ? "table" : "feed";
+    // Default to 'newsfeed'
+    return saved === "table" || saved === "newsfeed" ? saved : "newsfeed";
   });
   const [hideGridWords, setHideGridWords] = useState(false);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -81,6 +86,73 @@ export const SocialStatsModal: React.FC<Props> = ({
 
   const { date: currentDate, triggerToast } = useApp();
   const fetchIdRef = useRef(0);
+
+  const targetLbDate = useMemo(() => {
+    if (timeframe === "yesterday" && currentDate) {
+      const d = new Date(currentDate);
+      d.setDate(d.getDate() - 1);
+      return d.toISOString().split("T")[0];
+    }
+    return currentDate || "";
+  }, [timeframe, currentDate]);
+
+  const [newsfeedActivities, setNewsfeedActivities] = useState<SocialActivityItem[]>([]);
+  const [newsfeedLoading, setNewsfeedLoading] = useState(false);
+
+  // Fetch Newsfeed Activities for current timeframe
+  const fetchNewsfeed = useCallback(async (isBackground = false) => {
+    if (!isOpen || activeTab !== "leaderboard" || !targetLbDate) return;
+
+    if (!isBackground) {
+      setNewsfeedLoading(true);
+    }
+
+    try {
+      const activities = await fetchSocialActivities(targetLbDate, "daily_game", 60);
+      setNewsfeedActivities(activities);
+    } catch (err) {
+      console.error("Failed to load newsfeed activities:", err);
+    } finally {
+      if (!isBackground) {
+        setNewsfeedLoading(false);
+      }
+    }
+  }, [isOpen, activeTab, targetLbDate]);
+
+  useEffect(() => {
+    if (viewMode === "newsfeed") {
+      fetchNewsfeed(false);
+    }
+  }, [viewMode, fetchNewsfeed]);
+
+  // Realtime subscription for newsfeed activities
+  useEffect(() => {
+    if (!isOpen || viewMode !== "newsfeed" || !targetLbDate) return;
+
+    const channelName = `realtime_social_activities_${targetLbDate}_${Math.random().toString(36).slice(2, 6)}`;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "social_activities",
+          filter: `game_date=eq.${targetLbDate}`,
+        },
+        async (payload) => {
+          if (payload.new) {
+            // Re-fetch to get user profile attached
+            await fetchNewsfeed(true);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isOpen, viewMode, targetLbDate, fetchNewsfeed]);
 
   // Save viewMode preference
   const handleSetViewMode = (mode: ViewMode) => {
@@ -212,8 +284,8 @@ export const SocialStatsModal: React.FC<Props> = ({
           const toastMsg = username
             ? `New guess by @${formatUsername(username)}!`
             : isGameOverUpdate
-            ? "A player just finished their game!"
-            : "Leaderboard updated with latest live guesses!";
+              ? "A player just finished their game!"
+              : "Leaderboard updated with latest live guesses!";
           triggerToast(toastMsg, TOAST_DURATION.SHORT);
         }, TIMEOUT.LEADERBOARD_REFRESH);
       }
@@ -307,14 +379,29 @@ export const SocialStatsModal: React.FC<Props> = ({
 
   const canViewGuess = isGameOver || timeframe === "yesterday";
 
-  const targetLbDate = useMemo(() => {
-    if (timeframe === "yesterday" && currentDate) {
-      const d = new Date(currentDate);
-      d.setDate(d.getDate() - 1);
-      return d.toISOString().split("T")[0];
-    }
-    return currentDate || "";
-  }, [timeframe, currentDate]);
+  // Standard Competition Ranking (1224 - ties share the same rank and skip the following numbers)
+  const rankedLeaderboard = useMemo(() => {
+    return leaderboard.map((entry, index, arr) => {
+      if (index === 0) return { entry, rank: 1 };
+      if (entry.total_score === arr[index - 1].total_score) {
+        // Find first occurrence with this score to get the tied rank
+        const tiedIndex = arr.findIndex((e) => e.total_score === entry.total_score);
+        return { entry, rank: tiedIndex + 1 };
+      }
+      return { entry, rank: index + 1 };
+    });
+  }, [leaderboard]);
+
+  // Map of userId -> competition rank for quick lookup in Newsfeed cards
+  const userRankMap = useMemo(() => {
+    const map = new Map<string, number>();
+    rankedLeaderboard.forEach(({ entry, rank }) => {
+      if (entry.user_id) {
+        map.set(entry.user_id, rank);
+      }
+    });
+    return map;
+  }, [rankedLeaderboard]);
 
   const selectedEntry =
     selectedEntryIndex !== null && leaderboard[selectedEntryIndex]
@@ -341,8 +428,8 @@ export const SocialStatsModal: React.FC<Props> = ({
   return (
     <div
       className={`${inline
-          ? "w-full h-full"
-          : "fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200"
+        ? "w-full h-full"
+        : "fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200"
         }`}
       onClick={inline ? undefined : onClose}
     >
@@ -360,9 +447,11 @@ export const SocialStatsModal: React.FC<Props> = ({
             <Trophy size={18} className="text-amber-400" />
             <h2 className="text-lg font-black uppercase tracking-tight text-gray-100">
               {activeTab === "leaderboard"
-                ? supportsFeed && viewMode === "feed"
-                  ? "Social Feed & Leaderboard"
-                  : "Leaderboard"
+                ? supportsFeed && viewMode === "newsfeed"
+                  ? "Live Activity Feed"
+                  : supportsFeed && viewMode === "feed"
+                    ? "Social Feed & Leaderboard"
+                    : "Leaderboard"
                 : "Your Stats"}
             </h2>
           </div>
@@ -395,8 +484,8 @@ export const SocialStatsModal: React.FC<Props> = ({
           <button
             onClick={() => setActiveTab("stats")}
             className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${activeTab === "stats"
-                ? "bg-gray-700 text-white shadow-sm"
-                : "text-gray-400 hover:text-white"
+              ? "bg-gray-700 text-white shadow-sm"
+              : "text-gray-400 hover:text-white"
               }`}
           >
             <User size={12} /> Stats
@@ -404,8 +493,8 @@ export const SocialStatsModal: React.FC<Props> = ({
           <button
             onClick={() => setActiveTab("leaderboard")}
             className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${activeTab === "leaderboard"
-                ? "bg-amber-400 text-black shadow-md font-black"
-                : "text-gray-400 hover:text-white"
+              ? "bg-amber-400 text-black shadow-md font-black"
+              : "text-gray-400 hover:text-white"
               }`}
           >
             <Trophy size={12} /> Global Feed
@@ -429,8 +518,8 @@ export const SocialStatsModal: React.FC<Props> = ({
                   <StatItem value={stats.gamesPlayed} label="Played" />
                   <StatItem
                     value={`${stats.gamesPlayed
-                        ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100)
-                        : 0
+                      ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100)
+                      : 0
                       }%`}
                     label="Win %"
                   />
@@ -496,8 +585,8 @@ export const SocialStatsModal: React.FC<Props> = ({
                     key={t}
                     onClick={() => setTimeframe(t)}
                     className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider border transition-all cursor-pointer ${timeframe === t
-                        ? "bg-white text-black border-white shadow-sm"
-                        : "border-gray-800 text-gray-400 hover:text-white bg-gray-800/40"
+                      ? "bg-white text-black border-white shadow-sm"
+                      : "border-gray-800 text-gray-400 hover:text-white bg-gray-800/40"
                       }`}
                   >
                     {t === "today" ? "🔥 Today" : t === "yesterday" ? "Yesterday" : t}
@@ -517,11 +606,10 @@ export const SocialStatsModal: React.FC<Props> = ({
                       <button
                         type="button"
                         onClick={() => setHideGridWords((prev) => !prev)}
-                        className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer border ${
-                          hideGridWords
-                            ? "bg-amber-400/20 text-amber-300 border-amber-400/50 shadow-xs"
-                            : "bg-white/5 text-gray-400 hover:text-white border-white/10 hover:bg-white/10"
-                        }`}
+                        className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer border ${hideGridWords
+                          ? "bg-amber-400/20 text-amber-300 border-amber-400/50 shadow-xs"
+                          : "bg-white/5 text-gray-400 hover:text-white border-white/10 hover:bg-white/10"
+                          }`}
                         title={
                           hideGridWords
                             ? "Grid words hidden (Privacy/Screenshot Mode ON) - Click to reveal"
@@ -542,31 +630,70 @@ export const SocialStatsModal: React.FC<Props> = ({
                       </button>
                     )}
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 flex-wrap">
                     <button
                       onClick={() => handleSetViewMode("table")}
-                      className={`flex items-center gap-1 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${viewMode === "table"
-                          ? "bg-gray-700 text-white shadow-sm"
-                          : "text-gray-400 hover:text-white"
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${viewMode === "table"
+                        ? "bg-gray-700 text-white shadow-sm"
+                        : "text-gray-400 hover:text-white"
                         }`}
                     >
                       <List size={12} /> Table
                     </button>
                     <button
+                      onClick={() => handleSetViewMode("newsfeed")}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${viewMode === "newsfeed"
+                        ? "bg-blue-500 text-white shadow-sm shadow-blue-500/20 font-black"
+                        : "text-gray-400 hover:text-white hover:bg-white/5"
+                        }`}
+                    >
+                      <Zap size={12} className={viewMode === "newsfeed" ? "text-yellow-300 fill-yellow-300" : ""} /> Newsfeed
+                    </button>
+                    {/* Temporarily commented out Social Feed view
+                    <button
                       onClick={() => handleSetViewMode("feed")}
-                      className={`flex items-center gap-1 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${viewMode === "feed"
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                        viewMode === "feed"
                           ? "bg-amber-400 text-black shadow-sm"
                           : "text-gray-400 hover:text-white"
-                        }`}
+                      }`}
                     >
                       <LayoutGrid size={12} /> Social Feed
                     </button>
+                    */}
                   </div>
                 </div>
               )}
 
-              {/* Leaderboard List Content */}
-              {leaderboardError && leaderboard.length === 0 ? (
+              {/* Newsfeed Mode Content */}
+              {supportsFeed && viewMode === "newsfeed" ? (
+                newsfeedLoading && newsfeedActivities.length === 0 ? (
+                  <LeaderboardSkeleton />
+                ) : newsfeedActivities.length === 0 ? (
+                  <div className="py-16 text-center space-y-2">
+                    <Activity size={24} className="mx-auto text-gray-600 animate-pulse" />
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black">
+                      No live activities recorded yet for this date
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 pb-6">
+                    {newsfeedActivities.map((activity) => (
+                      <SocialActivityCard
+                        key={activity.id}
+                        activity={activity}
+                        userRank={userRankMap.get(activity.user_id)}
+                        canViewGuesses={canViewGuess}
+                        hideGridWords={hideGridWords}
+                        onOpenPreview={handleOpenPreview}
+                        onActivityDeleted={(id) =>
+                          setNewsfeedActivities((prev) => prev.filter((a) => a.id !== id))
+                        }
+                      />
+                    ))}
+                  </div>
+                )
+              ) : leaderboardError && leaderboard.length === 0 ? (
                 <div className="py-16 text-center space-y-3">
                   <p className="text-xs text-rose-400 font-bold">{leaderboardError}</p>
                   <button
@@ -583,13 +710,13 @@ export const SocialStatsModal: React.FC<Props> = ({
                   No scores submitted yet for this period
                 </p>
               ) : supportsFeed && viewMode === "feed" ? (
-                /* Social Feed Doom-Scroll Stream */
+                /* Social Feed Doom-Scroll Stream with Tied Rank Skipping */
                 <div className="space-y-3 pb-6">
-                  {leaderboard.map((entry, i) => (
+                  {rankedLeaderboard.map(({ entry, rank }, i) => (
                     <LeaderboardFeedCard
                       key={`${entry.username}-${i}`}
                       entry={entry}
-                      rank={i + 1}
+                      rank={rank}
                       gameDate={targetLbDate}
                       isCurrentUser={entry.user_id === user?.id}
                       canViewGuesses={canViewGuess}
@@ -599,14 +726,10 @@ export const SocialStatsModal: React.FC<Props> = ({
                   ))}
                 </div>
               ) : (
-                /* Traditional Ranking Table */
+                /* Traditional Ranking Table with Tied Rank Skipping */
                 <div className="space-y-1.5 pb-6">
-                  {leaderboard.map((entry, i, arr) => {
-                    let currentRank = i + 1;
-                    if (i > 0 && entry.total_score === arr[i - 1].total_score) {
-                      currentRank = i; // tie
-                    }
-                    const isFirst = i === 0;
+                  {rankedLeaderboard.map(({ entry, rank: currentRank }, i) => {
+                    const isFirst = currentRank === 1;
 
                     return (
                       <div
@@ -623,10 +746,10 @@ export const SocialStatsModal: React.FC<Props> = ({
                           }
                         }}
                         className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer hover:border-gray-600 ${isFirst
-                            ? "bg-yellow-500/10 border-yellow-500/40"
-                            : entry.user_id === user?.id
-                              ? "bg-emerald-500/10 border-emerald-500/40"
-                              : "bg-gray-800/40 border-gray-800"
+                          ? "bg-yellow-500/10 border-yellow-500/40"
+                          : entry.user_id === user?.id
+                            ? "bg-emerald-500/10 border-emerald-500/40"
+                            : "bg-gray-800/40 border-gray-800"
                           }`}
                       >
                         <div className="flex items-center gap-3">
@@ -636,13 +759,24 @@ export const SocialStatsModal: React.FC<Props> = ({
                           >
                             {currentRank}
                           </span>
-                          <ProtectedAvatar
-                            userId={entry.user_id}
-                            src={entry.avatar_url}
-                            username={entry.username}
-                            className={`w-7 h-7 rounded-full border ${isFirst ? "border-yellow-400" : "border-gray-700"
-                              }`}
-                          />
+                          <div className="relative shrink-0">
+                            {isFirst && (
+                              <span
+                                className="absolute -top-4 left-1/2 -translate-x-1/2 text-base z-10 select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] filter brightness-110 font-bold"
+                                role="img"
+                                aria-label="crown"
+                              >
+                                👑
+                              </span>
+                            )}
+                            <ProtectedAvatar
+                              userId={entry.user_id}
+                              src={entry.avatar_url}
+                              username={entry.username}
+                              className={`w-7 h-7 rounded-full border ${isFirst ? "border-yellow-400 ring-1 ring-yellow-400/40" : "border-gray-700"
+                                }`}
+                            />
+                          </div>
                           <div>
                             <div className="flex items-center gap-1.5">
                               <span

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useMemo } from "react";
-import { MessageCircle, Eye, Sparkles, User, Flame, X } from "lucide-react";
+import { MessageCircle, Eye, User, X } from "lucide-react";
 import { ProtectedAvatar } from "../chat/ProtectedAvatar";
 import { ReigningBadge } from "../common/ReigningBadge";
 import formatUsername from "../../utils/formatUsername";
@@ -220,14 +220,13 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
               status === "correct"
                 ? "bg-emerald-500 text-white"
                 : status === "present"
-                ? "bg-amber-400 text-black"
-                : "bg-gray-700 text-white";
+                  ? "bg-amber-400 text-black"
+                  : "bg-gray-700 text-white";
             return (
               <span
                 key={cIdx}
-                className={`w-4 h-4 sm:w-5 sm:h-5 rounded-xs shadow-xs ${bgClass} flex items-center justify-center font-black uppercase text-[9px] sm:text-[10px] select-none transition-all ${
-                  hideGridWords ? "blur-[2px] opacity-40 select-none text-transparent" : ""
-                }`}
+                className={`w-4 h-4 sm:w-5 sm:h-5 rounded-xs shadow-xs ${bgClass} flex items-center justify-center font-black uppercase text-[9px] sm:text-[10px] select-none transition-all ${hideGridWords ? "blur-[2px] opacity-40 select-none text-transparent" : ""
+                  }`}
               >
                 {!hideGridWords ? cell.letter || "" : ""}
               </span>
@@ -245,13 +244,12 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
           {Array.from({ length: wordLen }).map((_, cIdx) => (
             <span
               key={cIdx}
-              className={`w-4 h-4 sm:w-5 sm:h-5 rounded-xs ${
-                isWinningRow
-                  ? "bg-emerald-500"
-                  : (rIdx + cIdx) % 3 === 0
+              className={`w-4 h-4 sm:w-5 sm:h-5 rounded-xs ${isWinningRow
+                ? "bg-emerald-500"
+                : (rIdx + cIdx) % 3 === 0
                   ? "bg-amber-400"
                   : "bg-gray-700"
-              }`}
+                }`}
             />
           ))}
         </div>
@@ -263,13 +261,12 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
     <>
       <div
         onClick={() => onOpenPreview(entry, false)}
-        className={`bg-gray-900/90 border rounded-2xl p-4 transition-all duration-300 relative shadow-xl hover:border-gray-600 cursor-pointer ${
-          isFirst
-            ? "border-yellow-500/50 bg-linear-to-b from-yellow-500/10 via-gray-900 to-gray-900 shadow-[0_0_20px_rgba(234,179,8,0.12)]"
-            : isCurrentUser
+        className={`bg-gray-900/90 border rounded-2xl p-4 transition-all duration-300 relative shadow-xl hover:border-gray-600 cursor-pointer ${isFirst
+          ? "border-yellow-500/50 bg-linear-to-b from-yellow-500/10 via-gray-900 to-gray-900 shadow-[0_0_20px_rgba(234,179,8,0.12)]"
+          : isCurrentUser
             ? "border-emerald-500/40 bg-emerald-950/10"
             : "border-gray-800"
-        }`}
+          }`}
       >
         {/* Top Player Header */}
         <div className="flex items-center justify-between pb-3 border-b border-white/5">
@@ -277,18 +274,23 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
             {/* Rank badge */}
             <div className="relative flex items-center justify-center">
               <span
-                className={`text-sm font-black font-mono w-6 text-center ${
-                  isFirst
-                    ? "text-yellow-400 text-base"
-                    : rank <= 3
+                className={`text-sm font-black font-mono w-6 text-center ${isFirst
+                  ? "text-yellow-400 text-base"
+                  : rank <= 3
                     ? "text-amber-300"
                     : "text-gray-500"
-                }`}
+                  }`}
               >
                 #{rank}
               </span>
               {isFirst && (
-                <span className="absolute -top-4.5 left-1 text-sm select-none">👑</span>
+                <span
+                  className="absolute -top-1.5 left-1 text-base select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] filter brightness-110 font-bold"
+                  role="img"
+                  aria-label="crown"
+                >
+                  👑
+                </span>
               )}
             </div>
 
@@ -296,17 +298,15 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
               userId={entry.user_id}
               src={entry.avatar_url}
               username={entry.username}
-              className={`w-9 h-9 rounded-full border ${
-                isFirst ? "border-yellow-400 ring-2 ring-yellow-400/20" : "border-gray-700"
-              }`}
+              className={`w-9 h-9 rounded-full border ${isFirst ? "border-yellow-400 ring-2 ring-yellow-400/20" : "border-gray-700"
+                }`}
             />
 
             <div>
               <div className="flex items-center gap-1.5">
                 <span
-                  className={`text-xs sm:text-sm font-black tracking-tight truncate max-w-[130px] sm:max-w-[180px] ${
-                    isFirst ? "text-yellow-200" : "text-white"
-                  }`}
+                  className={`text-xs sm:text-sm font-black tracking-tight truncate max-w-[130px] sm:max-w-[180px] ${isFirst ? "text-yellow-200" : "text-white"
+                    }`}
                 >
                   {formatUsername(entry.username)}
                 </span>
@@ -355,18 +355,7 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
             </p>
           )}
 
-          {/* Highlight Quote / Bot Accuracy */}
-          {(entry as any).game_message ? (
-            <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-amber-300 text-[10px] font-bold italic">
-              <Flame size={12} className="text-amber-400 shrink-0" />
-              <span className="truncate max-w-[260px]">"{(entry as any).game_message}"</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 px-3 py-1 bg-white/5 border border-white/10 rounded-full text-gray-300 text-[10px] font-black uppercase tracking-wider">
-              <Sparkles size={11} className="text-cyan-400" />
-              <span>Full Scrutiny Available</span>
-            </div>
-          )}
+
         </div>
 
         {/* 1-Tap Reaction Bar & Counts */}
@@ -385,11 +374,10 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
                   key={emoji}
                   onClick={(e) => handleToggleReaction(emoji, e)}
                   title={label}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all cursor-pointer ${
-                    userHasReacted
-                      ? "bg-amber-400/20 text-amber-300 border border-amber-400/40 font-black scale-105"
-                      : "bg-white/5 hover:bg-white/10 border border-white/5 text-gray-400 hover:text-white"
-                  }`}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all cursor-pointer ${userHasReacted
+                    ? "bg-amber-400/20 text-amber-300 border border-amber-400/40 font-black scale-105"
+                    : "bg-white/5 hover:bg-white/10 border border-white/5 text-gray-400 hover:text-white"
+                    }`}
                 >
                   <span className="text-sm">{emoji}</span>
                   {count > 0 && <span className="text-[10px] font-bold font-mono">{count}</span>}
