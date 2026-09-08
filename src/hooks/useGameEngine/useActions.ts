@@ -8,6 +8,7 @@ import {
    getHint,
    updateStats,
    obfuscateWord,
+   calculateSkillIndex,
 } from "../../lib/game-logic";
 import { generateRoast } from "../../utils/roastEngine";
 import returnAnimationTime from "../../utils/returnAnimationTime";
@@ -262,8 +263,17 @@ export const useActions = ({
                });
             }
 
-            // If won or lost, record game completion activity (with score and attached guesses)
+            // If won or lost, record game completion activity (with real calculated score and attached guesses)
             if (won || lost) {
+               const calculatedScore = calculateSkillIndex({
+                  attempts: newGuesses.length,
+                  maxAttempts: config.maxAttempts || 6,
+                  usedHint: state.usedHint,
+                  guesses: newGuesses,
+                  gameDate: date,
+                  hintRecord: state.hintRecord,
+               }).finalScore;
+
                recordSocialActivity({
                   userId: user.id,
                   gameDate: date,
@@ -275,6 +285,8 @@ export const useActions = ({
                      attempts: newGuesses.length,
                      all_guesses: newGuesses,
                      hints_used: state.usedHint,
+                     total_score: calculatedScore,
+                     skill_score: calculatedScore,
                      status: newStatus,
                   },
                   metadata: {
