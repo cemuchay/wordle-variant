@@ -351,6 +351,7 @@ export const RegularGameplay = memo(function RegularGameplay({
                         gameplayType="challenge"
                         onSetCursor={actions.onSetCursor}
                         onSetEditIndex={actions.onSetEditIndex}
+                        onClearRow={actions.onClearRow}
                         maxGridWidth={gridDimensions.maxWidth}
                         maxGridHeight={gridDimensions.maxHeight}
                     />

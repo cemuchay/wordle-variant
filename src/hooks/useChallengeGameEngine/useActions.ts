@@ -96,6 +96,11 @@ export const useActions = ({
       dispatch({ type: "DELETE_CHAR" });
    }, [isGameOver, dispatch]);
 
+   const onClearRow = useCallback(() => {
+      if (isGameOver) return;
+      dispatch({ type: "RESET_CURRENT_GUESS" });
+   }, [isGameOver, dispatch]);
+
    const onSetCursor = useCallback(
       (index: number) => {
          dispatch({ type: "SET_CURSOR", index });
@@ -489,6 +494,7 @@ triggerToast(
       () => ({
          onChar,
          onDelete,
+         onClearRow,
          onEnter,
          handleHint,
          retrySync,
@@ -500,6 +506,7 @@ triggerToast(
       [
          onChar,
          onDelete,
+         onClearRow,
          onEnter,
          handleHint,
          retrySync,

@@ -31,6 +31,7 @@ interface DesktopGameLayoutProps {
   date?: string | null;
   onChar: (char: string) => void;
   onDelete: () => void;
+  onClearRow?: () => void;
   onEnter: () => void;
   onSetCursor?: (index: number) => void;
   onSetEditIndex?: (index: number | null) => void;
@@ -74,6 +75,7 @@ export const DesktopGameLayout: React.FC<DesktopGameLayoutProps> = ({
   date,
   onChar,
   onDelete,
+  onClearRow,
   onEnter,
   onSetCursor,
   onSetEditIndex,
@@ -93,7 +95,7 @@ export const DesktopGameLayout: React.FC<DesktopGameLayoutProps> = ({
   const isFinished = hideKeyboard && (isGameOver || isAlreadyPlayed);
 
   return (
-    <div className="desktop-gameplay-layout flex-1 flex flex-col min-h-0 w-full px-4 sm:px-8 py-2">
+    <div className="desktop-gameplay-layout flex-1 flex flex-col min-h-0 w-full px-4 sm:px-8 py-0">
       {/* 1. Active Playing Mode: Centered, uncrowded layout with independent vertical breathing room */}
       {!isFinished && (
         <div className="flex-1 flex flex-col justify-between items-center min-h-0 w-full gap-4 max-w-4xl mx-auto">
@@ -115,6 +117,7 @@ export const DesktopGameLayout: React.FC<DesktopGameLayoutProps> = ({
                 gameplayType={gameplayType}
                 onSetCursor={onSetCursor}
                 onSetEditIndex={onSetEditIndex}
+                onClearRow={onClearRow}
                 maxGridWidth={gridDimensions.maxWidth}
                 maxGridHeight={gridDimensions.maxHeight}
                 onToggleRules={onToggleRules}
@@ -130,7 +133,7 @@ export const DesktopGameLayout: React.FC<DesktopGameLayoutProps> = ({
           </div>
 
           {/* Desktop Keyboard */}
-          <div ref={keyboardRef as any} className="w-full max-w-[560px] pb-2 shrink-0 px-2">
+          <div ref={keyboardRef as any} className="w-full max-w-[560px] pb-0 shrink-0 px-2">
             <Keyboard
               onChar={onChar}
               onDelete={onDelete}
@@ -213,7 +216,7 @@ export const DesktopGameLayout: React.FC<DesktopGameLayoutProps> = ({
               gameMessage={gameMessage}
               date={date || new Date().toISOString().split('T')[0]}
               hintRecord={hintRecord}
-              onNavigate={onNavigate || (() => {})}
+              onNavigate={onNavigate || (() => { })}
               onOpenFreePlay={onOpenFreePlay}
               activeDailyMarathons={activeDailyMarathons}
               isMarathonLoading={isMarathonLoading}

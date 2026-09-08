@@ -1,6 +1,6 @@
 import React, { memo, useState, useEffect, useCallback, useRef } from 'react';
 import type { GuessResult } from '../types/game';
-import { HelpCircle, X, Calendar, Sparkles, ChevronRight, Share2, Check, Loader2, Lightbulb, Maximize2, Minimize2 } from 'lucide-react';
+import { HelpCircle, X, Calendar, Sparkles, ChevronRight, Share2, Check, Loader2, Lightbulb, Maximize2, Minimize2, RotateCcw } from 'lucide-react';
 import { ANIMATION_DURATION } from '../constants/ui';
 import { LAYOUT } from '../constants/game';
 import returnAnimationTime from '../utils/returnAnimationTime';
@@ -120,6 +120,7 @@ interface NewGridProps {
   gameMessage?: string;
   isBoardCollapsed?: boolean;
   onToggleBoardCollapse?: () => void;
+  onClearRow?: () => void;
 }
 
 const LONG_PRESS_MS = 500;
@@ -151,6 +152,7 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
   gameMessage,
   isBoardCollapsed = false,
   onToggleBoardCollapse,
+  onClearRow,
 }) => {
   const { isDesktop } = useIsResponsive();
   const { stats, triggerToast, date, profile } = useApp();
@@ -173,7 +175,8 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
     const gapSize = compact ? 4 : 6;
     const padding = compact ? LAYOUT.GRID_PADDING_COMPACT : LAYOUT.GRID_PADDING;
     const extraWidth = maxAttempts > LAYOUT.COMPACT_GRID_THRESHOLD ? LAYOUT.GRID_EXTRA_WIDTH : 0;
-    const topButtonsHeight = shouldHideNavButtons ? 0 : 36;
+    const showTopBar = !shouldHideNavButtons || (!isGameOverInitial && !!onClearRow);
+    const topButtonsHeight = showTopBar ? 36 : 0;
 
     const usableWidth = Math.max(180, maxGridWidth - padding - extraWidth);
     const cellWidthLimit = Math.max(32, (usableWidth - (wordLength - 1) * gapSize) / wordLength);
@@ -393,9 +396,27 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
 
   return (
     <div className={`relative mx-auto w-fit select-none shrink-0 `}>
+      {/* Challenge / Minimal Top Bar for Clear Row (When main nav bar is hidden but game is active) */}
+      {shouldHideNavButtons && !isGameOver && onClearRow && (
+        <div className="flex items-center justify-center mb-2 w-full shrink-0 px-0.5 py-0.5">
+          <button
+            onClick={onClearRow}
+            disabled={!currentGuess || currentGuess.length === 0}
+            className={`shrink-0 px-2.5 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg transition-all flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95 ${!currentGuess || currentGuess.length === 0
+              ? 'bg-white/5 text-gray-500 border border-white/5 opacity-40 cursor-not-allowed pointer-events-none'
+              : 'bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 hover:text-rose-200 border border-rose-500/30'
+              }`}
+            title="Clear current typed guess row"
+          >
+            <RotateCcw size={11} className={!currentGuess || currentGuess.length === 0 ? "text-gray-500" : "text-rose-400"} />
+            <span>clear row</span>
+          </button>
+        </div>
+      )}
+
       {/* Top Lightweight Quick Nav Buttons (Hidden in challenge/archive/guest modes) */}
       {!shouldHideNavButtons && (
-        <div className="flex items-center justify-start sm:justify-center gap-1.5 sm:gap-2 mb-2 w-full max-w-full overflow-x-auto scrollbar-hide shrink-0 px-0.5 py-0.5">
+        <div className="flex items-center justify-start sm:justify-center gap-1.5 sm:gap-2 mb-2 w-full max-w-full overflow-x-auto scrollbar-hide shrink-0 px-0.5 py-0.5 ms-7">
           {!isGameOver && canShowHint && onHint && (() => {
             const isLocked = isHintLocked ?? (guesses.length < 2);
             const isUnavailable = isLocked || !!usedHint;
@@ -403,11 +424,10 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
               <button
                 onClick={onHint}
                 disabled={isUnavailable}
-                className={`shrink-0 px-2.5 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg transition-all flex items-center gap-1.5 shadow-xs relative ${
-                  isUnavailable
-                    ? 'bg-black/80 text-gray-500 border border-gray-800 opacity-50 cursor-not-allowed pointer-events-none'
-                    : 'bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30 border border-yellow-500/40 cursor-pointer active:scale-95 animate-pulse'
-                }`}
+                className={`shrink-0 px-2.5 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg transition-all flex items-center gap-1.5 shadow-xs relative ${isUnavailable
+                  ? 'bg-black/80 text-gray-500 border border-gray-800 opacity-50 cursor-not-allowed pointer-events-none'
+                  : 'bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30 border border-yellow-500/40 cursor-pointer active:scale-95 animate-pulse'
+                  }`}
                 title={usedHint ? "Hint Used" : isLocked ? "Unlock hint by guessing 2+ words" : "Get Hint"}
               >
                 <Lightbulb size={12} className={isUnavailable ? "text-gray-600" : "text-yellow-400 fill-yellow-400/20"} />
@@ -420,6 +440,21 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
               </button>
             );
           })()}
+
+          {!isGameOver && onClearRow && (
+            <button
+              onClick={onClearRow}
+              disabled={!currentGuess || currentGuess.length === 0}
+              className={`shrink-0 px-2.5 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg transition-all flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95 ${!currentGuess || currentGuess.length === 0
+                ? 'bg-white/5 text-gray-500 border border-white/5 opacity-40 cursor-not-allowed pointer-events-none'
+                : 'bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 hover:text-rose-200 border border-rose-500/30'
+                }`}
+              title="Clear current typed guess row"
+            >
+              <RotateCcw size={11} className={!currentGuess || currentGuess.length === 0 ? "text-gray-500" : "text-rose-400"} />
+              <span>clear row</span>
+            </button>
+          )}
 
           <StreakCounter
             size="small"

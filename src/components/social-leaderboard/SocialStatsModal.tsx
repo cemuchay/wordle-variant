@@ -74,8 +74,8 @@ export const SocialStatsModal: React.FC<Props> = ({
   const [timeframe, setTimeframe] = useState<Timeframe>("today");
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = safeLocalStorage.getItem("wordle_social_lb_view_mode") as ViewMode | null;
-    // Default to 'newsfeed'
-    return saved === "table" || saved === "newsfeed" ? saved : "newsfeed";
+    // Default to 'feed'
+    return saved === "table" || saved === "feed" ? saved : "feed";
   });
   const [hideGridWords, setHideGridWords] = useState(false);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -640,6 +640,18 @@ export const SocialStatsModal: React.FC<Props> = ({
                     >
                       <List size={12} /> Table
                     </button>
+
+
+                    <button
+                      onClick={() => handleSetViewMode("feed")}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${viewMode === "feed"
+                        ? "bg-amber-400 text-black shadow-sm"
+                        : "text-gray-400 hover:text-white"
+                        }`}
+                    >
+                      <LayoutGrid size={12} /> Social Feed
+                    </button>
+
                     <button
                       onClick={() => handleSetViewMode("newsfeed")}
                       className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${viewMode === "newsfeed"
@@ -649,18 +661,7 @@ export const SocialStatsModal: React.FC<Props> = ({
                     >
                       <Zap size={12} className={viewMode === "newsfeed" ? "text-yellow-300 fill-yellow-300" : ""} /> Newsfeed
                     </button>
-                    {/* Temporarily commented out Social Feed view
-                    <button
-                      onClick={() => handleSetViewMode("feed")}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                        viewMode === "feed"
-                          ? "bg-amber-400 text-black shadow-sm"
-                          : "text-gray-400 hover:text-white"
-                      }`}
-                    >
-                      <LayoutGrid size={12} /> Social Feed
-                    </button>
-                    */}
+
                   </div>
                 </div>
               )}

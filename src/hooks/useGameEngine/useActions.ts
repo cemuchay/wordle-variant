@@ -61,6 +61,10 @@ export const useActions = ({
       dispatch({ type: "DELETE_LETTER" });
    }, [dispatch]);
 
+   const onClearRow = useCallback(() => {
+      dispatch({ type: "RESET_CURRENT_GUESS" });
+   }, [dispatch]);
+
    const onSetCursor = useCallback(
       (index: number) => {
          dispatch({ type: "SET_CURSOR", index });
@@ -423,6 +427,7 @@ export const useActions = ({
    return {
       onChar,
       onDelete,
+      onClearRow,
       onEnter,
       handleHint,
       loadState,
