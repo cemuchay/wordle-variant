@@ -26,6 +26,7 @@ export type ChallengeGameAction =
     | { type: 'SUBMIT_GUESS'; newGuesses: any[]; newStatuses: any; isWon: boolean; isLost: boolean; timestamp?: number }
     | { type: 'STOP_REVEALING' }
     | { type: 'SET_HINT'; hint: { letter: string, index: number, row?: number } }
+    | { type: 'RESET_CURRENT_GUESS' }
     | { type: 'SET_CURSOR'; index: number }
     | { type: 'SET_EDIT_INDEX'; index: number | null }
     | { type: 'TIME_UP' }
@@ -175,6 +176,14 @@ export function challengeGameReducer(state: ChallengeGameState, action: Challeng
             return {
                 ...state,
                 isShake: false,
+            };
+
+        case 'RESET_CURRENT_GUESS':
+            return {
+                ...state,
+                currentGuess: '',
+                cursorIndex: 0,
+                editIndex: null,
             };
 
         case 'SET_SAVING':

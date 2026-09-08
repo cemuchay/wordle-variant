@@ -31,6 +31,7 @@ interface MobileGameLayoutProps {
   date?: string | null;
   onChar: (char: string) => void;
   onDelete: () => void;
+  onClearRow?: () => void;
   onEnter: () => void;
   onSetCursor?: (index: number) => void;
   onSetEditIndex?: (index: number | null) => void;
@@ -74,6 +75,7 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({
   date,
   onChar,
   onDelete,
+  onClearRow,
   onEnter,
   onSetCursor,
   onSetEditIndex,
@@ -115,6 +117,7 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({
                 gameplayType={gameplayType}
                 onSetCursor={onSetCursor}
                 onSetEditIndex={onSetEditIndex}
+                onClearRow={onClearRow}
                 maxGridWidth={gridDimensions.maxWidth}
                 maxGridHeight={gridDimensions.maxHeight}
                 onToggleRules={onToggleRules}

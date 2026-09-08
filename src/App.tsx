@@ -1179,6 +1179,7 @@ function MainApp() {
                     isSaving={state.syncStatus === "syncing"}
                     onChar={actions.onChar}
                     onDelete={actions.onDelete}
+                    onClearRow={actions.onClearRow}
                     onEnter={actions.onEnter}
                     onSetCursor={actions.onSetCursor}
                     onSetEditIndex={actions.onSetEditIndex}

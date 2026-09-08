@@ -41,6 +41,7 @@ export interface LeaderboardEntry {
    status?: "lost" | "won" | "playing";
    days_active: number;
    user_id?: string;
+   guesses?: any[];
 }
 
 export type SyncStatus = "idle" | "syncing" | "synced" | "error";

@@ -20,6 +20,7 @@ interface GameAreaProps {
     isSaving?: boolean;
     onChar: (char: string) => void;
     onDelete: () => void;
+    onClearRow?: () => void;
     onEnter: () => void;
     onSetCursor?: (index: number) => void;
     onSetEditIndex?: (index: number | null) => void;
@@ -53,6 +54,7 @@ export const GameArea = ({
     isShake,
     onChar,
     onDelete,
+    onClearRow,
     onEnter,
     onSetCursor,
     onSetEditIndex,
@@ -217,6 +219,7 @@ export const GameArea = ({
         date: date || new Date().toISOString().split('T')[0],
         onChar,
         onDelete,
+        onClearRow,
         onEnter,
         onSetCursor,
         onSetEditIndex,
