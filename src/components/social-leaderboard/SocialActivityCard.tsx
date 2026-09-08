@@ -231,13 +231,14 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
         };
       }
       case 'hint_used': {
+        const canShowHintDetails = canViewGuesses || isCurrentUser;
         const letter = activity.payload?.letter || activity.payload?.hint_record?.letter;
         const pos =
           activity.payload?.position ||
           (activity.payload?.hint_record?.index !== undefined
             ? activity.payload.hint_record.index + 1
             : null);
-        const detailStr = letter && pos ? ` ("${letter}" @ pos ${pos})` : '';
+        const detailStr = canShowHintDetails && letter && pos ? ` ("${letter}" @ pos ${pos})` : '';
         return {
           title: `Used a Hint${detailStr}`,
           badgeBg: 'bg-purple-500/10 text-purple-400 border-purple-500/30 font-bold',
@@ -262,8 +263,8 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
         };
       }
       case 'game_won': {
-        const attempts = activity.payload?.attempts ?? 6;
-        const score = activity.payload?.total_score ?? 0;
+        const attempts = activity.payload?.attempts ?? (activity.payload?.all_guesses?.length || 6);
+        const score = activity.payload?.total_score ?? activity.payload?.skill_score ?? 0;
         return {
           title: `Solved in ${attempts}/6 (${score} pts) 🎉`,
           badgeBg: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-black',
@@ -284,7 +285,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
           icon: <Sparkles size={11} />,
         };
     }
-  }, [activity.activity_type, activity.payload, guessIdx, highlightedRowIndex]);
+  }, [activity.activity_type, activity.payload, guessIdx, highlightedRowIndex, canViewGuesses, isCurrentUser]);
 
   return (
     <div className="bg-gray-800/60 hover:bg-gray-800/80 transition-all border border-gray-700/60 rounded-2xl p-3 shadow-md relative overflow-hidden group">
@@ -497,24 +498,28 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
                 Final Result
               </span>
               <div className="text-sm font-black text-white font-mono flex items-center gap-2">
-                <span>{activity.payload?.total_score || 0} pts</span>
+                <span>
+                  {activity.payload?.total_score ?? activity.payload?.skill_score ?? 0} pts
+                </span>
                 <span className="text-xs text-gray-400">
-                  • {activity.activity_type === 'game_won' ? `${activity.payload?.attempts}/6` : 'X/6'}
+                  • {activity.activity_type === 'game_won' ? `${activity.payload?.attempts || activity.payload?.all_guesses?.length || 6}/6` : 'X/6'}
                 </span>
               </div>
             </div>
 
-            {onOpenPreview && (
+            {onOpenPreview && canViewGuesses && (
               <button
                 onClick={() => {
+                  const attempts = activity.payload?.attempts ?? (activity.payload?.all_guesses?.length || 6);
+                  const score = activity.payload?.total_score ?? activity.payload?.skill_score ?? 0;
                   const entry: LeaderboardEntry = {
                     username: activity.username || 'Player',
                     avatar_url: activity.avatar_url || '',
                     user_id: activity.user_id,
-                    total_score: activity.payload?.total_score || 0,
+                    total_score: score,
                     days_active: 1,
                     status: activity.activity_type === 'game_won' ? 'won' : 'lost',
-                    attempts: activity.payload?.attempts || 6,
+                    attempts: attempts,
                     guesses: activity.payload?.all_guesses || [],
                   };
                   onOpenPreview(entry, false);
@@ -565,12 +570,14 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
           <HelpCircle size={18} className="text-purple-400 shrink-0" />
           <div className="space-y-0.5">
             <span className="font-bold text-purple-300 block text-[11px]">
-              {activity.payload?.letter && activity.payload?.position
+              {(canViewGuesses || isCurrentUser) && activity.payload?.letter && activity.payload?.position
                 ? `Letter Hint: "${activity.payload.letter}" at Position ${activity.payload.position}`
                 : 'Used a Strategic Letter Hint'}
             </span>
             <span className="text-[10px] text-purple-300/70 block">
-              Narrowed down candidate possibilities.
+              {(canViewGuesses || isCurrentUser)
+                ? 'Narrowed down candidate possibilities.'
+                : '🔒 Complete today\'s game to unmask hint details.'}
             </span>
           </div>
         </div>

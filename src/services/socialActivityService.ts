@@ -135,25 +135,37 @@ export async function fetchSocialActivities(
       return [];
     }
 
-    // Collect profile data for unique users (and target users if present)
+    // Collect profile data and real scores for unique users
     const userIds = Array.from(
       new Set(
         activities.flatMap((a) => [a.user_id, a.payload?.target_user_id]).filter(Boolean)
       )
     );
 
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url')
-      .in('id', userIds);
+    const [profilesRes, scoresRes] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, username, avatar_url')
+        .in('id', userIds),
+      supabase
+        .from('scores')
+        .select('user_id, skill_score, attempts, status')
+        .eq('game_date', gameDate)
+        .in('user_id', userIds),
+    ]);
 
-    const profileMap = new Map(profiles?.map((p) => [p.id, p]));
+    const profileMap = new Map(profilesRes.data?.map((p) => [p.id, p]));
+    const scoreMap = new Map(scoresRes.data?.map((s) => [s.user_id, s]));
 
     return activities.map((item) => {
       const profile = profileMap.get(item.user_id);
       const targetProfile = item.payload?.target_user_id
         ? profileMap.get(item.payload.target_user_id)
         : null;
+      const userScore = scoreMap.get(item.user_id);
+
+      // Extract accurate score directly from scores table if available
+      const dbScore = userScore ? userScore.skill_score : null;
 
       return {
         ...item,
@@ -161,6 +173,8 @@ export async function fetchSocialActivities(
         avatar_url: profile?.avatar_url || '',
         payload: {
           ...item.payload,
+          total_score: dbScore !== null && dbScore !== undefined ? dbScore : (item.payload?.total_score ?? item.payload?.skill_score ?? 0),
+          skill_score: dbScore !== null && dbScore !== undefined ? dbScore : (item.payload?.skill_score ?? item.payload?.total_score ?? 0),
           target_username: targetProfile?.username || item.payload?.target_username || 'Player',
         },
       };
