@@ -368,6 +368,7 @@ export const useChallengeGameEngine = ({
                            .from("challenge_participants_marathon")
                            .select("guesses, hint_record")
                            .eq("participation_id", participation.id)
+                           .eq("challenge_id", challenge.id)
                            .eq("game_index", gameIndex!)
                            .maybeSingle();
 
@@ -451,7 +452,7 @@ export const useChallengeGameEngine = ({
                }
                if (saved) {
                   if (isFinishedStatus) {
-                     // DB is already completed/timed_out: DB state must override and purge local storage
+                     // 1. Cloud is finished (completed or timed_out): Cloud strictly wins, purge local storage
                      safeLocalStorage.removeItem(storageKey);
                      if (isMarathon && activeGame) {
                         const legacyKey = `challenge-prog-${challenge.id}-m-${activeGame.wordLength}`;
@@ -460,25 +461,37 @@ export const useChallengeGameEngine = ({
                   } else {
                      const parsed = JSON.parse(saved);
                      const localStatus = parsed.status || "playing";
+                     const localGuessesCount = parsed.guesses?.length || 0;
+                     const cloudGuessesCount = incoming.length;
 
-                     const hasMoreGuesses =
-                        (parsed.guesses?.length || 0) > incoming.length;
-                     const hasNewHint = parsed.hints_used && !localUsedHint;
-                     const hasAdvancedStatus =
-                        (localStatus === "completed" ||
-                           localStatus === "timed_out") &&
-                        serverStatus === "playing";
+                     const isLocalAhead =
+                        (localStatus === "completed" || localStatus === "timed_out") ||
+                        localGuessesCount > cloudGuessesCount ||
+                        (localGuessesCount === cloudGuessesCount && parsed.hints_used && !localUsedHint) ||
+                        (localGuessesCount === cloudGuessesCount && parsed.needsSync);
 
-                     if (
-                        hasMoreGuesses ||
-                        hasNewHint ||
-                        hasAdvancedStatus ||
-                        parsed.needsSync
-                     ) {
-                        if (
-                           parsed.guesses &&
-                           parsed.guesses.length >= incoming.length
-                        ) {
+                     const isCloudAhead =
+                        cloudGuessesCount > localGuessesCount ||
+                        (cloudGuessesCount === localGuessesCount && localUsedHint && !parsed.hints_used);
+
+                     if (isCloudAhead) {
+                        // 2. Cloud is ahead of local: Cloud rules, purge outdated local storage and save fresh cloud snapshot
+                        safeLocalStorage.removeItem(storageKey);
+                        if (isMarathon && activeGame) {
+                           const legacyKey = `challenge-prog-${challenge.id}-m-${activeGame.wordLength}`;
+                           safeLocalStorage.removeItem(legacyKey);
+                        }
+                        // Re-save current cloud progress locally to maintain cache
+                        saveToLocal({
+                           guesses: incoming,
+                           attempts: incoming.length,
+                           hints_used: localUsedHint,
+                           hint_record: localHintRecord,
+                           status: serverStatus,
+                        });
+                     } else if (isLocalAhead) {
+                        // 3. Local is ahead of cloud: Local rules, adopt local state and trigger background sync to cloud
+                        if (parsed.guesses && parsed.guesses.length >= incoming.length) {
                            localGuesses = parsed.guesses;
                         }
                         localUsedHint = parsed.hints_used || localUsedHint;
@@ -486,11 +499,23 @@ export const useChallengeGameEngine = ({
 
                         needsBackgroundSync = true;
                         recoveredPayload = parsed;
+                        recoveredCurrentGuess = parsed.currentGuess || '';
+                        recoveredCursorIndex = parsed.cursorIndex || 0;
+                     } else {
+                        // 4. Equal progress: keep local UI drafts (currentGuess/cursorIndex)
+                        recoveredCurrentGuess = parsed.currentGuess || '';
+                        recoveredCursorIndex = parsed.cursorIndex || 0;
                      }
-
-                     recoveredCurrentGuess = parsed.currentGuess || '';
-                     recoveredCursorIndex = parsed.cursorIndex || 0;
                   }
+               } else if (incoming.length > 0 && !isFinishedStatus) {
+                  // No local data existed (e.g. cache was cleared): populate local storage with current cloud progress
+                  saveToLocal({
+                     guesses: incoming,
+                     attempts: incoming.length,
+                     hints_used: localUsedHint,
+                     hint_record: localHintRecord,
+                     status: serverStatus,
+                  });
                }
             } catch (e) {
                logger.error("Local recovery failed", {
