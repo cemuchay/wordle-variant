@@ -9,7 +9,7 @@ import {
   Plus,
   HelpCircle,
   Loader2,
-  RotateCcw,
+  Trash2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
@@ -30,6 +30,8 @@ import {
   getPendingChallengeUploads,
   syncAllPendingChallenges,
   clearAllChallengeLocalData,
+  getConsecutiveSyncFailures,
+  resetSyncFailures,
   type PendingChallengeGame,
 } from "../utils/challengeQueueManager";
 
@@ -200,6 +202,8 @@ const AuthenticatedChallengeContent = memo(
       bootstrappingMessage,
     } = useChallengeContext();
 
+    const [isStuckSync, setIsStuckSync] = useState(false);
+
     // Refresh and prune pending queue whenever challenges are opened
     const refreshPendingUploads = useCallback(() => {
       // 1. Auto-prune any queued updates older than 7 days
@@ -207,6 +211,9 @@ const AuthenticatedChallengeContent = memo(
       // 2. Read any pending games that need sync
       const pending = getPendingChallengeUploads();
       setPendingUploads(pending);
+      // 3. Check if there are persistent sync failures
+      const fails = getConsecutiveSyncFailures();
+      setIsStuckSync(pending.length > 0 && fails >= 1);
     }, []);
 
     useEffect(() => {
@@ -227,7 +234,12 @@ const AuthenticatedChallengeContent = memo(
             TOAST_DURATION.SHORT
           );
         } else if (result.failCount > 0) {
-          triggerToast("Failed to sync pending challenge games. Please check your connection.", TOAST_DURATION.DEFAULT);
+          if (result.isStuck) {
+            setIsStuckSync(true);
+            setIsResetConfirmOpen(true);
+          } else {
+            triggerToast("Failed to sync pending challenge games. Please check your connection.", TOAST_DURATION.DEFAULT);
+          }
         } else {
           triggerToast("No pending challenge games to sync.", TOAST_DURATION.SHORT);
         }
@@ -249,6 +261,8 @@ const AuthenticatedChallengeContent = memo(
       try {
         // 1. Wipe all challenge keys from localStorage, sessionStorage, and IndexedDB
         await clearAllChallengeLocalData();
+        resetSyncFailures();
+        setIsStuckSync(false);
         // 2. Invalidate TanStack query cache for challenges
         await queryClient.invalidateQueries({ queryKey: ["my-challenges"] });
         await queryClient.invalidateQueries({ queryKey: ["discover-challenges"] });
@@ -431,7 +445,7 @@ const AuthenticatedChallengeContent = memo(
                   title="Clear Local Cache & Reload"
                   aria-label="Clear Local Challenge Cache"
                 >
-                  <RotateCcw className={`w-4 h-4 sm:w-[18px] sm:h-[18px] ${isResettingData ? 'animate-spin text-red-400' : ''}`} />
+                  <Trash2 className={`w-4 h-4 sm:w-[18px] sm:h-[18px] ${isResettingData ? 'animate-pulse text-red-400' : ''}`} />
                 </button>
                 {!selectedChallenge && (
                   <button
@@ -496,6 +510,8 @@ const AuthenticatedChallengeContent = memo(
                         pendingGames={pendingUploads}
                         isSyncing={isSyncingPending}
                         onSync={handleSyncPendingChallenges}
+                        isStuck={isStuckSync}
+                        onReset={() => setIsResetConfirmOpen(true)}
                       />
 
                       {/* Segmented Switcher for Columns */}
@@ -567,7 +583,7 @@ const AuthenticatedChallengeContent = memo(
                                     className="text-[9px] font-black uppercase text-red-400 hover:text-red-300 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-40"
                                     title="Clear Local Cache & Reload from Server"
                                   >
-                                    <RotateCcw size={10} className={isResettingData ? "animate-spin" : ""} />
+                                    <Trash2 size={10} className={isResettingData ? "animate-pulse" : ""} />
                                     Clear Cache
                                   </button>
                                   <button
@@ -1034,10 +1050,16 @@ const AuthenticatedChallengeContent = memo(
         {/* Clear Local Challenge Data Confirmation Modal */}
         <ConfirmationModal
           isOpen={isResetConfirmOpen}
-          onClose={() => setIsResetConfirmOpen(false)}
+          onClose={() => {
+            setIsResetConfirmOpen(false);
+          }}
           onConfirm={handleClearLocalData}
-          title="Reset Challenge Data?"
-          message="This will clear all local, session, and cached challenge records on this device and reload fresh from the server to fix any stale background games. You will continue with what the server has."
+          title={isStuckSync ? "Sync Stuck: Reset Challenge Data?" : "Reset Challenge Data?"}
+          message={
+            isStuckSync
+              ? "Your local game cache is out of sync with the cloud. Clearing local cache will wipe stale local games and restore your full cloud progress."
+              : "This will clear all local, session, and cached challenge records on this device and reload fresh from the server to fix any stale background games. You will continue with what the server has."
+          }
           confirmLabel={isResettingData ? "Resetting..." : "Clear & Reload"}
           cancelLabel="Cancel"
           type="danger"
