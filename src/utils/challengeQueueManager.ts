@@ -211,13 +211,75 @@ export async function syncSinglePendingChallenge(item: PendingChallengeGame): Pr
   }
 }
 
+const SYNC_FAIL_COUNT_KEY = 'challenge_consecutive_sync_failures';
+
+/**
+ * Gets consecutive non-network sync failure count.
+ */
+export function getConsecutiveSyncFailures(): number {
+  try {
+    const raw = safeLocalStorage.getItem(SYNC_FAIL_COUNT_KEY);
+    return raw ? parseInt(raw, 10) || 0 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Increments or sets consecutive non-network sync failure count.
+ */
+export function incrementSyncFailures(): number {
+  try {
+    const current = getConsecutiveSyncFailures();
+    const next = current + 1;
+    safeLocalStorage.setItem(SYNC_FAIL_COUNT_KEY, next.toString());
+    return next;
+  } catch {
+    return 1;
+  }
+}
+
+/**
+ * Resets consecutive sync failure count to 0.
+ */
+export function resetSyncFailures(): void {
+  try {
+    safeLocalStorage.removeItem(SYNC_FAIL_COUNT_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Checks whether an error is likely a network offline / connectivity error vs server / payload error.
+ */
+export function isNetworkError(err: any): boolean {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return true;
+  }
+  const msg = (err?.message || err?.details || String(err || '')).toLowerCase();
+  return (
+    msg.includes('failed to fetch') ||
+    msg.includes('network') ||
+    msg.includes('offline') ||
+    msg.includes('timeout') ||
+    msg.includes('abort')
+  );
+}
+
 /**
  * Batch syncs all pending challenge games.
  */
-export async function syncAllPendingChallenges(): Promise<{ successCount: number; failCount: number }> {
+export async function syncAllPendingChallenges(): Promise<{
+  successCount: number;
+  failCount: number;
+  nonNetworkFailCount: number;
+  isStuck: boolean;
+}> {
   const pending = getPendingChallengeUploads();
   let successCount = 0;
   let failCount = 0;
+  let nonNetworkFailCount = 0;
 
   for (const item of pending) {
     const ok = await syncSinglePendingChallenge(item);
@@ -225,10 +287,22 @@ export async function syncAllPendingChallenges(): Promise<{ successCount: number
       successCount++;
     } else {
       failCount++;
+      if (typeof navigator === 'undefined' || navigator.onLine) {
+        nonNetworkFailCount++;
+      }
     }
   }
 
-  return { successCount, failCount };
+  if (failCount === 0 && successCount > 0) {
+    resetSyncFailures();
+  } else if (nonNetworkFailCount > 0) {
+    incrementSyncFailures();
+  }
+
+  const consecutiveFailures = getConsecutiveSyncFailures();
+  const isStuck = consecutiveFailures >= 2 || (nonNetworkFailCount > 0 && consecutiveFailures >= 1);
+
+  return { successCount, failCount, nonNetworkFailCount, isStuck };
 }
 
 /**
