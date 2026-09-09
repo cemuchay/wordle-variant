@@ -178,7 +178,7 @@ export async function syncSinglePendingChallenge(item: PendingChallengeGame): Pr
 
       const { error: mError } = await supabase
         .from('challenge_participants_marathon')
-        .upsert(updateData, { onConflict: 'participation_id,game_index,play_date' });
+        .upsert(updateData, { onConflict: 'participation_id,challenge_id,game_index' });
 
       if (mError) {
         console.error('[ChallengeQueueManager] Failed to sync marathon result:', mError);

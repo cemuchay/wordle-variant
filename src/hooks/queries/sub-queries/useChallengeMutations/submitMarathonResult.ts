@@ -31,8 +31,8 @@ const useSubmitMarathonResult = () => {
                .from("challenge_participants_marathon")
                .select("status")
                .eq("participation_id", participationId)
+               .eq("challenge_id", challengeId)
                .eq("game_index", resolvedGameIndex)
-               .eq("play_date", finalPlayDate)
                .maybeSingle();
 
             if (
@@ -59,7 +59,7 @@ const useSubmitMarathonResult = () => {
          const { error } = await supabase
             .from("challenge_participants_marathon")
             .upsert(data, {
-               onConflict: "participation_id,game_index,play_date",
+               onConflict: "participation_id,challenge_id,game_index",
             });
 
          if (error) throw error;

@@ -2,12 +2,12 @@
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
--- Schedule the sync function to run hourly (at minute 0 of every hour)
+-- Schedule the sync function to run daily (at midnight UTC / 00:00 every day)
 -- Replace the URL with your actual supabase project URL if different,
 -- and substitute your real SERVICE_ROLE_KEY or INTERNAL_SECRET in the header.
 SELECT cron.schedule(
-    'sync-otdb-trivia-hourly',
-    '0 * * * *', -- hourly schedule cron syntax
+    'sync-otdb-trivia-daily',
+    '0 0 * * *', -- daily schedule cron syntax (00:00 UTC)
     $$ 
     SELECT net.http_post(
         url:='https://fhunogyceifqprpcosdg.supabase.co/functions/v1/sync-otdb-trivia',
