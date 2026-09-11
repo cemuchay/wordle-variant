@@ -1,8 +1,6 @@
 // src/utils/twemoji.tsx
-import React from 'react';
-
-// Twemoji CDN base URL (standard Twitter/Discord emoji asset CDN)
-const TWEMOJI_BASE_URL = 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg';
+import React, { useState, useEffect } from 'react';
+import { getMemoryEmoji, loadEmojiSvg, subscribeEmoji } from './emojiCache';
 
 /**
  * Converts a Unicode emoji string into its Twemoji hex code point sequence
@@ -32,7 +30,54 @@ export function toCodePoint(unicodeSurrogates: string): string {
 export const EMOJI_REGEX = /(?:\ud83c[\udde6-\uddff]{2}|(?:\ud83c[\udffb-\udfff])|(?:\ud83d[\udc00-\ude4f\ude80-\udeff]|\ud83c[\udf00-\udfff]|\ud83e[\udd00-\udfff]|\u2600-\u26ff|\u2700-\u27bf|\u2300-\u23ff|\u2b50|\u2b55|\u2934|\u2935|\u25aa|\u25ab|\u25b6|\u25c0|\u25fb-\u25fe|\u3030|\u303d|\u00a9|\u00ae|\u2122|\u203c|\u2049|\u2139|\u2194-\u2199|\u21a9-\u21aa)(?:\ufe0f|\ud83c[\udffb-\udfff])?(?:\u200d(?:\ud83d[\udc00-\ude4f\ude80-\udeff]|\ud83c[\udf00-\udfff]|\ud83e[\udd00-\udfff]|\u2600-\u26ff|\u2700-\u27bf|\u2300-\u23ff|\u2b50)(?:\ufe0f|\ud83c[\udffb-\udfff])?)*)/g;
 
 /**
- * Parses a string and returns React nodes with emojis replaced by crisp, universally-supported Twemoji SVGs.
+ * Reactive Twemoji component that renders native Unicode immediately (0ms delay),
+ * while asynchronously loading & caching the crisp Twemoji SVG in IndexedDB.
+ */
+export function Twemoji({ rawEmoji, hex }: { rawEmoji: string; hex: string }) {
+  const [cachedSrc, setCachedSrc] = useState<string | null>(() => getMemoryEmoji(hex));
+
+  useEffect(() => {
+    if (cachedSrc) return;
+
+    // Check synchronous memory again or subscribe to pending download
+    const currentInMem = getMemoryEmoji(hex);
+    if (currentInMem) {
+      setCachedSrc(currentInMem);
+      return;
+    }
+
+    const unsubscribe = subscribeEmoji(hex, (url) => {
+      setCachedSrc(url);
+    });
+
+    // Trigger async load (IndexedDB -> CDN fallback)
+    void loadEmojiSvg(hex);
+
+    return unsubscribe;
+  }, [hex, cachedSrc]);
+
+  if (cachedSrc) {
+    return (
+      <img
+        src={cachedSrc}
+        alt={rawEmoji}
+        draggable={false}
+        className="inline-block align-[-0.15em] w-[1.15em] h-[1.15em] mx-[0.05em] select-none pointer-events-none"
+      />
+    );
+  }
+
+  // Instant zero-delay native fallback
+  return (
+    <span className="font-emoji inline-block align-[-0.05em] mx-[0.03em] select-text">
+      {rawEmoji}
+    </span>
+  );
+}
+
+/**
+ * Parses a string and returns React nodes with instant native emoji first,
+ * seamlessly upgraded to cached Twemoji SVGs once available.
  */
 export function renderEmojiNode(text: string, keyPrefix = 'tw'): React.ReactNode {
   if (!text) return text;
@@ -54,24 +99,12 @@ export function renderEmojiNode(text: string, keyPrefix = 'tw'): React.ReactNode
     }
 
     const hex = toCodePoint(rawEmoji);
-    const src = `${TWEMOJI_BASE_URL}/${hex}.svg`;
 
     parts.push(
-      <img
+      <Twemoji
         key={`${keyPrefix}-em-${matchIdx}`}
-        src={src}
-        alt={rawEmoji}
-        draggable={false}
-        loading="lazy"
-        className="inline-block align-[-0.15em] w-[1.15em] h-[1.15em] mx-[0.05em] select-none pointer-events-none"
-        onError={(e) => {
-          // If SVG fails to load (rare/offline fallback), revert gracefully to native emoji character
-          const target = e.currentTarget;
-          target.style.display = 'none';
-          if (target.parentElement) {
-            target.parentElement.appendChild(document.createTextNode(rawEmoji));
-          }
-        }}
+        rawEmoji={rawEmoji}
+        hex={hex}
       />
     );
 

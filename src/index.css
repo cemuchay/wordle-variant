@@ -402,3 +402,9 @@ code {
     gap: 0.25rem !important;
   }
 }
+
+/* Cross-platform native color emoji typography */
+.font-emoji {
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji', sans-serif;
+  font-variant-numeric: tabular-nums;
+}
