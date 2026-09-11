@@ -32,6 +32,18 @@ import { fetchSocialActivities, type SocialActivityItem } from "../../services/s
 type Timeframe = "today" | "yesterday" | "weekly" | "monthly";
 type ViewMode = "table" | "feed" | "newsfeed";
 
+function getDaysInMonth(dateStr?: string | null): number {
+  if (!dateStr) return 30;
+  try {
+    const [year, month] = dateStr.split("-").map(Number);
+    if (year && month) {
+      return new Date(year, month, 0).getDate();
+    }
+  } catch { }
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+}
+
 interface GameStats {
   gamesPlayed: number;
   gamesWon: number;
@@ -788,6 +800,23 @@ export const SocialStatsModal: React.FC<Props> = ({
                               </span>
                               {entry.user_id && <ReigningBadge userId={entry.user_id} type="weekly" />}
                               {entry.user_id && <ReigningBadge userId={entry.user_id} type="bot_marathon" />}
+                              {entry.user_id && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.dispatchEvent(
+                                      new CustomEvent("open-user-profile", {
+                                        detail: { userId: entry.user_id },
+                                      })
+                                    );
+                                  }}
+                                  className="text-gray-500 hover:text-white p-0.5 rounded hover:bg-white/10 transition-colors cursor-pointer"
+                                  title="View Profile"
+                                >
+                                  <User size={11} />
+                                </button>
+                              )}
                             </div>
                             {canViewGuess && (
                               <span className="text-[9px] text-gray-400 font-semibold flex items-center gap-1">
@@ -797,14 +826,20 @@ export const SocialStatsModal: React.FC<Props> = ({
                           </div>
                         </div>
 
-                        <div className="text-right">
-                          <div className="text-xs font-black text-white font-mono">
-                            {entry.total_score} pts
+                          <div className="text-right">
+                            <div className="text-xs font-black text-white font-mono">
+                              {entry.total_score} pts
+                            </div>
+                            <div className="text-[9px] text-gray-400 font-bold uppercase">
+                              {timeframe === "weekly"
+                                ? `${entry.days_active || entry.attempts || 0}/7 games`
+                                : timeframe === "monthly"
+                                  ? `${entry.days_active || entry.attempts || 0}/${getDaysInMonth(currentDate)} games`
+                                  : entry.status === "lost"
+                                    ? "X/6"
+                                    : `${entry.attempts || "?"}/6`}
+                            </div>
                           </div>
-                          <div className="text-[9px] text-gray-400 font-bold uppercase">
-                            {entry.status === "lost" ? "X/6" : `${entry.attempts || "?"}/6`}
-                          </div>
-                        </div>
                       </div>
                     );
                   })}
