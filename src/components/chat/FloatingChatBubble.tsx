@@ -34,6 +34,8 @@ import TypingBubble from "./TypingBubble";
 import { useTypingPresence } from "../../hooks/useTypingPresence";
 import { usePeerReceipts } from "../../hooks/usePeerReceipts";
 import MessageInfoModal from "./ChatMessage/MessageInfoModal";
+import { getDailyConfig, deobfuscateWord } from "../../lib/game-logic";
+import { getLocalSalt } from "../../hooks/useGameEngine/utils";
 
 const CLOSE_DELAY = 60000; // 1 full minute
 // Desktop docked panel width (anchored beside the bubble)
@@ -121,11 +123,123 @@ const getUserChatColor = (userId?: string) => {
    return USER_COLOR_PALETTE[index];
 };
 
-// High-performance mention and cross-platform emoji parsing
+function SpoilerWord({
+   word,
+   canReveal,
+   onBlockedReveal,
+}: {
+   word: string;
+   canReveal: boolean;
+   onBlockedReveal?: () => void;
+}) {
+   const [revealed, setRevealed] = useState(false);
+   return (
+      <span
+         onClick={(e) => {
+            e.stopPropagation();
+            if (!canReveal) {
+               onBlockedReveal?.();
+               return;
+            }
+            setRevealed((prev) => !prev);
+         }}
+         className={`inline-flex items-center gap-1 mx-0.5 px-1.5 py-0.5 rounded text-[11px] font-bold cursor-pointer transition-all duration-200 select-none ${
+            revealed
+               ? "bg-amber-500/20 text-amber-300 ring-1 ring-amber-400/50 shadow-sm"
+               : "bg-slate-800/90 text-transparent filter blur-[4px] hover:blur-[2px] ring-1 ring-white/20 select-none cursor-pointer"
+         }`}
+         title={
+            !canReveal
+               ? "🔒 Complete today's game first to unlock spoilers!"
+               : revealed
+                  ? "Spoiler (tap to hide)"
+                  : "⚠️ Spoiler! Tap to reveal"
+         }
+      >
+         {revealed ? word : "SPOILER"}
+      </span>
+   );
+}
+
+// Escape special regex characters in a word
+const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const maskSpoilerText = (
+   text: string,
+   spoilerWord?: string | null,
+   isGroup?: boolean
+) => {
+   if (!text || !isGroup) return text;
+   let result = text;
+   const clean = spoilerWord ? spoilerWord.trim() : null;
+   if (clean && clean.length >= 3) {
+      const regex = new RegExp(`\\b${escapeRegex(clean)}\\b`, "gi");
+      result = result.replace(regex, "••••• (spoiler)");
+   }
+   // Also mask standalone uppercase words (e.g. SLATER, CRANE) in group previews
+   result = result.replace(/\b[A-Z]{4,8}\b/g, (match) => {
+      // Avoid masking common uppercase acronyms like GA, DM, E2EE, ID
+      if (["GA", "DM", "ID", "OK", "WOD"].includes(match)) return match;
+      return "•••••";
+   });
+   return result;
+};
+
+// High-performance mention, cross-platform emoji, and spoiler parsing
 const MENTION_REGEX = /(@[a-zA-Z0-9_.-]+)/g;
 
-const renderFormattedMessageText = (text: string, currentUsername?: string, isMe?: boolean) => {
+const renderFormattedMessageText = (
+   text: string,
+   currentUsername?: string,
+   isMe?: boolean,
+   spoilerWord?: string | null,
+   isGroupChat?: boolean,
+   canReveal = true,
+   onBlockedReveal?: () => void
+): React.ReactNode => {
    if (!text) return null;
+
+   const cleanSpoiler = spoilerWord ? spoilerWord.trim() : null;
+
+   // In group chats, detect spoilers: exact word of the day OR potential spoiler words (standalone ALL-CAPS words like SLATER, CRANE)
+   if (isGroupChat) {
+      // Build regex pattern for exact word of the day (case-insensitive) and/or uppercase potential guess words (3-8 letters)
+      const patterns: string[] = [];
+      if (cleanSpoiler && cleanSpoiler.length >= 3) {
+         patterns.push(`\\b${escapeRegex(cleanSpoiler)}\\b`);
+      }
+      // Add standalone 4-8 letter uppercase words (e.g. "SLATER", "CRANE") as spoiler candidates
+      patterns.push(`\\b[A-Z]{4,8}\\b`);
+
+      const spoilerPattern = new RegExp(`(${patterns.join("|")})`, "g");
+      if (spoilerPattern.test(text)) {
+         const parts = text.split(spoilerPattern);
+         return parts.map((part, index): React.ReactNode => {
+            const isWOD = cleanSpoiler && part.toLowerCase() === cleanSpoiler.toLowerCase();
+            const isAllUpperCandidate = /^[A-Z]{4,8}$/.test(part) && !["WHAT", "THAT", "THIS", "WITH", "HAVE", "FROM", "THEY", "YOUR", "SOME", "WHEN", "WERE", "BEEN"].includes(part);
+            if (isWOD || isAllUpperCandidate) {
+               return (
+                  <SpoilerWord
+                     key={`spoiler-${index}`}
+                     word={part}
+                     canReveal={canReveal}
+                     onBlockedReveal={onBlockedReveal}
+                  />
+               );
+            }
+            return renderFormattedMessageText(
+               part,
+               currentUsername,
+               isMe,
+               null,
+               false,
+               canReveal,
+               onBlockedReveal
+            );
+         });
+      }
+   }
+
    if (!text.includes("@")) return renderEmojiNode(text);
 
    const parts = text.split(MENTION_REGEX);
@@ -368,6 +482,7 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
    const [groups, setGroups] = useState<any[]>([]);
    const [groupsRefreshTrigger, setGroupsRefreshTrigger] = useState(0);
    const [hasPlayedToday, setHasPlayedToday] = useState(false);
+   const [dailyWord, setDailyWord] = useState<string | null>(null);
 
    // In-memory memoization cache for decrypted messages and DM partner IDs to prevent flickers
    const decryptedCacheRef = useRef<Map<string, string>>(new Map());
@@ -1076,6 +1191,43 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
       };
       checkGameStatus();
    }, [user?.id, date]);
+
+   // Load word of the day for spoiler blurring in group chats
+   useEffect(() => {
+      if (!date) return;
+      let isMounted = true;
+
+      // Synchronous fallback check from local game storage if available
+      try {
+         const localSaved = safeLocalStorage.getItem(`wordle-${date}`);
+         if (localSaved) {
+            const parsed = JSON.parse(localSaved);
+            const rawWord = parsed?.config?.word || parsed?.solution;
+            if (rawWord) {
+               const localSalt = getLocalSalt(date, user?.id);
+               const deobfuscated = deobfuscateWord(rawWord, localSalt);
+               if (deobfuscated) {
+                  setDailyWord(deobfuscated.toUpperCase());
+               }
+            }
+         }
+      } catch (err) {
+         console.warn("Error reading local solution:", err);
+      }
+
+      getDailyConfig(!!user, date)
+         .then((cfg) => {
+            if (isMounted && cfg?.word) {
+               setDailyWord(cfg.word.toUpperCase());
+            }
+         })
+         .catch((err) => {
+            console.warn("Error fetching daily config:", err);
+         });
+      return () => {
+         isMounted = false;
+      };
+   }, [date, user]);
 
    // Fetch all profiles for @ mentions
    useEffect(() => {
@@ -2365,7 +2517,7 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                                    ) : lastMessage.image_url ? (
                                                       <span className="text-indigo-400 font-semibold">📷 Image</span>
                                                    ) : (
-                                                      getDecryptedContent(lastMessage)
+                                                      maskSpoilerText(getDecryptedContent(lastMessage), dailyWord, !isDM)
                                                    )}
                                                 </p>
                                              </div>
@@ -2597,7 +2749,7 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                                             >
                                                                <Reply size={10} className="text-correct shrink-0" />
                                                                <span className="truncate text-gray-400">
-                                                                  {replyToMsg.profiles?.username || 'User'}: {replyToMsg.voice_url ? '🎤 Voice note' : replyToMsg.image_url ? '📷 Image' : getDecryptedContent(replyToMsg)}
+                                                                  {replyToMsg.profiles?.username || 'User'}: {replyToMsg.voice_url ? '🎤 Voice note' : replyToMsg.image_url ? '📷 Image' : maskSpoilerText(getDecryptedContent(replyToMsg), dailyWord, isGroupChat)}
                                                                </span>
                                                             </div>
                                                          );
@@ -2631,7 +2783,15 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                                                   ? `${userColor.bg} border ${userColor.border} text-gray-100`
                                                                   : 'bg-white/5 border border-white/5 text-gray-200'
                                                                }`}>
-                                                               {renderFormattedMessageText(getDecryptedContent(msg), profile?.username, isMe)}
+                                                               {renderFormattedMessageText(
+                                                                  getDecryptedContent(msg),
+                                                                  profile?.username,
+                                                                  isMe,
+                                                                  dailyWord,
+                                                                  isGroupChat,
+                                                                  hasPlayedToday,
+                                                                  () => triggerToast("Complete today's game first to unlock spoilers!", TOAST_DURATION.SHORT)
+                                                               )}
                                                                {msg.is_edited && (
                                                                   <span className="text-[8px] text-gray-500 ml-1">(edited)</span>
                                                                )}
@@ -2772,7 +2932,7 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                           Replying to {replyingToMsg.profiles?.username || "User"}
                                        </span>
                                        <p className="text-[10px] text-gray-400 truncate">
-                                          {replyingToMsg.voice_url ? "🎤 Voice note" : replyingToMsg.image_url ? "📷 Image" : getDecryptedContent(replyingToMsg)}
+                                          {replyingToMsg.voice_url ? "🎤 Voice note" : replyingToMsg.image_url ? "📷 Image" : maskSpoilerText(getDecryptedContent(replyingToMsg), dailyWord, selectedGroupObject?.type !== "dm")}
                                        </p>
                                     </div>
                                     <button
