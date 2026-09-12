@@ -11,7 +11,7 @@ create table public.challenges (
   is_public boolean null default false,
   max_participants integer null,
   is_custom_word boolean null default false,
-  handicap_starter character varying(10) null default null::character varying,
+  handicap_starter text null default null,
   handicap_starters jsonb null,
   handicap_enforced boolean null default false,
   marathon_timers jsonb null,

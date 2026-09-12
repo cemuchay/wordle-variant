@@ -212,9 +212,7 @@ export const RegularGameplay = memo(function RegularGameplay({
         };
     }, [onBack, onFinish, setBackAction]);
 
-    const starterWord = (gameIndex !== undefined && gameIndex !== null)
-        ? getHandicapStarter(challenge, gameIndex, wordLength)
-        : challenge.handicap_starter;
+    const starterWord = getHandicapStarter(challenge, gameIndex ?? 0, wordLength);
     const showStarter = starterWord && !challenge.handicap_enforced && guesses.length === 0 && !isGameOver;
     const showHint = stableGuessesCount >= ANIMATION.HINT_MIN_GUESSES && (!isGameOver || state.isRevealing) && !challenge.disable_hints;
 

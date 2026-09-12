@@ -618,7 +618,10 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                 : editingChallenge.handicap_starters
                         );
                     } else if (editingChallenge.handicap_starter) {
-                        setHandicapStarter(isCreatorPlayer ? '__MASKED__' : editingChallenge.handicap_starter);
+                        const starterVal = Array.isArray(editingChallenge.handicap_starter)
+                            ? editingChallenge.handicap_starter[0]
+                            : editingChallenge.handicap_starter;
+                        setHandicapStarter(isCreatorPlayer ? '__MASKED__' : starterVal);
                     }
                 }
             }

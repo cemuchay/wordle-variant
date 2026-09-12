@@ -627,6 +627,18 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
                     )}
                   </button>
 
+                  {/* Clear Board: recalls all placed uncommitted tiles back to rack */}
+                  {placedTiles.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={recallAllTiles}
+                      title="Clear all unplayed tiles from the board back to your rack"
+                      className="shrink-0 py-1.5 px-2 bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 hover:text-rose-100 rounded-xl text-[10px] font-black uppercase tracking-wider border border-rose-700/50 hover:border-rose-500 transition-all active:scale-95 cursor-pointer shadow-md flex items-center justify-center gap-1 animate-in fade-in duration-200"
+                    >
+                      <span>🧹 Clear</span>
+                    </button>
+                  )}
+
                   {/* Swap Tiles: disabled when tileBag is empty */}
                   <button
                     type="button"
