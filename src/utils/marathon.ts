@@ -127,6 +127,17 @@ export function getHandicapStartersList(challenge: any, gameIndex?: number, word
             return challenge.handicap_starter.filter(Boolean);
         }
         if (typeof challenge.handicap_starter === 'string') {
+            const trimmed = challenge.handicap_starter.trim();
+            if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                try {
+                    const parsed = JSON.parse(trimmed);
+                    if (Array.isArray(parsed)) {
+                        return parsed.filter(Boolean);
+                    }
+                } catch {
+                    // fallback to string
+                }
+            }
             return [challenge.handicap_starter];
         }
     }
