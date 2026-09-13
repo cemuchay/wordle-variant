@@ -3,6 +3,7 @@ import type { AwardType } from '../types/awards';
 import { safeLocalStorage } from './storage';
 
 const MILESTONES: Array<{ value: number; type: AwardType }> = [
+  { value: 7, type: 'streak_7' },
   { value: 50, type: 'streak_50' },
   { value: 100, type: 'streak_100' },
   { value: 250, type: 'streak_250' },
@@ -12,7 +13,7 @@ const MILESTONES: Array<{ value: number; type: AwardType }> = [
 ];
 
 /**
- * Checks if a user's streak reaches a milestone (50, 100, 250, 365, 500, 1000),
+ * Checks if a user's streak reaches a milestone (7, 50, 100, 250, 365, 500, 1000),
  * grants the permanent milestone award in user_awards table, and triggers celebratory modal event.
  */
 export async function checkAndGrantStreakMilestoneOnWin(
@@ -20,7 +21,7 @@ export async function checkAndGrantStreakMilestoneOnWin(
   currentStreak: number,
   gameDate?: string
 ) {
-  if (!userId || currentStreak < 50) return;
+  if (!userId || currentStreak < 7) return;
 
   const exactMilestone = MILESTONES.find((m) => m.value === currentStreak);
   const achievedMilestones = MILESTONES.filter((m) => currentStreak >= m.value);
