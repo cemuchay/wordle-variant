@@ -10,6 +10,7 @@ import { logger } from './lib/logger.ts'
 import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { safeLocalStorage, safeSessionStorage, runLegacyMigration } from './utils/storage'
+import { runOneTimeTasks } from './utils/oneTimeTasks'
 import { QUERY_RETRY } from './constants/queries'
 import { TIMEOUT } from './constants/game'
 
@@ -156,6 +157,7 @@ try {
 // ==========================================
 safeLocalStorage.hydrateFromDB()
   .then(() => runLegacyMigration())
+  .then(() => runOneTimeTasks())
   .catch((e) => console.warn('[Boot] IndexedDB init failed, falling back to localStorage', e));
 
 // ==========================================

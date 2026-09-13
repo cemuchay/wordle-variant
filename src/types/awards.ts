@@ -2,6 +2,7 @@ export type AwardType =
   | 'weekly_champion'
   | 'monthly_champion'
   | 'bot_marathon_weekly'
+  | 'streak_7'
   | 'streak_50'
   | 'streak_100'
   | 'streak_250'
@@ -27,6 +28,7 @@ export const AWARD_LABELS: Record<AwardType, { label: string; icon: string }> = 
   weekly_champion: { label: 'Weekly Champion', icon: 'crown' },
   monthly_champion: { label: 'Monthly Dominator', icon: 'trophy' },
   bot_marathon_weekly: { label: 'Bot Marathon Champion', icon: 'bot' },
+  streak_7: { label: '7-Day Streak', icon: 'flame' },
   streak_50: { label: '50-Day Streak', icon: 'flame' },
   streak_100: { label: '100-Day Streak', icon: 'flame' },
   streak_250: { label: '250-Day Streak', icon: 'flame' },

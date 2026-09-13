@@ -43,76 +43,109 @@ const getEmailHtml = (
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>${title}</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,700;0,6..72,800;1,6..72,400&family=Playfair+Display:wght@700;800;900&family=Source+Sans+3:wght@400;600;700;900&display=swap" rel="stylesheet">
         <style>
           body {
             background-color: #030712;
-            color: #f3f4f6;
-            font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: #f1f5f9;
+            font-family: 'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
             padding: 0;
+            -webkit-font-smoothing: antialiased;
           }
           .container {
             max-width: 600px;
             margin: 0 auto;
-            padding: 40px 20px;
+            padding: 36px 16px;
           }
           .card {
-            background-color: #111827;
-            border: 1px solid #1f2937;
-            border-radius: 24px;
-            padding: 32px;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
+            background: linear-gradient(180deg, #0f172a 0%, #090d16 100%);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 20px;
+            padding: 36px 28px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.85);
           }
-          .header-accent {
-            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-            height: 6px;
-            border-radius: 12px;
+          .rainbow-bar {
+            background: linear-gradient(90deg, #f43f5e 0%, #f59e0b 20%, #10b981 40%, #06b6d4 60%, #6366f1 80%, #a855f7 100%);
+            height: 4px;
+            border-radius: 9999px;
             margin-bottom: 24px;
           }
-          h1 {
-            color: #ffffff;
-            font-size: 24px;
+          .brand-tag {
+            display: inline-block;
+            font-family: 'Source Sans 3', sans-serif;
+            background: linear-gradient(90deg, rgba(244, 63, 94, 0.12), rgba(99, 102, 241, 0.12));
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #94a3b8;
+            font-size: 11px;
             font-weight: 900;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            padding: 4px 12px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+          }
+          /* WSJ / Morning Brew Editorial Headlines */
+          h1 {
+            font-family: 'Newsreader', 'Playfair Display', Georgia, 'Times New Roman', serif;
+            color: #ffffff;
+            font-size: 28px;
+            font-weight: 800;
             margin-top: 0;
             margin-bottom: 16px;
-            text-transform: uppercase;
-            letter-spacing: -0.025em;
+            letter-spacing: -0.015em;
+            line-height: 1.2;
+          }
+          h2, h3 {
+            font-family: 'Newsreader', 'Playfair Display', Georgia, serif;
           }
           p {
-            color: #9ca3af;
-            font-size: 15px;
-            line-height: 1.625;
+            font-family: 'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: #cbd5e1;
+            font-size: 16px;
+            line-height: 1.65;
             margin-top: 0;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
+          }
+          .greeting {
+            font-family: 'Source Sans 3', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            color: #f8fafc;
+            margin-bottom: 18px;
           }
           .btn-primary {
             display: inline-block;
-            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            font-family: 'Source Sans 3', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
             color: #ffffff !important;
             font-size: 13px;
-            font-weight: 800;
+            font-weight: 900;
             text-decoration: none;
-            padding: 14px 28px;
+            padding: 14px 34px;
             border-radius: 12px;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3);
+            letter-spacing: 0.08em;
+            box-shadow: 0 10px 20px -5px rgba(99, 102, 241, 0.45);
             text-align: center;
           }
           .footer {
-            margin-top: 32px;
+            margin-top: 36px;
             text-align: center;
-            border-top: 1px solid #1f2937;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
             padding-top: 24px;
           }
           .footer-text {
-            color: #4b5563;
-            font-size: 11px;
-            line-height: 1.5;
+            font-family: 'Source Sans 3', sans-serif;
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.55;
             margin: 0;
           }
           .footer-link {
-            color: #6366f1;
+            color: #818cf8;
             text-decoration: none;
             font-weight: 700;
           }
@@ -124,14 +157,15 @@ const getEmailHtml = (
       <body>
         <div class="container">
           <div class="card">
-            <div class="header-accent"></div>
+            <div class="rainbow-bar"></div>
+            <div class="brand-tag">THE DAILY VARIANT • ISSUE BRIEFING</div>
             <h1>${title}</h1>
-            <p>Hey <strong>${formatUsername(username)}</strong>,</p>
+            <p class="greeting">Good morning, <strong>${formatUsername(username)}</strong> —</p>
             ${contentHtml}
             <div class="footer">
               <p class="footer-text">
-                Sent automatically by variant. If you wish to stop receiving these emails, you can 
-                <a href="${unsubscribeUrl}" class="footer-link">unsubscribe here</a>.
+                Sent with ❤️ from <strong>wordle-variant.xyz</strong>. To opt out anytime, you can 
+                <a href="${unsubscribeUrl}" class="footer-link">manage preferences or unsubscribe</a>.
               </p>
             </div>
           </div>
@@ -620,16 +654,22 @@ serve(async (req) => {
          if (skippedRecipients && skippedRecipients.length > 0) {
             for (const recipient of skippedRecipients) {
                const content = `
-            <p>You skipped playing yesterday! Don't let your daily variant momentum slip away.</p>
-            <p>Challenge yourself, stay sharp, and maintain your standing by playing today's puzzle right now!</p>
+            <div style="background: linear-gradient(135deg, rgba(244, 63, 94, 0.12), rgba(245, 158, 11, 0.12)); border: 1px solid rgba(244, 63, 94, 0.25); border-radius: 18px; padding: 20px; margin-bottom: 24px; text-align: center;">
+               <div style="font-size: 32px; margin-bottom: 8px;">🔥</div>
+               <h3 style="margin: 0 0 6px 0; color: #ffffff; font-size: 16px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em;">Your Streak Needs You!</h3>
+               <p style="margin: 0; color: #cbd5e1; font-size: 14px; line-height: 1.5;">You missed yesterday's puzzle, but today is a fresh opportunity to stay sharp and climb the leaderboard.</p>
+            </div>
+            <p style="color: #9ca3af; font-size: 14px; line-height: 1.6; text-align: center;">
+               Today's word is live with fresh clues and high stakes. It only takes 3 minutes to test your vocabulary and defend your rank!
+            </p>
             <div style="margin: 32px 0 16px 0; text-align: center;">
-              <a href="${APP_URL}" class="btn-primary">Resume Play Now</a>
+              <a href="${APP_URL}" class="btn-primary">Crack Today's Word ⚡</a>
             </div>
           `;
                const html = getEmailHtml(
                   recipient.username,
                   recipient.user_id,
-                  "Resume your play today! ⚡",
+                  "Your Daily Puzzle Awaits! ⚡",
                   content,
                );
 
@@ -638,7 +678,7 @@ serve(async (req) => {
                );
                const success = await sendEmailWithFallback(
                   recipient.email,
-                  "Resume your play today! ⚡",
+                  "Your Daily Puzzle Awaits! ⚡",
                   html,
                );
                if (success) {
@@ -654,16 +694,22 @@ serve(async (req) => {
          if (inactiveRecipients.length > 0) {
             for (const recipient of inactiveRecipients) {
                const content = `
-            <p>It's been at least 3 days since you last logged in to play variant.</p>
-            <p>The weekly leaderboard is already heating up! Jump back in, crack today's word, and start climbing the ranks.</p>
+            <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(168, 85, 247, 0.12)); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 18px; padding: 20px; margin-bottom: 24px; text-align: center;">
+               <div style="font-size: 32px; margin-bottom: 8px;">🏆</div>
+               <h3 style="margin: 0 0 6px 0; color: #ffffff; font-size: 16px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em;">The Arena Misses You!</h3>
+               <p style="margin: 0; color: #cbd5e1; font-size: 14px; line-height: 1.5;">It's been a few days since your last solve. The global leaderboard is heating up, and your rivals are making moves.</p>
+            </div>
+            <p style="color: #9ca3af; font-size: 14px; line-height: 1.6; text-align: center;">
+               Jump back in this morning to test your skills, reclaim your standing, and claim your share of weekly trophies!
+            </p>
             <div style="margin: 32px 0 16px 0; text-align: center;">
-              <a href="${APP_URL}" class="btn-primary">Rejoin Leaderboard</a>
+              <a href="${APP_URL}" class="btn-primary">Jump Back In & Solve 🚀</a>
             </div>
           `;
                const html = getEmailHtml(
                   recipient.username,
                   recipient.user_id,
-                  "The Leaderboard Misses You! 🧩",
+                  "Reclaim Your Rank on the Leaderboard! 🧩",
                   content,
                );
 
@@ -672,7 +718,7 @@ serve(async (req) => {
                );
                const success = await sendEmailWithFallback(
                   recipient.email,
-                  "The Leaderboard Misses You! 🧩",
+                  "Reclaim Your Rank on the Leaderboard! 🧩",
                   html,
                );
                if (success) {
@@ -907,27 +953,35 @@ serve(async (req) => {
 
                   const rankColor =
                      rank === 1
-                        ? "#fbbf24"
+                        ? "#f59e0b"
                         : rank === 2
-                          ? "#d1d5db"
+                          ? "#94a3b8"
                           : rank === 3
-                            ? "#b45309"
-                            : "#ffffff";
+                            ? "#d97706"
+                            : "#a1a1aa";
+                  const rankBadgeBg =
+                     rank === 1
+                        ? "rgba(245, 158, 11, 0.18)"
+                        : rank === 2
+                          ? "rgba(148, 163, 184, 0.15)"
+                          : rank === 3
+                            ? "rgba(217, 119, 6, 0.15)"
+                            : "rgba(255, 255, 255, 0.05)";
                   const rankLabel =
                      rank === 1
-                        ? "🥇"
+                        ? "🥇 #1"
                         : rank === 2
-                          ? "🥈"
+                          ? "🥈 #2"
                           : rank === 3
-                            ? "🥉"
+                            ? "🥉 #3"
                             : `#${rank}`;
 
                   const rowStyle = isMe
-                     ? "background-color: #1e1b4b; border-left: 4px solid #6366f1;"
-                     : "border-bottom: 1px solid #1f2937;";
+                     ? "background: linear-gradient(90deg, rgba(99, 102, 241, 0.25), rgba(168, 85, 247, 0.15)); border-left: 4px solid #8b5cf6;"
+                     : "border-bottom: 1px solid rgba(255, 255, 255, 0.06);";
                   const textStyle = isMe
-                     ? "font-weight: 800; color: #a5b4fc;"
-                     : "color: #ffffff;";
+                     ? "font-weight: 800; color: #c7d2fe;"
+                     : "color: #f1f5f9;";
 
                   const avatarSrc = getAvatarUrl(
                      entry.avatar_url,
@@ -935,33 +989,37 @@ serve(async (req) => {
                   );
 
                   tableRowsHtml += `
-              <tr style="${rowStyle}">
-                <td style="padding: 12px 8px; font-weight: 800; color: ${rankColor};">${rankLabel}</td>
-                <td style="padding: 12px 8px; font-weight: bold; ${textStyle}">
-                  <img src="${avatarSrc}" alt="" style="width: 24px; height: 24px; border-radius: 50%; border: 1px solid #374151; vertical-align: middle; margin-right: 8px; background-color: #1f2937;" />
-                  <span style="vertical-align: middle;">${formatUsername(entry.username)}${isMe ? " (You)" : ""}</span>
-                  ${awardIcons ? `<span style="margin-left: 4px; font-size: 12px;">${awardIcons}</span>` : ''}
-                </td>
-                <td style="padding: 12px 8px; text-align: right; font-weight: 900; color: #6366f1;">${entry.total_points}</td>
-                <td style="padding: 12px 8px; text-align: right; color: #9ca3af; font-size: 13px;">${entry.days_active}d</td>
-              </tr>
-            `;
+               <tr style="${rowStyle}">
+                 <td style="padding: 12px 10px; font-weight: 900; font-size: 12px; white-space: nowrap;">
+                   <span style="display: inline-block; padding: 3px 8px; border-radius: 6px; background-color: ${rankBadgeBg}; color: ${rankColor};">${rankLabel}</span>
+                 </td>
+                 <td style="padding: 12px 10px; font-weight: 800; font-size: 13px; white-space: nowrap; ${textStyle}">
+                   <img src="${avatarSrc}" alt="" style="width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.2); vertical-align: middle; margin-right: 8px; background-color: #1e293b;" />
+                   <span style="vertical-align: middle;">${formatUsername(entry.username)}${isMe ? ' <span style="background: #6366f1; color: #ffffff; font-size: 9px; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; margin-left: 4px;">YOU</span>' : ""}</span>
+                   ${awardIcons ? `<span style="margin-left: 4px; font-size: 13px; vertical-align: middle;">${awardIcons}</span>` : ''}
+                 </td>
+                 <td style="padding: 12px 10px; text-align: right; font-weight: 900; font-size: 14px; color: #38bdf8; white-space: nowrap;">${entry.total_points.toLocaleString()}</td>
+                 <td style="padding: 12px 10px; text-align: right; color: #94a3b8; font-size: 12px; font-weight: 700; white-space: nowrap;">${entry.days_active}/7d</td>
+               </tr>
+             `;
                });
 
                const leaderboardTableHtml = `
-            <table style="width: 100%; border-collapse: collapse; margin: 24px 0; background-color: #0b0f19; border-radius: 12px; overflow: hidden;">
-              <thead>
-                <tr style="background-color: #1f2937; border-bottom: 2px solid #374151;">
-                  <th style="padding: 12px 8px; text-align: left; font-size: 11px; font-weight: 900; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em;">Rank</th>
-                  <th style="padding: 12px 8px; text-align: left; font-size: 11px; font-weight: 900; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em;">Player</th>
-                  <th style="padding: 12px 8px; text-align: right; font-size: 11px; font-weight: 900; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em;">Points</th>
-                  <th style="padding: 12px 8px; text-align: right; font-size: 11px; font-weight: 900; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em;">Active</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${tableRowsHtml}
-              </tbody>
-            </table>
+            <div style="width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 20px 0; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; background-color: #0b0f19;">
+              <table style="width: 100%; min-width: 480px; border-collapse: collapse;">
+                <thead>
+                  <tr style="background: linear-gradient(90deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.9)); border-bottom: 2px solid rgba(255, 255, 255, 0.1);">
+                    <th style="padding: 12px 10px; text-align: left; font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em;">Rank</th>
+                    <th style="padding: 12px 10px; text-align: left; font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em;">Player</th>
+                    <th style="padding: 12px 10px; text-align: right; font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em;">Points</th>
+                    <th style="padding: 12px 10px; text-align: right; font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em;">Puzzles</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${tableRowsHtml}
+                </tbody>
+              </table>
+            </div>
           `;
 
                let statsSummaryHtml = "";
@@ -970,51 +1028,59 @@ serve(async (req) => {
                   const recipientAwards = winnerMap[recipient.user_id];
                   if (recipientAwards) {
                      if (recipientAwards.weekly_champion) {
-                        awardBadgesHtml += `<div style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); color: #000000; font-weight: 900; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 14px; border-radius: 20px; margin: 0 4px;">🥇 Weekly Champion</div>`;
+                        awardBadgesHtml += `<div style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #ec4899); color: #ffffff; font-weight: 900; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; padding: 6px 16px; border-radius: 9999px; margin: 4px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);">👑 Weekly Champion</div>`;
                      }
                      if (recipientAwards.bot_marathon_weekly) {
-                        awardBadgesHtml += `<div style="display: inline-block; background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; font-weight: 900; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 14px; border-radius: 20px; margin: 0 4px;">🤖 Bot Marathon Champ</div>`;
+                        awardBadgesHtml += `<div style="display: inline-block; background: linear-gradient(135deg, #06b6d4, #10b981); color: #ffffff; font-weight: 900; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; padding: 6px 16px; border-radius: 9999px; margin: 4px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">🤖 Bot Marathon Champ</div>`;
                      }
                   }
                   statsSummaryHtml = `
-              <div style="background-color: #1e1b4b; border: 1px solid #312e81; border-radius: 16px; padding: 18px; margin-bottom: 24px; text-align: center;">
-                ${awardBadgesHtml ? `<div style="margin-bottom: 12px; display: flex; justify-content: center; gap: 6px; flex-wrap: wrap;">${awardBadgesHtml}</div>` : ''}
-                <p style="margin: 0; font-size: 12px; text-transform: uppercase; font-weight: 900; color: #c7d2fe; letter-spacing: 0.05em;">Your Performance</p>
-                <div style="display: flex; justify-content: space-around; margin-top: 12px;">
-                  <div>
-                    <span style="display: block; font-size: 20px; font-weight: 900; color: #ffffff;">#${myRank}</span>
-                    <span style="font-size: 10px; color: #a5b4fc; text-transform: uppercase;">Rank</span>
-                  </div>
-                  <div>
-                    <span style="display: block; font-size: 20px; font-weight: 900; color: #ffffff;">${myPoints}</span>
-                    <span style="font-size: 10px; color: #a5b4fc; text-transform: uppercase;">Points</span>
-                  </div>
-                  <div>
-                    <span style="display: block; font-size: 20px; font-weight: 900; color: #ffffff;">${myDaysActive}d</span>
-                    <span style="font-size: 10px; color: #a5b4fc; text-transform: uppercase;">Active</span>
-                  </div>
-                </div>
+              <div style="background: linear-gradient(135deg, rgba(30, 27, 75, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(139, 92, 246, 0.35); border-radius: 20px; padding: 22px 16px; margin: 24px 0; text-align: center; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);">
+                ${awardBadgesHtml ? `<div style="margin-bottom: 14px; display: flex; justify-content: center; gap: 6px; flex-wrap: wrap;">${awardBadgesHtml}</div>` : ''}
+                <div style="display: inline-block; background: linear-gradient(90deg, #f43f5e, #f59e0b, #10b981, #06b6d4, #8b5cf6); -webkit-background-clip: text; color: #a5b4fc; font-size: 11px; text-transform: uppercase; font-weight: 900; letter-spacing: 0.1em; margin-bottom: 12px;">★ Your Weekly Snapshot ★</div>
+                
+                <table style="width: 100%; border-collapse: collapse; margin-top: 4px;">
+                  <tr>
+                    <td style="text-align: center; padding: 8px; width: 33%;">
+                      <span style="display: block; font-size: 26px; font-weight: 900; color: #fbbf24; text-shadow: 0 2px 8px rgba(251, 191, 36, 0.3);">#${myRank}</span>
+                      <span style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">Global Rank</span>
+                    </td>
+                    <td style="text-align: center; padding: 8px; width: 33%; border-left: 1px solid rgba(255,255,255,0.1); border-right: 1px solid rgba(255,255,255,0.1);">
+                      <span style="display: block; font-size: 26px; font-weight: 900; color: #38bdf8; text-shadow: 0 2px 8px rgba(56, 189, 248, 0.3);">${myPoints.toLocaleString()}</span>
+                      <span style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">Skill Points</span>
+                    </td>
+                    <td style="text-align: center; padding: 8px; width: 33%;">
+                      <span style="display: block; font-size: 26px; font-weight: 900; color: #34d399; text-shadow: 0 2px 8px rgba(52, 211, 153, 0.3);">${myDaysActive}/7</span>
+                      <span style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;">Days Active</span>
+                    </td>
+                  </tr>
+                </table>
               </div>
             `;
                }
 
                const content = `
-            <p>Here is your weekly report for the previous week (Monday to Sunday).</p>
+            <p style="font-size: 15px; color: #cbd5e1; line-height: 1.6;">
+               Another thrilling week of word battles is in the books! Check out how you stacked up against the competition from Monday to Sunday:
+            </p>
             ${statsSummaryHtml}
-            <h3 style="color: #ffffff; font-size: 16px; font-weight: 800; margin: 24px 0 12px 0; text-transform: uppercase; letter-spacing: -0.025em;">Weekly Leaderboard (Your Window)</h3>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin: 24px 0 10px 0;">
+              <h3 style="color: #ffffff; font-size: 15px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: -0.01em;">Leaderboard Standing (Your Window)</h3>
+              <span style="color: #64748b; font-size: 11px; font-weight: 700;">Swipe &rarr; on mobile</span>
+            </div>
             ${leaderboardTableHtml}
             <div style="margin: 32px 0 16px 0; text-align: center;">
-              <a href="${APP_URL}" class="btn-primary">View Full Leaderboard</a>
+              <a href="${APP_URL}" class="btn-primary">View Full Leaderboard & Play 🧩</a>
             </div>
           `;
 
                const html = getEmailHtml(
                   recipient.username,
                   recipient.user_id,
-                  "Your Weekly Report 📊",
+                  "Your Weekly Wordle Recap 📊",
                   content,
                );
-               const subject = "Your variant Weekly Report 📊";
+               const subject = "Your Weekly Wordle Recap & Standings 📊";
 
                log(
                   `Attempting to send weekly report email to user ${recipient.username} (${recipient.email})...`,
