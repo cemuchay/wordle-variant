@@ -1,13 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Volume2, VolumeX, ChevronLeft, ChevronRight, X, Trophy, Film, Share2 } from 'lucide-react';
+import { Volume2, VolumeX, ChevronLeft, ChevronRight, X, Trophy, Film, Share2, Sparkles } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useConfirmation } from '../hooks/useConfirmation';
 import { logger } from '../lib/logger';
 import { getPreviousIsoWeekKey } from '../utils/isoWeek';
 import type { UserAward } from '../types/awards';
 import { DEFAULT_WORD_LENGTH, WRAPPED } from '../constants/game';
+import { WeeklyWrappedMosaic } from './wrapped/WeeklyWrappedMosaic';
 
 const getWeekNumber = (d: Date): number => {
     const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -292,19 +293,22 @@ const parseYYYYMMDD = (dateStr: string): Date => {
     return new Date(year, month - 1, day, 12, 0, 0);
 };
 
-interface ScoreRecord {
+export interface ScoreRecord {
     game_date: string;
     status: string;
-    guesses: { letter: string; status: 'correct' | 'present' | 'absent' }[][];
-    game_message: string;
+    guesses: any;
+    game_message?: string;
     skill_score?: number;
 }
 
-interface LeaderboardEntry {
+export interface LeaderboardEntry {
     username: string;
     avatar_url?: string;
     total_points: number;
-    days_active: number;
+    days_active?: number;
+    games_played?: number;
+    games_won?: number;
+    avg_guesses?: number;
 }
 
 export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
@@ -326,6 +330,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     }, []);
 
     const [isMusicPlaying, setIsMusicPlaying] = useState(true);
+    const [viewMode, setViewMode] = useState<'mosaic' | 'slides'>('mosaic');
     const [weeklyScores, setWeeklyScores] = useState<ScoreRecord[]>([]);
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
     const [userRank, setUserRank] = useState<{ rank: number; entry: LeaderboardEntry } | null>(null);
@@ -359,6 +364,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
 
         const fetchData = async () => {
             setLoading(true);
+            setViewMode('mosaic');
             setCurrentSlide(0);
             try {
                 // Fetch profile username and avatar
@@ -367,9 +373,18 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                     .select('username, avatar_url')
                     .eq('id', userId)
                     .single();
+
+                const { data: authUserData } = await supabase.auth.getUser();
+                const authUser = authUserData?.user;
+                const metadataAvatar = authUser?.id === userId ? authUser.user_metadata?.avatar_url : null;
+                const finalAvatar = profile?.avatar_url || metadataAvatar || null;
+
                 if (profile) {
                     setUsername(profile.username);
-                    setAvatarUrl(profile.avatar_url || null);
+                    setAvatarUrl(finalAvatar);
+                } else if (authUser?.id === userId) {
+                    if (authUser.user_metadata?.username) setUsername(authUser.user_metadata.username);
+                    setAvatarUrl(finalAvatar);
                 }
 
                 // Fetch scores range: Previous week (Monday to Sunday) relative to context gameDate
@@ -437,23 +452,25 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen, userId, isEasterEgg]);
 
-    // 2. Play/Pause Music Loop
+    // 2. Play/Pause Music Loop (Only plays when user views classic video slides)
     useEffect(() => {
-        if (!isOpen) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setGeneratedVideoFile(null);
-            wrappedTextCache.current = {};
+        if (!isOpen || viewMode !== 'slides') {
             if (synthRef.current) {
                 synthRef.current.stop();
                 synthRef.current = null;
             }
-            if (preRecordIntervalRef.current) {
-                clearInterval(preRecordIntervalRef.current);
-                preRecordIntervalRef.current = null;
-            }
-            if (recordingIntervalRef.current) {
-                clearInterval(recordingIntervalRef.current);
-                recordingIntervalRef.current = null;
+            if (!isOpen) {
+                // eslint-disable-next-line react-hooks/set-state-in-effect
+                setGeneratedVideoFile(null);
+                wrappedTextCache.current = {};
+                if (preRecordIntervalRef.current) {
+                    clearInterval(preRecordIntervalRef.current);
+                    preRecordIntervalRef.current = null;
+                }
+                if (recordingIntervalRef.current) {
+                    clearInterval(recordingIntervalRef.current);
+                    recordingIntervalRef.current = null;
+                }
             }
             return;
         }
@@ -482,7 +499,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                 recordingIntervalRef.current = null;
             }
         };
-    }, [isOpen, isMusicPlaying, weeklyTrackIndex]);
+    }, [isOpen, viewMode, isMusicPlaying, weeklyTrackIndex]);
 
     // 3. Preload User Avatar Image for Canvas (preventing taint and CORS issues)
     useEffect(() => {
@@ -892,8 +909,8 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             const startX = (width - boardWidth) / 2;
             const startY = height * 0.35;
 
-            guesses.forEach((guessRow, r) => {
-                guessRow.forEach((charObj, c) => {
+            guesses.forEach((guessRow: any[], r: number) => {
+                guessRow.forEach((charObj: any, c: number) => {
                     const x = startX + (c * (tileSize + tileGap));
                     const y = startY + (r * (tileSize + tileGap));
 
@@ -1288,21 +1305,21 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     return (
         <div
             onClick={() => {
-                if (synthRef.current && isMusicPlayingRef.current) {
+                if (viewMode === 'slides' && synthRef.current && isMusicPlayingRef.current) {
                     synthRef.current.resumeContext(weeklyTrackIndex);
                 }
             }}
             onTouchStart={() => {
-                if (synthRef.current && isMusicPlayingRef.current) {
+                if (viewMode === 'slides' && synthRef.current && isMusicPlayingRef.current) {
                     synthRef.current.resumeContext(weeklyTrackIndex);
                 }
             }}
-            className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-99999 text-white overflow-hidden select-none"
+            className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-2 sm:p-4 z-99999 text-white overflow-y-auto sm:overflow-hidden select-none"
         >
             {/* hidden canvas for export drawing - positioned offscreen to bypass layout engine throttling and preserve quality */}
             <canvas
                 ref={canvasRef}
-                className="absolute left-[-9999px] top-[-9999px]"
+                className="absolute -left-2499.75 -top-2499.75"
                 width={1080}
                 height={1920}
                 style={{ width: '1080px', height: '1920px' }}
@@ -1334,6 +1351,18 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                         Close
                     </button>
                 </div>
+            ) : viewMode === 'mosaic' ? (
+                <WeeklyWrappedMosaic
+                    userId={userId}
+                    username={username}
+                    avatarUrl={avatarUrl}
+                    weeklyScores={weeklyScores}
+                    userRank={userRank}
+                    weeklyAwards={weeklyAwards}
+                    gameDate={gameDate}
+                    onSwitchToSlides={() => setViewMode('slides')}
+                    onClose={onClose}
+                />
             ) : (
                 <div className="w-full max-w-md h-[88vh] flex flex-col relative bg-linear-to-b from-gray-900 via-gray-950 to-black rounded-[36px] overflow-hidden border border-white/10 shadow-2xl">
                     {/* Video Recording & Share Overlay */}
@@ -1346,7 +1375,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                         <h3 className="text-sm font-black uppercase tracking-widest text-correct">Generating Shareable Video</h3>
                                         <p className="text-xs text-gray-500">Compiling slides {isMusicPlaying ? "with" : "without"} music: {recordingProgress}%</p>
                                     </div>
-                                    <div className="w-full max-w-[200px] h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                    <div className="w-full max-w-50 h-1.5 bg-white/10 rounded-full overflow-hidden">
                                         <div className="h-full bg-correct" style={{ width: `${recordingProgress}%` }} />
                                     </div>
                                 </>
@@ -1419,6 +1448,17 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                             <X size={16} />
                         </button>
                         <div className="flex gap-2">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setViewMode('mosaic');
+                                }}
+                                className="p-2 bg-black/40 border border-white/5 hover:bg-black/60 rounded-full text-amber-400 hover:scale-105 transition-all cursor-pointer flex items-center gap-1 text-[10px] font-black px-2.5"
+                                title="View Mosaic Recap"
+                            >
+                                <Sparkles size={14} />
+                                <span>Mosaic</span>
+                            </button>
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -1536,19 +1576,17 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                                     return (
                                                         <div
                                                             key={a.id}
-                                                            className={`flex items-center gap-3 px-4 py-3 rounded-2xl border ${
-                                                                isWeekly
-                                                                    ? 'bg-amber-500/10 border-amber-500/30'
-                                                                    : isBot
-                                                                        ? 'bg-emerald-500/10 border-emerald-500/30'
-                                                                        : 'bg-purple-500/10 border-purple-500/30'
-                                                            }`}
+                                                            className={`flex items-center gap-3 px-4 py-3 rounded-2xl border ${isWeekly
+                                                                ? 'bg-amber-500/10 border-amber-500/30'
+                                                                : isBot
+                                                                    ? 'bg-emerald-500/10 border-emerald-500/30'
+                                                                    : 'bg-purple-500/10 border-purple-500/30'
+                                                                }`}
                                                         >
                                                             <span className="text-2xl">{isWeekly ? '🏆' : isBot ? '🤖' : '👑'}</span>
                                                             <div className="flex-1 text-left">
-                                                                <div className={`text-sm font-black uppercase tracking-wider ${
-                                                                    isWeekly ? 'text-amber-400' : isBot ? 'text-emerald-400' : 'text-purple-400'
-                                                                }`}>
+                                                                <div className={`text-sm font-black uppercase tracking-wider ${isWeekly ? 'text-amber-400' : isBot ? 'text-emerald-400' : 'text-purple-400'
+                                                                    }`}>
                                                                     {isWeekly ? 'Weekly Champion' : isBot ? 'Bot Marathon Champion' : 'Monthly Dominator'}
                                                                 </div>
                                                                 <div className="text-[10px] text-gray-400 font-bold">{a.score} points</div>
@@ -1666,9 +1704,9 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
 
                                                 {/* Guess Grid */}
                                                 <div className="my-auto space-y-1.5 flex flex-col items-center">
-                                                    {score.guesses.map((row, rIdx) => (
+                                                    {score.guesses.map((row: any[], rIdx: number) => (
                                                         <div key={rIdx} className="flex gap-1.5 justify-center">
-                                                            {row.map((charObj, cIdx) => (
+                                                            {row.map((charObj: any, cIdx: number) => (
                                                                 <div
                                                                     key={cIdx}
                                                                     className={`${cellSize} flex items-center justify-center font-bold rounded-md border
