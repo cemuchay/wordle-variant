@@ -149,7 +149,7 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({
       {isFinished && (
         <div
           ref={containerRef as any}
-          className="flex-1 min-h-0 w-full overflow-y-auto scrollbar-thin flex flex-col items-center justify-start gap-3 px-1 pt-1 pb-16"
+          className="flex-1 min-h-0 w-full overflow-y-auto scrollbar-thin flex flex-col items-center justify-start gap-3 px-1 pt-1 pb-4"
         >
           {/* Collapsible Victory Board Card */}
           <div className="shrink-0 w-full max-w-sm flex flex-col items-center bg-slate-900/60 border border-white/10 rounded-2xl p-3 shadow-lg backdrop-blur-md">
@@ -191,7 +191,7 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({
               gameMessage={gameMessage}
               date={date || new Date().toISOString().split('T')[0]}
               hintRecord={hintRecord}
-              onNavigate={onNavigate || (() => {})}
+              onNavigate={onNavigate || (() => { })}
               onOpenFreePlay={onOpenFreePlay}
               activeDailyMarathons={activeDailyMarathons}
               isMarathonLoading={isMarathonLoading}

@@ -8,34 +8,155 @@ interface StreakMilestoneCardProps {
   isWon?: boolean;
 }
 
-const MILESTONES = [7, 14, 30, 50, 100, 250, 365, 500, 1000];
+interface MilestoneTheme {
+  name: string;
+  gradient: string;
+  shadow: string;
+  text: string;
+  badgeBg: string;
+  badgeBorder: string;
+  flameColor: string;
+}
+
+const MILESTONE_CONFIGS: { target: number; theme: MilestoneTheme }[] = [
+  {
+    target: 7,
+    theme: {
+      name: "Bronze Spark",
+      gradient: "bg-linear-to-r from-red-500 to-rose-500",
+      shadow: "shadow-red-500/50",
+      text: "text-rose-400",
+      badgeBg: "bg-red-500/15",
+      badgeBorder: "border-red-500/30",
+      flameColor: "text-red-400 fill-red-400/30",
+    },
+  },
+  {
+    target: 14,
+    theme: {
+      name: "Solar Flare",
+      gradient: "bg-linear-to-r from-orange-500 to-amber-500",
+      shadow: "shadow-orange-500/50",
+      text: "text-orange-400",
+      badgeBg: "bg-orange-500/15",
+      badgeBorder: "border-orange-500/30",
+      flameColor: "text-orange-400 fill-orange-400/30",
+    },
+  },
+  {
+    target: 30,
+    theme: {
+      name: "Golden Beacon",
+      gradient: "bg-linear-to-r from-amber-400 to-yellow-300",
+      shadow: "shadow-yellow-400/50",
+      text: "text-yellow-400",
+      badgeBg: "bg-yellow-500/15",
+      badgeBorder: "border-yellow-500/30",
+      flameColor: "text-yellow-400 fill-yellow-400/30",
+    },
+  },
+  {
+    target: 50,
+    theme: {
+      name: "Emerald Surge",
+      gradient: "bg-linear-to-r from-emerald-500 to-teal-400",
+      shadow: "shadow-emerald-500/50",
+      text: "text-emerald-400",
+      badgeBg: "bg-emerald-500/15",
+      badgeBorder: "border-emerald-500/30",
+      flameColor: "text-emerald-400 fill-emerald-400/30",
+    },
+  },
+  {
+    target: 100,
+    theme: {
+      name: "Cyan Tempest",
+      gradient: "bg-linear-to-r from-cyan-500 to-blue-500",
+      shadow: "shadow-cyan-500/50",
+      text: "text-cyan-400",
+      badgeBg: "bg-cyan-500/15",
+      badgeBorder: "border-cyan-500/30",
+      flameColor: "text-cyan-400 fill-cyan-400/30",
+    },
+  },
+  {
+    target: 250,
+    theme: {
+      name: "Indigo Nebula",
+      gradient: "bg-linear-to-r from-indigo-500 to-blue-600",
+      shadow: "shadow-indigo-500/50",
+      text: "text-indigo-400",
+      badgeBg: "bg-indigo-500/15",
+      badgeBorder: "border-indigo-500/30",
+      flameColor: "text-indigo-400 fill-indigo-400/30",
+    },
+  },
+  {
+    target: 365,
+    theme: {
+      name: "Violet Eclipse",
+      gradient: "bg-linear-to-r from-purple-500 to-violet-600",
+      shadow: "shadow-purple-500/50",
+      text: "text-purple-400",
+      badgeBg: "bg-purple-500/15",
+      badgeBorder: "border-purple-500/30",
+      flameColor: "text-purple-400 fill-purple-400/30",
+    },
+  },
+  {
+    target: 500,
+    theme: {
+      name: "Fuchsia Nova",
+      gradient: "bg-linear-to-r from-pink-500 to-fuchsia-500",
+      shadow: "shadow-pink-500/50",
+      text: "text-pink-400",
+      badgeBg: "bg-pink-500/15",
+      badgeBorder: "border-pink-500/30",
+      flameColor: "text-pink-400 fill-pink-400/30",
+    },
+  },
+  {
+    target: 1000,
+    theme: {
+      name: "Prismatic Legend",
+      gradient: "bg-linear-to-r from-rose-500 via-yellow-400 via-emerald-400 via-cyan-400 to-purple-500",
+      shadow: "shadow-purple-500/50",
+      text: "text-amber-300",
+      badgeBg: "bg-purple-500/15",
+      badgeBorder: "border-purple-500/30",
+      flameColor: "text-amber-400 fill-amber-400/30",
+    },
+  },
+];
 
 const getMilestoneProgress = (streak: number) => {
   let prev = 0;
-  let target = MILESTONES[0];
+  let target = MILESTONE_CONFIGS[0].target;
+  let theme = MILESTONE_CONFIGS[0].theme;
 
-  for (let i = 0; i < MILESTONES.length; i++) {
-    if (streak < MILESTONES[i]) {
-      target = MILESTONES[i];
-      prev = i === 0 ? 0 : MILESTONES[i - 1];
+  for (let i = 0; i < MILESTONE_CONFIGS.length; i++) {
+    if (streak < MILESTONE_CONFIGS[i].target) {
+      target = MILESTONE_CONFIGS[i].target;
+      prev = i === 0 ? 0 : MILESTONE_CONFIGS[i - 1].target;
+      theme = MILESTONE_CONFIGS[i].theme;
       break;
     }
   }
 
-  if (streak >= MILESTONES[MILESTONES.length - 1]) {
-    const last = MILESTONES[MILESTONES.length - 1];
+  if (streak >= MILESTONE_CONFIGS[MILESTONE_CONFIGS.length - 1].target) {
+    const last = MILESTONE_CONFIGS[MILESTONE_CONFIGS.length - 1].target;
     const step = 500;
     const overflowSteps = Math.floor((streak - last) / step) + 1;
     target = last + overflowSteps * step;
     prev = target - step;
+    theme = MILESTONE_CONFIGS[MILESTONE_CONFIGS.length - 1].theme;
   }
 
-  const range = target - prev;
-  const progressRatio = Math.max(0, Math.min(1, (streak - prev) / range));
-  const percent = Math.round(progressRatio * 100);
+  const progressRatio = Math.max(0, Math.min(1, streak / target));
+  const percent = Number((progressRatio * 100).toFixed(1));
   const remaining = Math.max(0, target - streak);
 
-  return { target, prev, percent, remaining };
+  return { target, prev, percent, remaining, theme };
 };
 
 export const StreakMilestoneCard: React.FC<StreakMilestoneCardProps> = ({
@@ -60,10 +181,10 @@ export const StreakMilestoneCard: React.FC<StreakMilestoneCardProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between border-b border-white/5 pb-2">
         <div className="flex items-center gap-1.5">
-          <div className="p-1 bg-amber-500/15 rounded-lg border border-amber-500/30 text-amber-400">
+          <div className={`p-1 ${milestone.theme.badgeBg} rounded-lg border ${milestone.theme.badgeBorder} ${milestone.theme.text}`}>
             <Flame size={14} />
           </div>
-          <span className="text-[9px] font-black uppercase tracking-widest text-amber-300">
+          <span className={`text-[9px] font-black uppercase tracking-widest ${milestone.theme.text}`}>
             Streak & Milestones
           </span>
         </div>
@@ -74,20 +195,20 @@ export const StreakMilestoneCard: React.FC<StreakMilestoneCardProps> = ({
       </div>
 
       {/* Streak Progress Bar */}
-      <div className="space-y-1 bg-black/30 p-2.5 rounded-xl border border-white/5">
+      <div className="space-y-1.5 bg-black/30 p-2.5 rounded-xl border border-white/5">
         <div className="flex items-center justify-between text-xs">
           <span className="font-black uppercase tracking-wide text-white flex items-center gap-1">
-            <Flame size={13} className="text-orange-400 fill-orange-400/30" />
+            <Flame size={13} className={milestone.theme.flameColor} />
             {currentStreak}d Streak
           </span>
           <span className="text-[9px] font-bold text-gray-400">
-            {milestone.remaining > 0 ? `${milestone.remaining}d to ${milestone.target}d Goal` : "Goal Reached!"}
+            {milestone.remaining > 0 ? `${milestone.remaining}d to ${milestone.target}d Goal (${milestone.percent}%)` : "Goal Reached!"}
           </span>
         </div>
-        <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden p-0.5 border border-white/5">
+        <div className="w-full h-2 bg-gray-800/90 rounded-full overflow-hidden p-0.5 border border-white/5">
           <div
             style={{ width: `${milestone.percent}%` }}
-            className="h-full bg-linear-to-r from-orange-500 to-amber-400 rounded-full transition-all duration-1000 shadow-sm shadow-orange-500/50"
+            className={`h-full ${milestone.theme.gradient} rounded-full transition-all duration-1000 shadow-sm ${milestone.theme.shadow}`}
           />
         </div>
       </div>

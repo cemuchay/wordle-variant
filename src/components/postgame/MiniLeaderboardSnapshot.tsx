@@ -18,6 +18,7 @@ export const MiniLeaderboardSnapshot: React.FC<MiniLeaderboardSnapshotProps> = (
   const [loading, setLoading] = useState(false);
   const [userRank, setUserRank] = useState<number | null>(null);
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const fetchTopScores = useCallback(async (ignoreCache = false) => {
     if (!currentDate) return;
     setLoading(true);
@@ -45,6 +46,7 @@ export const MiniLeaderboardSnapshot: React.FC<MiniLeaderboardSnapshotProps> = (
   }, [currentDate, profile?.id]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTopScores(false);
   }, [fetchTopScores]);
 

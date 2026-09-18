@@ -50,7 +50,7 @@ export const PostGameHub: React.FC<PostGameHubProps> = ({
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
-      className="w-full mx-auto flex flex-col space-y-3 pb-8 md:pb-2 pt-1 px-1 text-white"
+      className="w-full mx-auto flex flex-col space-y-3 pb-0 md:pb-2 pt-1 px-1 text-white"
     >
       {/* Row 1: Share Victory Card & Word Trivia Side by Side on Desktop */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-stretch">
