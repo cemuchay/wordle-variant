@@ -46,6 +46,7 @@ interface ModalsManagerProps {
         stats: any;
     };
     statsActiveTab?: 'stats' | 'leaderboard';
+    initialCommentTarget?: any | null;
     onChallengeCreated: (challenge: any, invitedUsernames: string[], invitedIds: string[]) => void;
     viewedProfileId: string | null;
     setViewedProfileId: (id: string | null) => void;
@@ -59,6 +60,7 @@ export const ModalsManager = ({
     actions,
     gameContext,
     statsActiveTab = 'leaderboard',
+    initialCommentTarget,
     onChallengeCreated,
     viewedProfileId,
     setViewedProfileId,
@@ -142,6 +144,7 @@ export const ModalsManager = ({
                     user={gameContext.user}
                     isGameOver={gameContext.isGameOver}
                     initialTab={statsActiveTab}
+                    initialCommentTarget={initialCommentTarget}
                 />
             )}
 

@@ -28,6 +28,7 @@ import SocialTable from "./components/SocialTable";
 import StatItem from "./components/StatItem";
 import { LeaderboardFeedCard } from "./LeaderboardFeedCard";
 import { SocialActivityCard } from "./SocialActivityCard";
+import { FeedCommentDrawer } from "./FeedCommentDrawer";
 
 type Timeframe = "today" | "yesterday" | "weekly" | "monthly";
 type ViewMode = "table" | "feed" | "newsfeed";
@@ -48,6 +49,7 @@ interface Props {
   stats: GameStats;
   isGameOver: boolean;
   initialTab?: "stats" | "leaderboard";
+  initialCommentTarget?: any | null;
   inline?: boolean;
 }
 
@@ -58,6 +60,7 @@ export const SocialStatsModal: React.FC<Props> = ({
   stats,
   isGameOver,
   initialTab = "leaderboard",
+  initialCommentTarget,
   inline = false,
 }) => {
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
@@ -84,6 +87,15 @@ export const SocialStatsModal: React.FC<Props> = ({
   const [selectedEntryIndex, setSelectedEntryIndex] = useState<number | null>(null);
   const [initialOpenAnalysis, setInitialOpenAnalysis] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
+  const [activeCommentDrawer, setActiveCommentDrawer] = useState<{
+    targetUserId: string;
+    targetUsername: string;
+    gameDate: string;
+    rawGuesses?: any[];
+    status?: "won" | "lost" | "playing";
+    attempts?: number | "X";
+    wordLength?: number;
+  } | null>(null);
 
   const { date: currentDate, triggerToast } = useApp();
   const fetchIdRef = useRef(0);
@@ -375,6 +387,82 @@ export const SocialStatsModal: React.FC<Props> = ({
       window.removeEventListener("global-scores-updated", handleGlobalUpdate);
     };
   }, [isOpen, currentDate, fetchLeaderboard, triggerToast]);
+
+  // Listen to open-stats-modal event with commentTarget
+  useEffect(() => {
+    const handleOpenStatsEvent = async (e: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+
+      if (detail?.tab) {
+        setActiveTab(detail.tab);
+      }
+      if (detail?.commentTarget) {
+        const { targetUserId, gameDate } = detail.commentTarget;
+        const effectiveDate = gameDate || currentDate;
+
+        if (targetUserId && effectiveDate) {
+          try {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("username")
+              .eq("id", targetUserId)
+              .maybeSingle();
+
+            setActiveCommentDrawer({
+              targetUserId,
+              targetUsername: profile?.username || "Player",
+              gameDate: effectiveDate,
+            });
+          } catch (err) {
+            console.error("Failed to load profile for comment target:", err);
+            setActiveCommentDrawer({
+              targetUserId,
+              targetUsername: "Player",
+              gameDate: effectiveDate,
+            });
+          }
+        }
+      }
+    };
+
+    window.addEventListener("open-stats-modal", handleOpenStatsEvent);
+    return () => {
+      window.removeEventListener("open-stats-modal", handleOpenStatsEvent);
+    };
+  }, [currentDate]);
+
+  // Handle initialCommentTarget prop when modal mounts / prop updates
+  useEffect(() => {
+    if (!isOpen || !initialCommentTarget) return;
+
+    const { targetUserId, gameDate } = initialCommentTarget;
+    const effectiveDate = gameDate || currentDate;
+
+    if (targetUserId && effectiveDate) {
+      (async () => {
+        try {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("username")
+            .eq("id", targetUserId)
+            .maybeSingle();
+
+          setActiveCommentDrawer({
+            targetUserId,
+            targetUsername: profile?.username || "Player",
+            gameDate: effectiveDate,
+          });
+        } catch (err) {
+          console.error("Failed to load profile from prop target:", err);
+          setActiveCommentDrawer({
+            targetUserId,
+            targetUsername: "Player",
+            gameDate: effectiveDate,
+          });
+        }
+      })();
+    }
+  }, [isOpen, initialCommentTarget, currentDate]);
 
   const maxGuesses = useMemo(() => {
     return Math.max(...Object.values(stats.guesses), 1);
@@ -754,6 +842,23 @@ export const SocialStatsModal: React.FC<Props> = ({
               initialOpenAnalysis={initialOpenAnalysis}
             />
           </div>
+        )}
+
+        {/* Global Slide-up Comments Drawer (e.g. from Notifications) */}
+        {activeCommentDrawer && (
+          <FeedCommentDrawer
+            isOpen={!!activeCommentDrawer}
+            onClose={() => setActiveCommentDrawer(null)}
+            targetUserId={activeCommentDrawer.targetUserId}
+            targetUsername={activeCommentDrawer.targetUsername}
+            gameDate={activeCommentDrawer.gameDate}
+            canViewGuesses={canViewGuess}
+            hideGridWords={hideGridWords}
+            rawGuesses={activeCommentDrawer.rawGuesses}
+            status={activeCommentDrawer.status}
+            attempts={activeCommentDrawer.attempts}
+            wordLength={activeCommentDrawer.wordLength}
+          />
         )}
       </div>
     </div>

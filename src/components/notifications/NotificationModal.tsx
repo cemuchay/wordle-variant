@@ -420,7 +420,25 @@ export const NotificationModal = memo(() => {
                 window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: followerId } }));
                 setIsNotificationsOpen(false);
             }
-        } else if (n.type === 'NEW_COMMENT' || n.type === 'FOLLOWEE_STARTED_PLAYING' || n.type === 'FOLLOWEE_FINISHED_PLAYING') {
+        } else if (n.type === 'NEW_COMMENT') {
+            const targetUserId = n.data?.target_user_id || n.data?.commenter_id || n.user_id;
+            const gameDate = n.data?.game_date || (n.created_at ? n.created_at.split('T')[0] : undefined);
+
+            window.dispatchEvent(
+                new CustomEvent('open-stats-modal', {
+                    detail: {
+                        tab: 'leaderboard',
+                        commentTarget: {
+                            targetUserId,
+                            gameDate,
+                            guessIndex: n.data?.guess_index,
+                            parentId: n.data?.parent_id,
+                        }
+                    }
+                })
+            );
+            setIsNotificationsOpen(false);
+        } else if (n.type === 'FOLLOWEE_STARTED_PLAYING' || n.type === 'FOLLOWEE_FINISHED_PLAYING') {
             window.dispatchEvent(new CustomEvent('open-stats-modal', { detail: { tab: 'leaderboard' } }));
             setIsNotificationsOpen(false);
         } else if (n.type === 'DM_MESSAGE' || n.type === 'DM_REMINDER' || n.type === 'CHAT_MENTION') {

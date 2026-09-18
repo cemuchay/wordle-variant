@@ -572,6 +572,8 @@ function MainApp() {
     return () => clearTimeout(timer);
   }, [date, isLoadingDate, isHydrated]);
 
+  const [statsCommentTarget, setStatsCommentTarget] = useState<any | null>(null);
+
   // Listen to custom event to open stats modal at a specific tab
   useEffect(() => {
     const handleOpenStats = (e: Event) => {
@@ -580,6 +582,11 @@ function MainApp() {
         setStatsActiveTab(detail.tab);
       } else {
         setStatsActiveTab("leaderboard");
+      }
+      if (detail?.commentTarget) {
+        setStatsCommentTarget(detail.commentTarget);
+      } else {
+        setStatsCommentTarget(null);
       }
       setIsStatsOpen(true);
     };
@@ -1224,6 +1231,7 @@ function MainApp() {
                     user={user as AppUser}
                     isGameOver={state.isGameOver}
                     initialTab={statsActiveTab}
+                    initialCommentTarget={statsCommentTarget}
                   />
                 </Suspense>
               </div>
@@ -1338,6 +1346,7 @@ function MainApp() {
           isGameOver: state.isGameOver,
         }}
         statsActiveTab={statsActiveTab}
+        initialCommentTarget={statsCommentTarget}
         onChallengeCreated={handleChallengeCreated}
         viewedProfileId={viewedProfileId}
         setViewedProfileId={setViewedProfileId}
