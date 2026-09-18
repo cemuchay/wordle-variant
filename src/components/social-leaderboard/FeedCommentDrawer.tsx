@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { X, Send, MessageCircle, Loader2, Trash2, Edit2, Check, CornerDownRight, Tag } from "lucide-react";
+import { X, Send, MessageCircle, Loader2, Trash2, Edit2, Check, CornerDownRight, Tag, Smile } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import { useAuth } from "../../hooks/useAuth";
 import formatUsername from "../../utils/formatUsername";
+import UserSuggestions from "../chat/UserSuggestions";
 
 interface FeedCommentDrawerProps {
   isOpen: boolean;
@@ -32,6 +33,19 @@ interface CommentItem {
   is_deleted?: boolean;
 }
 
+interface CommentReaction {
+  comment_id: string;
+  reaction: string;
+  user_id: string;
+}
+
+interface SuggestionUser {
+  username: string;
+  avatar_url: string;
+}
+
+const EMOJIS = ["🔥", "😂", "👏", "💀", "🎯", "❤️", "👀"];
+
 export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
   isOpen,
   onClose,
@@ -48,6 +62,7 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
 }) => {
   const { user: currentUser } = useAuth();
   const [comments, setComments] = useState<CommentItem[]>([]);
+  const [commentReactions, setCommentReactions] = useState<CommentReaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -56,6 +71,21 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
   const [taggedRow, setTaggedRow] = useState<number | null>(null);
   const [replyTo, setReplyTo] = useState<CommentItem | null>(null);
   const [fetchedGuesses, setFetchedGuesses] = useState<any[]>(rawGuesses);
+  
+  // Hold-to-react & Reaction Picker state
+  const [activeReactionPickerCommentId, setActiveReactionPickerCommentId] = useState<string | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const isLongPressTriggeredRef = useRef(false);
+
+  // Swipe-to-reply state (tracking touch/drag per comment)
+  const [swipingCommentId, setSwipingCommentId] = useState<string | null>(null);
+  const [swipeOffset, setSwipeOffset] = useState<number>(0);
+
+  // User @ mention state
+  const [allUsers, setAllUsers] = useState<SuggestionUser[]>([]);
+  const [mentionState, setMentionState] = useState<{ isVisible: boolean; filter: string; cursorPosition: number } | null>(null);
+
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -87,17 +117,17 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
         status: isWinningRow
           ? "correct"
           : (rIdx + cIdx) % 3 === 0
-          ? "present"
-          : "absent",
+            ? "present"
+            : "absent",
       }));
     });
   }, [fetchedGuesses, rawGuesses, attempts, status, wordLength]);
 
-  const fetchComments = async () => {
+  const fetchComments = async (silent = false) => {
     if (!targetUserId || !gameDate) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
-      // Parallel fetch comments and player guesses if not present
+      // Fetch comments, scores, and users for @ tagging
       const promises: PromiseLike<any>[] = [
         supabase
           .from("guess_comments")
@@ -128,11 +158,15 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
       if (commentsRes.error) throw commentsRes.error;
 
       if (data && data.length > 0) {
+        const commentIds = data.map((c: any) => c.id);
         const authorIds = Array.from(new Set(data.map((c: any) => c.author_id)));
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("id, username")
-          .in("id", authorIds);
+        
+        // Fetch profiles & reactions in parallel
+        const [{ data: profiles }, { data: reactions }] = await Promise.all([
+          supabase.from("profiles").select("id, username, avatar_url").in("id", authorIds),
+          supabase.from("comment_reactions").select("comment_id, reaction, user_id").in("comment_id", commentIds)
+        ]);
+
         const map = new Map(profiles?.map((p) => [p.id, p.username]));
         setComments(
           data.map((c: any) => ({
@@ -140,28 +174,96 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
             author_username: map.get(c.author_id) || "Someone",
           }))
         );
+
+        if (reactions) {
+          setCommentReactions(reactions);
+        }
       } else {
         setComments([]);
+        setCommentReactions([]);
       }
     } catch (err) {
       console.error("Error fetching feed comments:", err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
+
+  // Fetch list of profiles for @ mention suggestions
+  useEffect(() => {
+    if (!isOpen) return;
+    const fetchUsers = async () => {
+      try {
+        const { data: usersData } = await supabase
+          .from("profiles")
+          .select("username, avatar_url")
+          .not("username", "is", null)
+          .limit(50);
+
+        if (usersData) {
+          setAllUsers(usersData as SuggestionUser[]);
+        }
+      } catch (e) {
+        console.error("Error loading mention profiles:", e);
+      }
+    };
+    fetchUsers();
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
       fetchComments();
       setTaggedRow(null);
       setReplyTo(null);
+      setActiveReactionPickerCommentId(null);
+      setMentionState(null);
       setTimeout(() => inputRef.current?.focus(), 150);
     } else {
       setComments([]);
+      setCommentReactions([]);
       setNewComment("");
       setTaggedRow(null);
       setReplyTo(null);
+      setActiveReactionPickerCommentId(null);
+      setMentionState(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, targetUserId, gameDate]);
+
+  // Realtime subscription for comments and reactions (silent background updates)
+  useEffect(() => {
+    if (!isOpen || !targetUserId) return;
+
+    const channel = supabase
+      .channel(`feed_drawer_${targetUserId}_${gameDate}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "guess_comments",
+          filter: `target_user_id=eq.${targetUserId}`,
+        },
+        () => {
+          fetchComments(true);
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "comment_reactions",
+        },
+        () => {
+          fetchComments(true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, targetUserId, gameDate]);
 
@@ -177,6 +279,39 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
     });
     return map;
   }, [comments]);
+
+  // Handle @ mention typing
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    const cursorPos = e.target.selectionStart || 0;
+    setNewComment(val);
+
+    const textBeforeCursor = val.slice(0, cursorPos);
+    const lastAtIdx = textBeforeCursor.lastIndexOf("@");
+
+    if (lastAtIdx !== -1) {
+      const textAfterAt = textBeforeCursor.slice(lastAtIdx + 1);
+      if (!/\s/.test(textAfterAt)) {
+        setMentionState({
+          isVisible: true,
+          filter: textAfterAt,
+          cursorPosition: cursorPos,
+        });
+        return;
+      }
+    }
+    setMentionState(null);
+  };
+
+  const handleSelectMention = (username: string) => {
+    if (!mentionState || !inputRef.current) return;
+    const textBeforeAt = newComment.slice(0, newComment.lastIndexOf("@", mentionState.cursorPosition - 1));
+    const textAfterCursor = newComment.slice(mentionState.cursorPosition);
+    const updated = `${textBeforeAt}@${username} ${textAfterCursor}`;
+    setNewComment(updated);
+    setMentionState(null);
+    inputRef.current.focus();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -216,6 +351,7 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
         ]);
         setNewComment("");
         setReplyTo(null);
+        setMentionState(null);
         if (onCommentAdded) onCommentAdded();
       }
     } catch (err) {
@@ -287,11 +423,159 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
 
   const handleStartReply = (comment: CommentItem) => {
     setReplyTo(comment);
-    // If the parent comment had a tagged row, inherit it if no row is currently chosen
     if (comment.guess_index && comment.guess_index > 0 && taggedRow === null) {
       setTaggedRow(comment.guess_index);
     }
     inputRef.current?.focus();
+  };
+
+  // Optimistic UI reaction update
+  const handleCommentReact = async (commentId: string, emoji: string) => {
+    if (!currentUser) return;
+    setActiveReactionPickerCommentId(null);
+
+    const previousReactions = [...commentReactions];
+    const existing = commentReactions.find(
+      (r) => r.comment_id === commentId && r.user_id === currentUser.id
+    );
+
+    // 1. Immediately apply optimistic UI change
+    if (existing && existing.reaction === emoji) {
+      // Toggle off / remove reaction
+      setCommentReactions((prev) =>
+        prev.filter((r) => !(r.comment_id === commentId && r.user_id === currentUser.id))
+      );
+
+      // 2. Perform DB update in background without full refresh
+      supabase
+        .from("comment_reactions")
+        .delete()
+        .eq("comment_id", commentId)
+        .eq("user_id", currentUser.id)
+        .then(({ error }) => {
+          if (error) {
+            console.error("Failed to remove reaction, rolling back:", error);
+            setCommentReactions(previousReactions);
+          }
+        });
+    } else {
+      // Upsert reaction optimistically
+      setCommentReactions((prev) => [
+        ...prev.filter((r) => !(r.comment_id === commentId && r.user_id === currentUser.id)),
+        { comment_id: commentId, user_id: currentUser.id, reaction: emoji },
+      ]);
+
+      // 2. Perform DB update in background without full refresh
+      supabase
+        .from("comment_reactions")
+        .upsert({
+          comment_id: commentId,
+          user_id: currentUser.id,
+          reaction: emoji,
+        })
+        .then(({ error }) => {
+          if (error) {
+            console.error("Failed to add reaction, rolling back:", error);
+            setCommentReactions(previousReactions);
+          }
+        });
+    }
+  };
+
+  // Hold-to-react & touch handlers
+  const handleTouchStart = (commentId: string, e: React.TouchEvent | React.MouseEvent) => {
+    if (!currentUser) return;
+    isLongPressTriggeredRef.current = false;
+    const clientX = "touches" in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    touchStartPosRef.current = { x: clientX, y: clientY };
+
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressTriggeredRef.current = true;
+      setActiveReactionPickerCommentId(commentId);
+      if (typeof navigator !== "undefined" && navigator.vibrate) {
+        try {
+          navigator.vibrate(40);
+        } catch (_) {
+          // Ignore vibration failures
+        }
+      }
+    }, 450); // 450ms hold
+  };
+
+  const handleTouchMove = (comment: CommentItem, e: React.TouchEvent) => {
+    if (!touchStartPosRef.current) return;
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const diffX = currentX - touchStartPosRef.current.x;
+    const diffY = currentY - touchStartPosRef.current.y;
+
+    // If user moves vertically or scrolls, cancel long press
+    if (Math.abs(diffY) > 10 || Math.abs(diffX) > 10) {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    }
+
+    // Swipe right to reply gesture (only allow horizontal drag to the right)
+    if (diffX > 10 && Math.abs(diffY) < 30 && !comment.is_deleted) {
+      setSwipingCommentId(comment.id);
+      setSwipeOffset(Math.min(diffX * 0.45, 60)); // Max drag offset
+    }
+  };
+
+  const handleTouchEnd = (comment: CommentItem) => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+
+    // If swipe passed threshold (35px), trigger reply
+    if (swipingCommentId === comment.id) {
+      if (swipeOffset >= 35) {
+        handleStartReply(comment);
+        if (typeof navigator !== "undefined" && navigator.vibrate) {
+          try {
+            navigator.vibrate(25);
+          } catch (_) {
+            // Ignore vibration error
+          }
+        }
+      }
+      setSwipingCommentId(null);
+      setSwipeOffset(0);
+    }
+
+    touchStartPosRef.current = null;
+  };
+
+  // Format text to highlight @mentions
+  const renderFormattedContent = (content: string) => {
+    const mentionRegex = /(@[a-zA-Z0-9_.-]+)/g;
+    const parts = content.split(mentionRegex);
+
+    return parts.map((part, i) => {
+      if (part.startsWith("@")) {
+        return (
+          <span
+            key={i}
+            className="text-amber-400 font-bold bg-amber-400/10 px-1 py-0.5 rounded-sm hover:underline cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              const username = part.slice(1);
+              setNewComment((prev) => `${prev} @${username} `);
+              inputRef.current?.focus();
+            }}
+          >
+            {part}
+          </span>
+        );
+      }
+      return part;
+    });
   };
 
   if (!isOpen) return null;
@@ -300,111 +584,226 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
     const isMine = currentUser?.id === c.author_id;
     const isEditing = editingCommentId === c.id;
     const hasTaggedRow = typeof c.guess_index === "number" && c.guess_index > 0;
+    const isSwipingThis = swipingCommentId === c.id;
+    const isPickerActive = activeReactionPickerCommentId === c.id;
+
+    // Reactions calculations
+    const cReactions = commentReactions.filter((r) => r.comment_id === c.id);
+    const reactionCounts = EMOJIS.map((emoji) => ({
+      emoji,
+      count: cReactions.filter((r) => r.reaction === emoji).length,
+      hasReacted: cReactions.some((r) => r.user_id === currentUser?.id && r.reaction === emoji),
+    })).filter((r) => r.count > 0);
 
     return (
-      <div
-        key={c.id}
-        className={`rounded-xl p-2.5 flex flex-col gap-1 text-xs transition-colors ${
-          isReply
-            ? "bg-white/[0.03] border border-white/5"
-            : "bg-white/5 border border-white/5"
-        }`}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="font-bold text-gray-200 text-[11px]">
-              @{formatUsername(c.author_username || "Player")}
-            </span>
-            {isMine && (
-              <span className="text-[9px] text-amber-400 uppercase font-mono font-bold">
-                (You)
-              </span>
-            )}
-            {hasTaggedRow && (
-              <span className="text-[9px] bg-amber-400/15 border border-amber-400/30 text-amber-300 font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1">
-                <Tag size={9} />
-                Row {c.guess_index}
-              </span>
-            )}
-            {c.is_edited && !c.is_deleted && (
-              <span className="text-[8px] bg-white/10 px-1 py-0.5 rounded-sm text-gray-400 uppercase font-bold">
-                Edited
-              </span>
-            )}
+      <div key={c.id} className="relative group">
+        {/* Swipe-to-reply background icon indicator */}
+        {isSwipingThis && swipeOffset > 10 && (
+          <div className="absolute left-2 top-1/2 -translate-y-1/2 text-amber-400 flex items-center gap-1 text-[11px] font-bold animate-in fade-in">
+            <CornerDownRight size={14} />
+            <span>Reply</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[9px] text-gray-500 font-mono">
-              {new Date(c.created_at).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-            {isMine && !c.is_deleted && (
-              <div className="flex items-center gap-1 ml-1">
-                <button
-                  onClick={() => handleStartEdit(c)}
-                  className="text-gray-400 hover:text-white p-1 hover:bg-white/5 rounded transition-colors cursor-pointer"
-                  title="Edit comment"
-                >
-                  <Edit2 size={12} />
-                </button>
-                <button
-                  onClick={() => handleDelete(c.id)}
-                  className="text-gray-400 hover:text-rose-400 p-1 hover:bg-white/5 rounded transition-colors cursor-pointer"
-                  title="Delete comment"
-                >
-                  <Trash2 size={12} />
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {isEditing ? (
-          <div className="flex flex-col gap-1.5 mt-1.5">
-            <input
-              type="text"
-              value={editCommentText}
-              onChange={(e) => setEditCommentText(e.target.value)}
-              className="bg-black/60 border border-amber-400/50 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none"
-            />
-            <div className="flex gap-1.5 justify-end">
-              <button
-                onClick={() => setEditingCommentId(null)}
-                className="text-[9px] uppercase font-bold text-gray-400 hover:text-white px-2 py-1 bg-white/5 rounded-md cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleSaveEdit(c.id)}
-                className="text-[9px] uppercase font-bold text-black px-2.5 py-1 bg-amber-400 hover:bg-amber-300 rounded-md cursor-pointer flex items-center gap-1"
-              >
-                <Check size={10} /> Save
-              </button>
-            </div>
-          </div>
-        ) : (
-          <p
-            className={`font-medium break-words leading-relaxed text-xs ${
-              c.is_deleted ? "text-gray-500 italic" : "text-gray-200"
-            }`}
-          >
-            {c.content}
-          </p>
         )}
 
-        {/* Reply Action button */}
-        {currentUser && !c.is_deleted && (
-          <div className="flex items-center justify-start mt-1 pt-1 border-t border-white/5">
+        {/* Reaction Picker Popover (via Long Press or Smile Button) */}
+        {isPickerActive && (
+          <div
+            className="absolute right-2 -top-9 bg-gray-950/95 border border-amber-400/40 rounded-full px-2.5 py-1 flex items-center gap-1.5 z-50 shadow-[0_10px_25px_rgba(0,0,0,0.8)] backdrop-blur-md animate-in zoom-in-90 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {EMOJIS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => handleCommentReact(c.id, emoji)}
+                className="text-base p-1 hover:scale-130 active:scale-95 transition-transform cursor-pointer"
+              >
+                {emoji}
+              </button>
+            ))}
             <button
-              onClick={() => handleStartReply(c)}
-              className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-amber-300 transition-colors cursor-pointer"
+              type="button"
+              onClick={() => setActiveReactionPickerCommentId(null)}
+              className="text-gray-400 hover:text-white p-0.5 ml-0.5 cursor-pointer"
+              title="Close reaction picker"
             >
-              <CornerDownRight size={11} />
-              <span>Reply</span>
+              <X size={12} />
             </button>
           </div>
         )}
+
+        <div
+          style={{
+            transform: isSwipingThis ? `translateX(${swipeOffset}px)` : undefined,
+            transition: isSwipingThis ? "none" : "transform 0.2s ease-out",
+          }}
+          onTouchStart={(e) => handleTouchStart(c.id, e)}
+          onTouchMove={(e) => handleTouchMove(c, e)}
+          onTouchEnd={() => handleTouchEnd(c)}
+          onMouseDown={(e) => handleTouchStart(c.id, e)}
+          onMouseUp={() => handleTouchEnd(c)}
+          onMouseLeave={() => handleTouchEnd(c)}
+          className={`rounded-2xl p-3 flex flex-col gap-1 text-xs transition-all relative select-none ${
+            isReply
+              ? "bg-[#161c28] border border-cyan-500/20 shadow-[0_2px_8px_rgba(6,182,212,0.04)]"
+              : "bg-[#1c1829] border border-purple-500/25 shadow-[0_3px_12px_rgba(168,85,247,0.06)]"
+          } ${isPickerActive ? "ring-2 ring-amber-400/60" : ""}`}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span
+                className={`font-black text-[11px] ${
+                  isReply ? "text-cyan-300" : "text-purple-200"
+                }`}
+              >
+                @{formatUsername(c.author_username || "Player")}
+              </span>
+              {isReply && (
+                <span className="text-[8px] bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-bold px-1.5 py-0.2 rounded-full uppercase tracking-wider">
+                  Reply
+                </span>
+              )}
+              {isMine && (
+                <span className="text-[9px] text-amber-400 uppercase font-mono font-bold">
+                  (You)
+                </span>
+              )}
+              {hasTaggedRow && (
+                <span className="text-[9px] bg-amber-400/15 border border-amber-400/30 text-amber-300 font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                  <Tag size={9} />
+                  Row {c.guess_index}
+                </span>
+              )}
+              {c.is_edited && !c.is_deleted && (
+                <span className="text-[8px] bg-white/10 px-1 py-0.5 rounded-sm text-gray-400 uppercase font-bold">
+                  Edited
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] text-gray-400 font-mono">
+                {new Date(c.created_at).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+              {isMine && !c.is_deleted && (
+                <div className="flex items-center gap-1 ml-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleStartEdit(c);
+                    }}
+                    className="text-gray-400 hover:text-white p-1 hover:bg-white/5 rounded transition-colors cursor-pointer"
+                    title="Edit comment"
+                  >
+                    <Edit2 size={12} />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(c.id);
+                    }}
+                    className="text-gray-400 hover:text-rose-400 p-1 hover:bg-white/5 rounded transition-colors cursor-pointer"
+                    title="Delete comment"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {isEditing ? (
+            <div className="flex flex-col gap-1.5 mt-1.5" onClick={(e) => e.stopPropagation()}>
+              <input
+                type="text"
+                value={editCommentText}
+                onChange={(e) => setEditCommentText(e.target.value)}
+                className="bg-black/60 border border-amber-400/50 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none"
+              />
+              <div className="flex gap-1.5 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setEditingCommentId(null)}
+                  className="text-[9px] uppercase font-bold text-gray-400 hover:text-white px-2 py-1 bg-white/5 rounded-md cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSaveEdit(c.id)}
+                  className="text-[9px] uppercase font-bold text-black px-2.5 py-1 bg-amber-400 hover:bg-amber-300 rounded-md cursor-pointer flex items-center gap-1"
+                >
+                  <Check size={10} /> Save
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p
+              className={`font-medium wrap-break-word leading-relaxed text-xs py-2 border-t border-white/5 text-left ${
+                c.is_deleted ? "text-gray-500 italic" : "text-gray-100"
+              }`}
+            >
+              {c.is_deleted ? c.content : renderFormattedContent(c.content)}
+            </p>
+          )}
+
+          {/* Emoji Reactions List on Comment */}
+          {reactionCounts.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+              {reactionCounts.map(({ emoji, count, hasReacted }) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCommentReact(c.id, emoji);
+                  }}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold transition-all cursor-pointer ${
+                    hasReacted
+                      ? "bg-amber-400/20 border border-amber-400/50 text-amber-300 shadow-[0_0_8px_rgba(251,191,36,0.2)]"
+                      : "bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10"
+                  }`}
+                >
+                  <span>{emoji}</span>
+                  <span>{count}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Action footer: reply & quick reaction trigger */}
+          {currentUser && !c.is_deleted && (
+            <div
+              className="flex items-center justify-between mt-1 pt-1.5 border-t border-white/5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => handleStartReply(c)}
+                className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-amber-300 transition-colors cursor-pointer"
+                title="Tap or swipe right to reply"
+              >
+                <CornerDownRight size={11} />
+                <span>Reply</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveReactionPickerCommentId(
+                    activeReactionPickerCommentId === c.id ? null : c.id
+                  )
+                }
+                className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-amber-400 p-1 hover:bg-white/5 rounded transition-colors cursor-pointer"
+                title="Hold or tap to react"
+              >
+                <Smile size={12} />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -492,8 +891,8 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
                           status === "correct"
                             ? "bg-emerald-500 text-white"
                             : status === "present"
-                            ? "bg-amber-400 text-black"
-                            : "bg-gray-700 text-white";
+                              ? "bg-amber-400 text-black"
+                              : "bg-gray-700 text-white";
                         return (
                           <span
                             key={cIdx}
@@ -552,7 +951,7 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
 
                   {/* Threaded nested replies */}
                   {replies.length > 0 && (
-                    <div className="pl-3.5 ml-2.5 border-l-2 border-amber-400/20 space-y-2">
+                    <div className="pl-3.5 ml-2.5 border-l-2 border-cyan-500/30 space-y-2">
                       {replies.map((reply) => renderCommentCard(reply, true))}
                     </div>
                   )}
@@ -564,17 +963,28 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
 
         {/* Form input */}
         {canViewGuesses ? (
-          <div className="pt-2.5 border-t border-gray-800 shrink-0 flex flex-col gap-1.5">
+          <div className="pt-2.5 border-t border-gray-800 shrink-0 flex flex-col gap-1.5 relative">
+            {/* User mention autocompletion dropdown */}
+            {mentionState?.isVisible && (
+              <UserSuggestions
+                users={allUsers}
+                filter={mentionState.filter}
+                onSelect={handleSelectMention}
+                isVisible={mentionState.isVisible}
+                currentInput={newComment}
+              />
+            )}
+
             {/* Banner showing active Tagged Row or Reply To */}
             {(taggedRow !== null || replyTo !== null) && (
               <div className="flex items-center justify-between bg-black/40 border border-white/10 rounded-xl px-2.5 py-1 text-[10px]">
                 <div className="flex items-center gap-2 flex-wrap">
                   {replyTo && (
                     <span className="flex items-center gap-1 text-gray-300">
-                      <CornerDownRight size={10} className="text-amber-400" />
+                      <CornerDownRight size={10} className="text-cyan-400" />
                       <span>
                         Replying to{" "}
-                        <span className="text-amber-300 font-bold">
+                        <span className="text-cyan-300 font-bold">
                           @{formatUsername(replyTo.author_username || "")}
                         </span>
                       </span>
@@ -629,15 +1039,15 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
                   ref={inputRef}
                   type="text"
                   value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
+                  onChange={handleInputChange}
                   placeholder={
                     replyTo
                       ? `Reply to @${formatUsername(replyTo.author_username || "Player")}...`
                       : taggedRow !== null
-                      ? `Comment on Row ${taggedRow}...`
-                      : currentUser
-                      ? "Drop a reaction or roast..."
-                      : "Log in to join the banter"
+                        ? `Comment on Row ${taggedRow}...`
+                        : currentUser
+                          ? "Drop a reaction or roast (type @ to tag)..."
+                          : "Log in to join the banter"
                   }
                   disabled={!currentUser || submitting}
                   maxLength={280}
@@ -670,3 +1080,4 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
     </div>
   );
 };
+

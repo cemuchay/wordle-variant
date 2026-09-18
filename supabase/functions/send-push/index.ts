@@ -51,6 +51,8 @@ Deno.serve(async (req) => {
             }
          } else if (record.type === 'LEADERBOARD_OVERTAKEN') {
             targetUrl = '/?open=leaderboard';
+         } else if (record.type === 'NEW_COMMENT') {
+            targetUrl = '/?open=leaderboard';
          } else if (record.type === 'ADMIN_BROADCAST') {
             targetUrl = record.data?.url || record.data?.action_url || '/';
          }
