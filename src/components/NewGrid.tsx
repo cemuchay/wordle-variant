@@ -256,7 +256,7 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
   const isGameOver = isWon || isLost;
   const empties = (isGameOver && isBoardCollapsed)
     ? 0
-    : Math.max(0, maxAttempts - guesses.length - (revealingRowIndex !== null ? 0 : 1));
+    : Math.max(0, maxAttempts - guesses.length - (!isGameOver && revealingRowIndex === null ? 1 : 0));
 
   const lastGuess = guesses[guesses.length - 1];
   let hasRepeatedLetters = false;
@@ -665,7 +665,7 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
           })}
 
           {/* Current Guess Row */}
-          {guesses.length < maxAttempts && revealingRowIndex === null && (
+          {!isGameOver && guesses.length < maxAttempts && revealingRowIndex === null && (
             <div ref={currentRowRef} className="flex items-center gap-2">
               {maxAttempts > 6 && (
                 <div className="w-6 text-[9px] font-black text-white/20 text-right shrink-0">

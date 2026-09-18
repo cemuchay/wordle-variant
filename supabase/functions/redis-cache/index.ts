@@ -135,6 +135,28 @@ serve(async (req) => {
 
       if (error) throw error;
 
+      // For daily views (today / yesterday), batch fetch guesses from scores table for instant zero-waterfall UI rendering
+      const userGuessesMap = new Map<string, any[]>();
+      if (isDailyView && data && data.length > 0) {
+        const userIds = data.map((entry: any) => entry.user_id).filter(Boolean);
+        const targetDate = timeframe === "today" ? getLagosDate(date, 0) : getLagosDate(date, -1);
+        if (userIds.length > 0) {
+          const { data: scoreRecords } = await supabaseClient
+            .from("scores")
+            .select("user_id, guesses")
+            .eq("game_date", targetDate)
+            .in("user_id", userIds);
+
+          if (scoreRecords) {
+            for (const rec of scoreRecords) {
+              if (rec.user_id && rec.guesses) {
+                userGuessesMap.set(rec.user_id, rec.guesses);
+              }
+            }
+          }
+        }
+      }
+
       // TTL definitions:
       // today: 5s, yesterday: 86400s (24h), weekly: 300s (5m), monthly: 600s (10m)
       const ttlMap: Record<string, number> = {
@@ -156,6 +178,7 @@ serve(async (req) => {
         status: entry.status,
         days_active: entry.days_active ?? 0,
         user_id: entry.user_id ?? null,
+        guesses: entry.user_id ? (userGuessesMap.get(entry.user_id) || []) : [],
       }));
 
       // Cache it
