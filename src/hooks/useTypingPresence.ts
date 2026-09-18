@@ -34,7 +34,7 @@ export function useTypingPresence(
    useEffect(() => {
       if (!groupId || !selfId || !enabled) return;
 
-      const channel = supabase.channel(`chat_room_${groupId}`, {
+      const channel = supabase.channel(`chat_presence_${groupId}`, {
          config: { presence: { key: selfId } },
       });
 
@@ -59,6 +59,9 @@ export function useTypingPresence(
       channelRef.current = channel;
 
       return () => {
+         if (isTypingRef.current) {
+            channel.track({ isTyping: false, username: usernameRef.current || "Someone", ts: Date.now() });
+         }
          supabase.removeChannel(channel);
          channelRef.current = null;
          if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
@@ -82,15 +85,14 @@ export function useTypingPresence(
          return;
       }
 
-      if (!isTypingRef.current) {
-         isTypingRef.current = true;
-         channel.track({ isTyping: true, username: uname, ts: Date.now() });
-      }
+      isTypingRef.current = true;
+      channel.track({ isTyping: true, username: uname, ts: Date.now() });
+
       if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
       clearTimerRef.current = window.setTimeout(() => {
          isTypingRef.current = false;
          channelRef.current?.track({ isTyping: false, username: uname, ts: Date.now() });
-      }, 2000);
+      }, 3000);
    }, []);
 
    // While disabled (overlay closed / no room selected) never report names

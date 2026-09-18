@@ -1272,11 +1272,12 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
    const visitedGroupsRef = useRef<Set<string>>(new Set());
 
    // Typing presence — subscribed only while a conversation is open
+   const isConversationOpen = !!selectedGroupId && (isFullMode || isOverlayOpen);
    const { typingNames, setSelfTyping } = useTypingPresence(
       selectedGroupId,
       user?.id,
-      isOverlayOpen && !!selectedGroupId && !isChatOpen,
-      profile?.username || null,
+      isConversationOpen,
+      profile?.username || user?.user_metadata?.username || null,
    );
 
    // Pause/clear inactivity timer while other users are typing
@@ -1288,7 +1289,7 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
       }
    }, [typingNames.length, isOverlayOpen]);
 
-   const peerReceipts = usePeerReceipts(selectedGroupId, user?.id, isOverlayOpen && !!selectedGroupId);
+   const peerReceipts = usePeerReceipts(selectedGroupId, user?.id, isConversationOpen);
    const [infoMsg, setInfoMsg] = useState<any>(null);
 
    // Mark all unread messages as read when the bubble overlay closes

@@ -9,19 +9,24 @@ interface TypingBubbleProps {
  */
 export default function TypingBubble({ name }: TypingBubbleProps) {
    return (
-      <div className="flex items-center gap-2 my-2">
-         <div className="bg-white/5 border border-white/10 px-3 py-2.5 rounded-2xl rounded-bl-md flex items-center gap-1">
-            {[0, 1, 2].map((i) => (
-               <span
-                  key={i}
-                  className="w-1.5 h-1.5 bg-white/50 rounded-full animate-bounce"
-                  style={{ animationDelay: `${i * 0.15}s` }}
-               />
-            ))}
+      <div className="flex items-center gap-2.5 my-2 animate-in fade-in slide-in-from-bottom-2 duration-200 select-none">
+         <div className="bg-white/10 border border-white/10 backdrop-blur-md px-3.5 py-2 rounded-2xl rounded-bl-xs flex items-center gap-1.5 shadow-sm">
+            <span
+               className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"
+               style={{ animationDelay: "0ms" }}
+            />
+            <span
+               className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"
+               style={{ animationDelay: "150ms" }}
+            />
+            <span
+               className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"
+               style={{ animationDelay: "300ms" }}
+            />
          </div>
          {name && (
-            <span className="text-[9px] font-bold uppercase tracking-wider text-white/40">
-               {name} {name.includes(",") ? "are" : "is"} typing…
+            <span className="text-[10px] font-semibold text-gray-400 tracking-wide">
+               <span className="text-gray-200 font-bold">{name}</span> {name.includes(",") ? "are" : "is"} typing…
             </span>
          )}
       </div>
