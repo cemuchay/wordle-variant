@@ -21,6 +21,13 @@ import { fetchSocialActivities, type SocialActivityItem } from "../../services/s
 import type { AppUser, LeaderboardEntry } from "../../types/game";
 import formatUsername from "../../utils/formatUsername";
 import { safeSessionStorage } from "../../utils/storage";
+import {
+  cleanStaleLeaderboardSnapshots,
+  computeLeaderboardMovement,
+  getLeaderboardSnapshot,
+  saveLeaderboardSnapshot,
+  type RankMovementInfo,
+} from "../../utils/leaderboardSnapshotUtils";
 import { LeaderboardSkeleton } from "../common/Skeletons";
 import GuessPreviewModal from "../guess-preview";
 import { StreakCounter } from "../StreakCounter";
@@ -483,6 +490,40 @@ export const SocialStatsModal: React.FC<Props> = ({
     });
   }, [leaderboard]);
 
+  // Rank movement tracking comparing current leaderboard with previous snapshot in localStorage
+  const [movementMap, setMovementMap] = useState<Map<string, RankMovementInfo>>(new Map());
+
+  useEffect(() => {
+    if (timeframe !== "today" || !currentDate || rankedLeaderboard.length === 0) {
+      setMovementMap(new Map());
+      return;
+    }
+
+    // 1. Purge snapshots older than 2 days
+    cleanStaleLeaderboardSnapshots(currentDate);
+
+    // 2. Read previous snapshot for today BEFORE updating it
+    const prevSnapshot = getLeaderboardSnapshot(currentDate);
+
+    // 3. Compute movements against previous snapshot
+    const movements = computeLeaderboardMovement(rankedLeaderboard, prevSnapshot);
+    setMovementMap(movements);
+
+    // 4. Save current snapshot to local storage for future comparisons
+    saveLeaderboardSnapshot(currentDate, rankedLeaderboard);
+  }, [rankedLeaderboard, timeframe, currentDate]);
+
+  // Partition playing vs completed entries for today's feed view
+  const playingFeedEntries = useMemo(() => {
+    if (timeframe !== "today") return [];
+    return rankedLeaderboard.filter(({ entry }) => entry.status === "playing");
+  }, [rankedLeaderboard, timeframe]);
+
+  const completedFeedEntries = useMemo(() => {
+    if (timeframe !== "today") return rankedLeaderboard;
+    return rankedLeaderboard.filter(({ entry }) => entry.status !== "playing");
+  }, [rankedLeaderboard, timeframe]);
+
   // Map of userId -> competition rank for quick lookup in Newsfeed cards
   const userRankMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -808,22 +849,78 @@ export const SocialStatsModal: React.FC<Props> = ({
               ) : supportsFeed && viewMode === "feed" ? (
                 /* Social Feed Doom-Scroll Stream with Tied Rank Skipping */
                 <div className="space-y-3 pb-6">
-                  {rankedLeaderboard.map(({ entry, rank }, i) => (
-                    <LeaderboardFeedCard
-                      key={`${entry.username}-${i}`}
-                      entry={entry}
-                      rank={rank}
-                      gameDate={targetLbDate}
-                      isCurrentUser={entry.user_id === user?.id}
-                      canViewGuesses={canViewGuess}
-                      hideGridWords={hideGridWords}
-                      onOpenPreview={handleOpenPreview}
-                    />
-                  ))}
+                  {playingFeedEntries.length > 0 && (
+                    <div className="space-y-2 mb-3 bg-cyan-950/15 p-2.5 rounded-2xl border border-cyan-500/20">
+                      <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                          <span className="text-[10px] font-black uppercase tracking-wider text-cyan-400">
+                            ⚡ In Progress / Playing Now ({playingFeedEntries.length})
+                          </span>
+                        </div>
+                        <span className="text-[9px] text-cyan-400/80 font-bold tracking-wider uppercase flex items-center gap-1">
+                          Swipe ➔
+                        </span>
+                      </div>
+                      <div className="flex overflow-x-auto gap-3 pb-2 pt-1 scrollbar-hide snap-x snap-mandatory">
+                        {playingFeedEntries.map(({ entry, rank }, i) => (
+                          <div
+                            key={`playing-${entry.username}-${i}`}
+                            className="w-[270px] sm:w-[290px] shrink-0 snap-start"
+                          >
+                            <LeaderboardFeedCard
+                              entry={entry}
+                              rank={rank}
+                              gameDate={targetLbDate}
+                              isCurrentUser={entry.user_id === user?.id}
+                              canViewGuesses={canViewGuess}
+                              hideGridWords={hideGridWords}
+                              movement={movementMap.get(entry.user_id || entry.username)}
+                              onOpenPreview={handleOpenPreview}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {completedFeedEntries.length > 0 && (
+                    <div className="space-y-3">
+                      {playingFeedEntries.length > 0 && (
+                        <div className="flex items-center gap-2 px-1 pt-2 pb-1">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                            🏆 Completed Standings ({completedFeedEntries.length})
+                          </span>
+                          <div className="h-px bg-gray-800 flex-1 ml-2" />
+                        </div>
+                      )}
+                      {completedFeedEntries.map(({ entry, rank }, i) => (
+                        <LeaderboardFeedCard
+                          key={`completed-${entry.username}-${i}`}
+                          entry={entry}
+                          rank={rank}
+                          gameDate={targetLbDate}
+                          isCurrentUser={entry.user_id === user?.id}
+                          canViewGuesses={canViewGuess}
+                          hideGridWords={hideGridWords}
+                          movement={movementMap.get(entry.user_id || entry.username)}
+                          onOpenPreview={handleOpenPreview}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               ) : (
                 /* Traditional Ranking Table with Tied Rank Skipping */
-                <SocialTable rankedLeaderboard={rankedLeaderboard} canViewGuess={canViewGuess} handleOpenPreview={handleOpenPreview} user={user} timeframe={timeframe} currentDate={currentDate} />
+                <SocialTable
+                  rankedLeaderboard={rankedLeaderboard}
+                  canViewGuess={canViewGuess}
+                  handleOpenPreview={handleOpenPreview}
+                  user={user}
+                  timeframe={timeframe}
+                  currentDate={currentDate}
+                  movementMap={movementMap}
+                />
               )}
             </div>
           )}
