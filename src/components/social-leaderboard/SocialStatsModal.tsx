@@ -21,6 +21,13 @@ import { fetchSocialActivities, type SocialActivityItem } from "../../services/s
 import type { AppUser, LeaderboardEntry } from "../../types/game";
 import formatUsername from "../../utils/formatUsername";
 import { safeSessionStorage } from "../../utils/storage";
+import {
+  cleanStaleLeaderboardSnapshots,
+  computeLeaderboardMovement,
+  getLeaderboardSnapshot,
+  saveLeaderboardSnapshot,
+  type RankMovementInfo,
+} from "../../utils/leaderboardSnapshotUtils";
 import { LeaderboardSkeleton } from "../common/Skeletons";
 import GuessPreviewModal from "../guess-preview";
 import { StreakCounter } from "../StreakCounter";
@@ -28,6 +35,7 @@ import SocialTable from "./components/SocialTable";
 import StatItem from "./components/StatItem";
 import { LeaderboardFeedCard } from "./LeaderboardFeedCard";
 import { SocialActivityCard } from "./SocialActivityCard";
+import { FeedCommentDrawer } from "./FeedCommentDrawer";
 
 type Timeframe = "today" | "yesterday" | "weekly" | "monthly";
 type ViewMode = "table" | "feed" | "newsfeed";
@@ -48,6 +56,7 @@ interface Props {
   stats: GameStats;
   isGameOver: boolean;
   initialTab?: "stats" | "leaderboard";
+  initialCommentTarget?: any | null;
   inline?: boolean;
 }
 
@@ -58,6 +67,7 @@ export const SocialStatsModal: React.FC<Props> = ({
   stats,
   isGameOver,
   initialTab = "leaderboard",
+  initialCommentTarget,
   inline = false,
 }) => {
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
@@ -84,6 +94,15 @@ export const SocialStatsModal: React.FC<Props> = ({
   const [selectedEntryIndex, setSelectedEntryIndex] = useState<number | null>(null);
   const [initialOpenAnalysis, setInitialOpenAnalysis] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
+  const [activeCommentDrawer, setActiveCommentDrawer] = useState<{
+    targetUserId: string;
+    targetUsername: string;
+    gameDate: string;
+    rawGuesses?: any[];
+    status?: "won" | "lost" | "playing";
+    attempts?: number | "X";
+    wordLength?: number;
+  } | null>(null);
 
   const { date: currentDate, triggerToast } = useApp();
   const fetchIdRef = useRef(0);
@@ -376,6 +395,82 @@ export const SocialStatsModal: React.FC<Props> = ({
     };
   }, [isOpen, currentDate, fetchLeaderboard, triggerToast]);
 
+  // Listen to open-stats-modal event with commentTarget
+  useEffect(() => {
+    const handleOpenStatsEvent = async (e: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+
+      if (detail?.tab) {
+        setActiveTab(detail.tab);
+      }
+      if (detail?.commentTarget) {
+        const { targetUserId, gameDate } = detail.commentTarget;
+        const effectiveDate = gameDate || currentDate;
+
+        if (targetUserId && effectiveDate) {
+          try {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("username")
+              .eq("id", targetUserId)
+              .maybeSingle();
+
+            setActiveCommentDrawer({
+              targetUserId,
+              targetUsername: profile?.username || "Player",
+              gameDate: effectiveDate,
+            });
+          } catch (err) {
+            console.error("Failed to load profile for comment target:", err);
+            setActiveCommentDrawer({
+              targetUserId,
+              targetUsername: "Player",
+              gameDate: effectiveDate,
+            });
+          }
+        }
+      }
+    };
+
+    window.addEventListener("open-stats-modal", handleOpenStatsEvent);
+    return () => {
+      window.removeEventListener("open-stats-modal", handleOpenStatsEvent);
+    };
+  }, [currentDate]);
+
+  // Handle initialCommentTarget prop when modal mounts / prop updates
+  useEffect(() => {
+    if (!isOpen || !initialCommentTarget) return;
+
+    const { targetUserId, gameDate } = initialCommentTarget;
+    const effectiveDate = gameDate || currentDate;
+
+    if (targetUserId && effectiveDate) {
+      (async () => {
+        try {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("username")
+            .eq("id", targetUserId)
+            .maybeSingle();
+
+          setActiveCommentDrawer({
+            targetUserId,
+            targetUsername: profile?.username || "Player",
+            gameDate: effectiveDate,
+          });
+        } catch (err) {
+          console.error("Failed to load profile from prop target:", err);
+          setActiveCommentDrawer({
+            targetUserId,
+            targetUsername: "Player",
+            gameDate: effectiveDate,
+          });
+        }
+      })();
+    }
+  }, [isOpen, initialCommentTarget, currentDate]);
+
   const maxGuesses = useMemo(() => {
     return Math.max(...Object.values(stats.guesses), 1);
   }, [stats.guesses]);
@@ -395,6 +490,40 @@ export const SocialStatsModal: React.FC<Props> = ({
     });
   }, [leaderboard]);
 
+  // Rank movement tracking comparing current leaderboard with previous snapshot in localStorage
+  const [movementMap, setMovementMap] = useState<Map<string, RankMovementInfo>>(new Map());
+
+  useEffect(() => {
+    if (timeframe !== "today" || !currentDate || rankedLeaderboard.length === 0) {
+      setMovementMap(new Map());
+      return;
+    }
+
+    // 1. Purge snapshots older than 2 days
+    cleanStaleLeaderboardSnapshots(currentDate);
+
+    // 2. Read previous snapshot for today BEFORE updating it
+    const prevSnapshot = getLeaderboardSnapshot(currentDate);
+
+    // 3. Compute movements against previous snapshot
+    const movements = computeLeaderboardMovement(rankedLeaderboard, prevSnapshot);
+    setMovementMap(movements);
+
+    // 4. Save current snapshot to local storage for future comparisons
+    saveLeaderboardSnapshot(currentDate, rankedLeaderboard);
+  }, [rankedLeaderboard, timeframe, currentDate]);
+
+  // Partition playing vs completed entries for today's feed view
+  const playingFeedEntries = useMemo(() => {
+    if (timeframe !== "today") return [];
+    return rankedLeaderboard.filter(({ entry }) => entry.status === "playing");
+  }, [rankedLeaderboard, timeframe]);
+
+  const completedFeedEntries = useMemo(() => {
+    if (timeframe !== "today") return rankedLeaderboard;
+    return rankedLeaderboard.filter(({ entry }) => entry.status !== "playing");
+  }, [rankedLeaderboard, timeframe]);
+
   // Map of userId -> competition rank for quick lookup in Newsfeed cards
   const userRankMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -412,6 +541,10 @@ export const SocialStatsModal: React.FC<Props> = ({
       : null;
 
   const handleOpenPreview = (entry: LeaderboardEntry, openAnalysis = false) => {
+    if (!canViewGuess) {
+      triggerToast("Solve today's puzzle to unlock guess previews!", TOAST_DURATION.SHORT);
+      return;
+    }
     const idx = leaderboard.findIndex((e) => e.username === entry.username);
     setSelectedEntryIndex(idx >= 0 ? idx : 0);
     setInitialOpenAnalysis(openAnalysis);
@@ -716,22 +849,78 @@ export const SocialStatsModal: React.FC<Props> = ({
               ) : supportsFeed && viewMode === "feed" ? (
                 /* Social Feed Doom-Scroll Stream with Tied Rank Skipping */
                 <div className="space-y-3 pb-6">
-                  {rankedLeaderboard.map(({ entry, rank }, i) => (
-                    <LeaderboardFeedCard
-                      key={`${entry.username}-${i}`}
-                      entry={entry}
-                      rank={rank}
-                      gameDate={targetLbDate}
-                      isCurrentUser={entry.user_id === user?.id}
-                      canViewGuesses={canViewGuess}
-                      hideGridWords={hideGridWords}
-                      onOpenPreview={handleOpenPreview}
-                    />
-                  ))}
+                  {playingFeedEntries.length > 0 && (
+                    <div className="space-y-2 mb-3 bg-cyan-950/15 p-2.5 rounded-2xl border border-cyan-500/20">
+                      <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                          <span className="text-[10px] font-black uppercase tracking-wider text-cyan-400">
+                            ⚡ In Progress / Playing Now ({playingFeedEntries.length})
+                          </span>
+                        </div>
+                        <span className="text-[9px] text-cyan-400/80 font-bold tracking-wider uppercase flex items-center gap-1">
+                          Swipe ➔
+                        </span>
+                      </div>
+                      <div className="flex overflow-x-auto gap-3 pb-2 pt-1 scrollbar-hide snap-x snap-mandatory">
+                        {playingFeedEntries.map(({ entry, rank }, i) => (
+                          <div
+                            key={`playing-${entry.username}-${i}`}
+                            className="w-[270px] sm:w-[290px] shrink-0 snap-start"
+                          >
+                            <LeaderboardFeedCard
+                              entry={entry}
+                              rank={rank}
+                              gameDate={targetLbDate}
+                              isCurrentUser={entry.user_id === user?.id}
+                              canViewGuesses={canViewGuess}
+                              hideGridWords={hideGridWords}
+                              movement={movementMap.get(entry.user_id || entry.username)}
+                              onOpenPreview={handleOpenPreview}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {completedFeedEntries.length > 0 && (
+                    <div className="space-y-3">
+                      {playingFeedEntries.length > 0 && (
+                        <div className="flex items-center gap-2 px-1 pt-2 pb-1">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                            🏆 Completed Standings ({completedFeedEntries.length})
+                          </span>
+                          <div className="h-px bg-gray-800 flex-1 ml-2" />
+                        </div>
+                      )}
+                      {completedFeedEntries.map(({ entry, rank }, i) => (
+                        <LeaderboardFeedCard
+                          key={`completed-${entry.username}-${i}`}
+                          entry={entry}
+                          rank={rank}
+                          gameDate={targetLbDate}
+                          isCurrentUser={entry.user_id === user?.id}
+                          canViewGuesses={canViewGuess}
+                          hideGridWords={hideGridWords}
+                          movement={movementMap.get(entry.user_id || entry.username)}
+                          onOpenPreview={handleOpenPreview}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               ) : (
                 /* Traditional Ranking Table with Tied Rank Skipping */
-                <SocialTable rankedLeaderboard={rankedLeaderboard} canViewGuess={canViewGuess} handleOpenPreview={handleOpenPreview} user={user} timeframe={timeframe} currentDate={currentDate} />
+                <SocialTable
+                  rankedLeaderboard={rankedLeaderboard}
+                  canViewGuess={canViewGuess}
+                  handleOpenPreview={handleOpenPreview}
+                  user={user}
+                  timeframe={timeframe}
+                  currentDate={currentDate}
+                  movementMap={movementMap}
+                />
               )}
             </div>
           )}
@@ -750,6 +939,23 @@ export const SocialStatsModal: React.FC<Props> = ({
               initialOpenAnalysis={initialOpenAnalysis}
             />
           </div>
+        )}
+
+        {/* Global Slide-up Comments Drawer (e.g. from Notifications) */}
+        {activeCommentDrawer && (
+          <FeedCommentDrawer
+            isOpen={!!activeCommentDrawer}
+            onClose={() => setActiveCommentDrawer(null)}
+            targetUserId={activeCommentDrawer.targetUserId}
+            targetUsername={activeCommentDrawer.targetUsername}
+            gameDate={activeCommentDrawer.gameDate}
+            canViewGuesses={canViewGuess}
+            hideGridWords={hideGridWords}
+            rawGuesses={activeCommentDrawer.rawGuesses}
+            status={activeCommentDrawer.status}
+            attempts={activeCommentDrawer.attempts}
+            wordLength={activeCommentDrawer.wordLength}
+          />
         )}
       </div>
     </div>

@@ -1,10 +1,232 @@
 import { memo, useMemo, useState, useEffect, useCallback } from 'react';
-import { X, Bell, Trash2, BellOff, Mail, MailOpen, CheckCheck } from 'lucide-react';
+import {
+    X,
+    Bell,
+    Trash2,
+    BellOff,
+    Mail,
+    MailOpen,
+    CheckCheck,
+    Swords,
+    Trophy,
+    MessageCircle,
+    UserPlus,
+    Flame,
+    Bot,
+    Radio,
+    Sparkles,
+    Grid3X3,
+    Gamepad2,
+    AtSign
+} from 'lucide-react';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useApp } from '../../context/AppContext';
 import { useAppStore } from '../../store/useAppStore';
 import { ModalLayout } from '../layout/ModalLayout';
 import { type AppNotification } from '../../types/notifications';
+
+interface NotificationTheme {
+    border: string;
+    borderLeft: string;
+    bgUnread: string;
+    bgRead: string;
+    badgeBg: string;
+    badgeText: string;
+    accentText: string;
+    iconBg: string;
+    iconColor: string;
+    IconComponent: any;
+    typeName: string;
+}
+
+const getNotificationTheme = (type: string, data?: Record<string, any>): NotificationTheme => {
+    // WordGrid Notifications (Indigo / Cyan / Violet)
+    if (data?.mode === 'wordgrid' || type?.startsWith('WORDGRID')) {
+        return {
+            border: 'border-indigo-500/25',
+            borderLeft: 'border-l-indigo-400',
+            bgUnread: 'bg-linear-to-r from-indigo-950/60 via-slate-900/90 to-indigo-950/30',
+            bgRead: 'bg-linear-to-r from-indigo-950/20 via-slate-900/60 to-slate-900/40',
+            badgeBg: 'bg-indigo-500/25 border-indigo-500/40',
+            badgeText: 'text-indigo-200',
+            accentText: 'text-indigo-400',
+            iconBg: 'bg-indigo-500/20 border-indigo-500/30',
+            iconColor: 'text-indigo-300',
+            IconComponent: Grid3X3,
+            typeName: 'WordGrid',
+        };
+    }
+
+    switch (type) {
+        // 🔴 RED / ROSE: High-stakes Alerts & Broadcasts
+        case 'BOT_MARATHON_FINALE':
+        case 'ADMIN_BROADCAST':
+            return {
+                border: 'border-rose-500/25',
+                borderLeft: 'border-l-rose-500',
+                bgUnread: 'bg-linear-to-r from-rose-950/60 via-slate-900/90 to-rose-950/30',
+                bgRead: 'bg-linear-to-r from-rose-950/20 via-slate-900/60 to-slate-900/40',
+                badgeBg: 'bg-rose-500/25 border-rose-500/40',
+                badgeText: 'text-rose-200',
+                accentText: 'text-rose-400',
+                iconBg: 'bg-rose-500/20 border-rose-500/30',
+                iconColor: 'text-rose-300',
+                IconComponent: Radio,
+                typeName: 'Announcement',
+            };
+
+        // 🟠 ORANGE: Direct PvP Challenges & Invites
+        case 'CHALLENGE_INVITE':
+        case 'CHALLENGE_STARTED':
+            return {
+                border: 'border-orange-500/25',
+                borderLeft: 'border-l-orange-500',
+                bgUnread: 'bg-linear-to-r from-orange-950/60 via-slate-900/90 to-orange-950/30',
+                bgRead: 'bg-linear-to-r from-orange-950/20 via-slate-900/60 to-slate-900/40',
+                badgeBg: 'bg-orange-500/25 border-orange-500/40',
+                badgeText: 'text-orange-200',
+                accentText: 'text-orange-400',
+                iconBg: 'bg-orange-500/20 border-orange-500/30',
+                iconColor: 'text-orange-300',
+                IconComponent: Swords,
+                typeName: 'PvP Challenge',
+            };
+
+        // 🟡 AMBER / YELLOW: Competitive Overtakes & Leaderboard Changes
+        case 'LEADERBOARD_OVERTAKEN':
+        case 'BOT_MARATHON_OVERTAKEN':
+            return {
+                border: 'border-amber-500/25',
+                borderLeft: 'border-l-amber-400',
+                bgUnread: 'bg-linear-to-r from-amber-950/60 via-slate-900/90 to-amber-950/30',
+                bgRead: 'bg-linear-to-r from-amber-950/20 via-slate-900/60 to-slate-900/40',
+                badgeBg: 'bg-amber-500/25 border-amber-500/40',
+                badgeText: 'text-amber-200',
+                accentText: 'text-amber-400',
+                iconBg: 'bg-amber-500/20 border-amber-500/30',
+                iconColor: 'text-amber-300',
+                IconComponent: Trophy,
+                typeName: 'Overtaken',
+            };
+
+        // 🟢 EMERALD / GREEN: Completed Games & Victories
+        case 'CHALLENGE_COMPLETED':
+        case 'MARATHON_GAME_COMPLETED':
+            return {
+                border: 'border-emerald-500/25',
+                borderLeft: 'border-l-emerald-500',
+                bgUnread: 'bg-linear-to-r from-emerald-950/60 via-slate-900/90 to-emerald-950/30',
+                bgRead: 'bg-linear-to-r from-emerald-950/20 via-slate-900/60 to-slate-900/40',
+                badgeBg: 'bg-emerald-500/25 border-emerald-500/40',
+                badgeText: 'text-emerald-200',
+                accentText: 'text-emerald-400',
+                iconBg: 'bg-emerald-500/20 border-emerald-500/30',
+                iconColor: 'text-emerald-300',
+                IconComponent: Sparkles,
+                typeName: 'Completed',
+            };
+
+        // 🩵 CYAN / TEAL: Social Follows & Friends
+        case 'NEW_FOLLOWER':
+        case 'FOLLOWEE_STARTED_PLAYING':
+        case 'FOLLOWEE_FINISHED_PLAYING':
+            return {
+                border: 'border-cyan-500/25',
+                borderLeft: 'border-l-cyan-400',
+                bgUnread: 'bg-linear-to-r from-cyan-950/60 via-slate-900/90 to-cyan-950/30',
+                bgRead: 'bg-linear-to-r from-cyan-950/20 via-slate-900/60 to-slate-900/40',
+                badgeBg: 'bg-cyan-500/25 border-cyan-500/40',
+                badgeText: 'text-cyan-200',
+                accentText: 'text-cyan-400',
+                iconBg: 'bg-cyan-500/20 border-cyan-500/30',
+                iconColor: 'text-cyan-300',
+                IconComponent: UserPlus,
+                typeName: 'Friend Alert',
+            };
+
+        // 🔵 BLUE: Direct Messages & Reminders
+        case 'DM_MESSAGE':
+        case 'DM_REMINDER':
+            return {
+                border: 'border-blue-500/25',
+                borderLeft: 'border-l-blue-500',
+                bgUnread: 'bg-linear-to-r from-blue-950/60 via-slate-900/90 to-blue-950/30',
+                bgRead: 'bg-linear-to-r from-blue-950/20 via-slate-900/60 to-slate-900/40',
+                badgeBg: 'bg-blue-500/25 border-blue-500/40',
+                badgeText: 'text-blue-200',
+                accentText: 'text-blue-400',
+                iconBg: 'bg-blue-500/20 border-blue-500/30',
+                iconColor: 'text-blue-300',
+                IconComponent: MessageCircle,
+                typeName: 'Direct Message',
+            };
+
+        case 'CHAT_MENTION':
+            return {
+                border: 'border-sky-500/25',
+                borderLeft: 'border-l-sky-400',
+                bgUnread: 'bg-linear-to-r from-sky-950/60 via-slate-900/90 to-sky-950/30',
+                bgRead: 'bg-linear-to-r from-sky-950/20 via-slate-900/60 to-slate-900/40',
+                badgeBg: 'bg-sky-500/25 border-sky-500/40',
+                badgeText: 'text-sky-200',
+                accentText: 'text-sky-400',
+                iconBg: 'bg-sky-500/20 border-sky-500/30',
+                iconColor: 'text-sky-300',
+                IconComponent: AtSign,
+                typeName: 'Chat Mention',
+            };
+
+        // 🟣 PURPLE / VIOLET: Bot Events & Daily Marathon Runs
+        case 'BOT_MARATHON_NEW':
+            return {
+                border: 'border-purple-500/25',
+                borderLeft: 'border-l-purple-500',
+                bgUnread: 'bg-linear-to-r from-purple-950/60 via-slate-900/90 to-purple-950/30',
+                bgRead: 'bg-linear-to-r from-purple-950/20 via-slate-900/60 to-slate-900/40',
+                badgeBg: 'bg-purple-500/25 border-purple-500/40',
+                badgeText: 'text-purple-200',
+                accentText: 'text-purple-400',
+                iconBg: 'bg-purple-500/20 border-purple-500/30',
+                iconColor: 'text-purple-300',
+                IconComponent: Bot,
+                typeName: 'Bot Marathon',
+            };
+
+        // 🌸 PINK / FUCHSIA: Comments & Social Reactions
+        case 'NEW_COMMENT':
+            return {
+                border: 'border-pink-500/25',
+                borderLeft: 'border-l-pink-500',
+                bgUnread: 'bg-linear-to-r from-pink-950/60 via-slate-900/90 to-pink-950/30',
+                bgRead: 'bg-linear-to-r from-pink-950/20 via-slate-900/60 to-slate-900/40',
+                badgeBg: 'bg-pink-500/25 border-pink-500/40',
+                badgeText: 'text-pink-200',
+                accentText: 'text-pink-400',
+                iconBg: 'bg-pink-500/20 border-pink-500/30',
+                iconColor: 'text-pink-300',
+                IconComponent: Flame,
+                typeName: 'Comment',
+            };
+
+        // ⚪ DEFAULT / SYSTEM
+        case 'SYSTEM':
+        case 'GENERAL':
+        default:
+            return {
+                border: 'border-indigo-500/20',
+                borderLeft: 'border-l-indigo-400',
+                bgUnread: 'bg-linear-to-r from-indigo-950/50 via-slate-900/90 to-indigo-950/20',
+                bgRead: 'bg-linear-to-r from-indigo-950/20 via-slate-900/60 to-slate-900/40',
+                badgeBg: 'bg-indigo-500/25 border-indigo-500/40',
+                badgeText: 'text-indigo-200',
+                accentText: 'text-indigo-400',
+                iconBg: 'bg-indigo-500/20 border-indigo-500/30',
+                iconColor: 'text-indigo-300',
+                IconComponent: Gamepad2,
+                typeName: 'System',
+            };
+    }
+};
 
 const NotificationItem = memo(({
     notification,
@@ -23,58 +245,82 @@ const NotificationItem = memo(({
 }) => {
     const isUnread = !notification.is_read;
     const isNew = isSessionNew;
+    const theme = getNotificationTheme(notification.type, notification.data);
+    const Icon = theme.IconComponent;
 
     return (
         <div
             onClick={onClick ? () => onClick(notification) : undefined}
-            className={`p-4 rounded-2xl border transition-colors ${onClick ? 'cursor-pointer hover:bg-white/10 hover:border-white/20 active:scale-[0.98]' : ''
+            className={`p-3.5 sm:p-4 rounded-2xl border transition-all duration-200 relative overflow-hidden backdrop-blur-xs ${onClick ? 'cursor-pointer hover:brightness-110 active:scale-[0.98]' : ''
                 } ${isNew
-                    ? 'bg-white/8 border-l-4 border-l-correct border-y-white/10 border-r-white/10 shadow-lg shadow-black/30'
+                    ? `${theme.bgUnread} ${theme.border} border-l-4 ${theme.borderLeft} shadow-lg shadow-black/40`
                     : isUnread
-                        ? 'bg-white/6 border-l-4 border-l-blue-500 border-y-white/10 border-r-white/10 shadow-md shadow-black/20'
-                        : 'bg-white/3 border-white/5 opacity-90'
+                        ? `${theme.bgUnread} ${theme.border} border-l-4 ${theme.borderLeft} shadow-md shadow-black/30`
+                        : `${theme.bgRead} border-white/5 opacity-85 hover:opacity-100`
                 }`}
         >
             <div className="flex justify-between items-start gap-3">
-                <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
+                {/* Left Type Icon Badge */}
+                <div className={`p-2 rounded-xl shrink-0 ${theme.iconBg} ${theme.iconColor} border border-white/5 mt-0.5`}>
+                    <Icon size={16} />
+                </div>
+
+                <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                        {/* Type Rainbow Pill */}
+                        <span className={`px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider rounded-md border border-white/10 ${theme.badgeBg} ${theme.badgeText}`}>
+                            {theme.typeName}
+                        </span>
+
                         {isNew ? (
-                            <span className="px-1.5 py-0.5 text-[9px] font-black bg-correct text-black rounded-md uppercase tracking-wider">New</span>
+                            <span className="px-1.5 py-0.5 text-[8px] font-black bg-correct text-black rounded-md uppercase tracking-wider shadow-xs">
+                                New
+                            </span>
                         ) : isUnread ? (
-                            <span className="px-1.5 py-0.5 text-[9px] font-black bg-blue-500 text-white rounded-md uppercase tracking-wider">Reminder</span>
+                            <span className="px-1.5 py-0.5 text-[8px] font-black bg-blue-500 text-white rounded-md uppercase tracking-wider shadow-xs">
+                                Unread
+                            </span>
                         ) : null}
-                        <h4 className="text-sm font-extrabold uppercase tracking-tight text-white">{notification.title}</h4>
+
+                        <h4 className="text-xs sm:text-sm font-black uppercase tracking-tight text-white truncate">
+                            {notification.title}
+                        </h4>
                     </div>
-                    <p className="text-xs text-white leading-relaxed pt-0.5">{notification.message}</p>
-                    <span className="text-[10px] font-semibold text-white/50 block pt-1.5">
+
+                    <p className="text-xs text-gray-200 leading-relaxed pt-0.5 break-words">
+                        {notification.message}
+                    </p>
+
+                    <span className="text-[10px] font-semibold text-white/40 block pt-1">
                         {new Date(notification.created_at).toLocaleString()}
                     </span>
                 </div>
 
+                {/* Actions */}
                 <div className="flex items-center gap-1 shrink-0">
                     {isUnread ? (
                         <button
                             onClick={(e) => { e.stopPropagation(); onMarkRead(notification.id); }}
-                            className="p-2 hover:bg-correct/10 text-correct hover:text-white rounded-xl transition-all"
+                            className="p-1.5 sm:p-2 hover:bg-correct/15 text-correct hover:text-white rounded-xl transition-all cursor-pointer"
                             title="Mark as read"
                         >
-                            <MailOpen size={16} />
+                            <MailOpen size={15} />
                         </button>
                     ) : (
                         <button
                             onClick={(e) => { e.stopPropagation(); onMarkUnread(notification.id); }}
-                            className="p-2 hover:bg-blue-500/10 text-gray-400 hover:text-blue-400 rounded-xl transition-all"
+                            className="p-1.5 sm:p-2 hover:bg-blue-500/15 text-gray-400 hover:text-blue-400 rounded-xl transition-all cursor-pointer"
                             title="Mark as unread (Reminder)"
                         >
-                            <Mail size={16} />
+                            <Mail size={15} />
                         </button>
                     )}
                     <button
                         onClick={(e) => { e.stopPropagation(); onDelete(notification.id); }}
-                        className="p-2 hover:bg-red-500/10 text-gray-400 hover:text-red-500 rounded-xl transition-all"
+                        className="p-1.5 sm:p-2 hover:bg-red-500/15 text-gray-400 hover:text-red-400 rounded-xl transition-all cursor-pointer"
                         title="Delete"
                     >
-                        <Trash2 size={16} />
+                        <Trash2 size={15} />
                     </button>
                 </div>
             </div>
@@ -174,7 +420,25 @@ export const NotificationModal = memo(() => {
                 window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: followerId } }));
                 setIsNotificationsOpen(false);
             }
-        } else if (n.type === 'NEW_COMMENT' || n.type === 'FOLLOWEE_STARTED_PLAYING' || n.type === 'FOLLOWEE_FINISHED_PLAYING') {
+        } else if (n.type === 'NEW_COMMENT') {
+            const targetUserId = n.data?.target_user_id || n.data?.commenter_id || n.user_id;
+            const gameDate = n.data?.game_date || (n.created_at ? n.created_at.split('T')[0] : undefined);
+
+            window.dispatchEvent(
+                new CustomEvent('open-stats-modal', {
+                    detail: {
+                        tab: 'leaderboard',
+                        commentTarget: {
+                            targetUserId,
+                            gameDate,
+                            guessIndex: n.data?.guess_index,
+                            parentId: n.data?.parent_id,
+                        }
+                    }
+                })
+            );
+            setIsNotificationsOpen(false);
+        } else if (n.type === 'FOLLOWEE_STARTED_PLAYING' || n.type === 'FOLLOWEE_FINISHED_PLAYING') {
             window.dispatchEvent(new CustomEvent('open-stats-modal', { detail: { tab: 'leaderboard' } }));
             setIsNotificationsOpen(false);
         } else if (n.type === 'DM_MESSAGE' || n.type === 'DM_REMINDER' || n.type === 'CHAT_MENTION') {
@@ -267,7 +531,7 @@ export const NotificationModal = memo(() => {
                     ) : (
                         <div className="space-y-3">
                             {sortedNotifications.map(n => {
-                                                const isInteractive = n.type === 'CHALLENGE_INVITE' ||
+                                const isInteractive = n.type === 'CHALLENGE_INVITE' ||
                                     n.type === 'CHALLENGE_COMPLETED' ||
                                     n.type === 'MARATHON_GAME_COMPLETED' ||
                                     n.type === 'BOT_MARATHON_NEW' ||
@@ -315,4 +579,3 @@ export const NotificationModal = memo(() => {
         </ModalLayout>
     );
 });
-

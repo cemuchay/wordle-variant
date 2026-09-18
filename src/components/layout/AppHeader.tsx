@@ -1,4 +1,4 @@
-import { HelpCircle, RotateCcw, SettingsIcon, Share, } from 'lucide-react';
+import { HelpCircle, RotateCcw, SettingsIcon, } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirmation } from '../../hooks/useConfirmation';
 import type { SyncStatus } from '../../types/game';
@@ -36,9 +36,9 @@ export const AppHeader = ({
     onOpenInfo,
     onOpenWeeklyWrapped,
     onReset,
-    onShare,
+    // onShare,
     onRetrySync,
-    isGameOver,
+    // isGameOver,
     syncStatus,
     isMonday = false,
     hideGameplayActions = false
@@ -85,7 +85,7 @@ export const AppHeader = ({
                                 >
                                     <RotateCcw size={ICON_SIZE} />
                                 </button>
-                                {isGameOver && (
+                                {/* {isGameOver && (
                                     <button
                                         onClick={onShare}
                                         className="p-1.5 text-white hover:text-white rounded-lg hover:bg-white/5 transition-all cursor-pointer"
@@ -93,7 +93,7 @@ export const AppHeader = ({
                                     >
                                         <Share size={ICON_SIZE} />
                                     </button>
-                                )}
+                                )} */}
                             </div>
 
                             {/* Divider */}

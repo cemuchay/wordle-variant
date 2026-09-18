@@ -16,6 +16,11 @@ interface LeaderboardFeedCardProps {
   isCurrentUser: boolean;
   canViewGuesses: boolean;
   hideGridWords?: boolean;
+  movement?: {
+    prevRank?: number;
+    delta?: number;
+    isNew?: boolean;
+  };
   onOpenPreview: (entry: LeaderboardEntry, openAnalysis?: boolean) => void;
 }
 
@@ -34,6 +39,7 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
   isCurrentUser,
   canViewGuesses,
   hideGridWords = false,
+  movement,
   onOpenPreview,
 }) => {
   const { user: currentUser } = useAuth();
@@ -54,6 +60,7 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
   const targetUserId = entry.user_id;
   const attempts = entry.status === "lost" ? "X" : entry.attempts;
   const isFirst = rank === 1;
+  const isPlaying = entry.status === "playing";
 
   // Load reactions & top comment
   const loadSocialData = async () => {
@@ -201,7 +208,10 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
   const miniGrid = useMemo(() => {
     const rawGuesses = playerGuesses.length > 0 ? playerGuesses : ((entry as any).guesses || []);
     const wordLen = entry.word_length || 5;
-    const guessCount = typeof entry.attempts === "number" ? entry.attempts : (rawGuesses.length || 4);
+    const guessCount =
+      typeof entry.attempts === "number"
+        ? Math.max(entry.attempts, entry.status === "playing" ? 1 : 0)
+        : rawGuesses.length || (entry.status === "playing" ? 1 : 4);
 
     if (!canViewGuesses) {
       // Masked spoiler preview (squares with blurred mystery colors)
@@ -267,52 +277,83 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
     <>
       <div
         onClick={() => onOpenPreview(entry, false)}
-        className={`bg-gray-900/90 border rounded-2xl p-4 transition-all duration-300 relative shadow-xl hover:border-gray-600 cursor-pointer ${isFirst
-          ? "border-yellow-500/50 bg-linear-to-b from-yellow-500/10 via-gray-900 to-gray-900 shadow-[0_0_20px_rgba(234,179,8,0.12)]"
-          : isCurrentUser
-            ? "border-emerald-500/40 bg-emerald-950/10"
-            : "border-gray-800"
-          }`}
+        className={`border rounded-2xl transition-all duration-300 relative shadow-xl hover:border-gray-600 cursor-pointer ${
+          isPlaying
+            ? "p-3 border-cyan-500/40 bg-cyan-950/20 shadow-[0_0_20px_rgba(6,182,212,0.08)]"
+            : isFirst
+              ? "p-4 border-yellow-500/50 bg-linear-to-b from-yellow-500/10 via-gray-900 to-gray-900 shadow-[0_0_20px_rgba(234,179,8,0.12)]"
+              : isCurrentUser
+                ? "p-4 border-emerald-500/40 bg-emerald-950/10"
+                : "p-4 border-gray-800 bg-gray-900/90"
+        }`}
       >
         {/* Top Player Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-white/5">
+        <div className={`flex items-center justify-between ${isPlaying ? "pb-2" : "pb-3"} border-b border-white/5`}>
           <div className="flex items-center gap-3">
-            {/* Rank badge */}
-            <div className="relative flex items-center justify-center">
+            {/* Rank badge + Movement Indicator */}
+            <div className="relative flex flex-col items-center justify-center">
               <span
-                className={`text-sm font-black font-mono w-6 text-center ${isFirst
-                  ? "text-yellow-400 text-base"
-                  : rank <= 3
-                    ? "text-amber-300"
-                    : "text-gray-500"
-                  }`}
+                className={`text-sm font-black font-mono w-6 text-center ${
+                  isPlaying
+                    ? "text-cyan-400"
+                    : isFirst
+                      ? "text-yellow-400 text-base"
+                      : rank <= 3
+                        ? "text-amber-300"
+                        : "text-gray-500"
+                }`}
               >
                 #{rank}
               </span>
-              {isFirst && (
+              {isFirst && !isPlaying && (
                 <span
-                  className="absolute -top-1.5 left-1 text-base select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] filter brightness-110 font-bold"
+                  className="absolute -top-2.5 left-1 text-base select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] filter brightness-110 font-bold"
                   role="img"
                   aria-label="crown"
                 >
                   👑
                 </span>
               )}
+              {/* Rank Movement Indicator / NEW Tag */}
+              {movement?.isNew ? (
+                <span className="text-[8px] font-black uppercase tracking-tight bg-gradient-to-r from-amber-400 to-orange-500 text-black px-1 rounded-sm shadow-xs mt-0.5 animate-in fade-in">
+                  NEW
+                </span>
+              ) : movement?.delta !== undefined && movement.delta !== 0 ? (
+                <span
+                  className={`text-[8px] font-mono font-bold flex items-center mt-0.5 ${
+                    movement.delta > 0 ? "text-emerald-400" : "text-rose-400"
+                  }`}
+                  title={`Previously #${movement.prevRank}`}
+                >
+                  {movement.delta > 0 ? `▲+${movement.delta}` : `▼${movement.delta}`}
+                </span>
+              ) : null}
             </div>
 
             <ProtectedAvatar
               userId={entry.user_id}
               src={entry.avatar_url}
               username={entry.username}
-              className={`w-9 h-9 rounded-full border ${isFirst ? "border-yellow-400 ring-2 ring-yellow-400/20" : "border-gray-700"
-                }`}
+              className={`w-9 h-9 rounded-full border ${
+                isPlaying
+                  ? "border-cyan-400 ring-2 ring-cyan-400/20"
+                  : isFirst
+                    ? "border-yellow-400 ring-2 ring-yellow-400/20"
+                    : "border-gray-700"
+              }`}
             />
 
             <div>
               <div className="flex items-center gap-1.5">
                 <span
-                  className={`text-xs sm:text-sm font-black tracking-tight truncate max-w-[130px] sm:max-w-[180px] ${isFirst ? "text-yellow-200" : "text-white"
-                    }`}
+                  className={`text-xs sm:text-sm font-black tracking-tight truncate max-w-[130px] sm:max-w-[180px] ${
+                    isPlaying
+                      ? "text-cyan-200"
+                      : isFirst
+                        ? "text-yellow-200"
+                        : "text-white"
+                  }`}
                 >
                   {formatUsername(entry.username)}
                 </span>
@@ -321,9 +362,11 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
               </div>
               <p className="text-[10px] text-gray-400 font-bold mt-0.5">
                 {attempts && `${attempts}/6`} •{" "}
-                <span className="text-amber-400 font-black">{entry.total_score} pts</span>
-                {entry.status === "playing" && (
-                  <span className="ml-1.5 text-amber-400 animate-pulse font-mono font-bold">
+                <span className={isPlaying ? "text-cyan-400 font-black" : "text-amber-400 font-black"}>
+                  {entry.total_score} pts
+                </span>
+                {isPlaying && (
+                  <span className="ml-1.5 text-cyan-300 animate-pulse font-mono font-bold">
                     • In Progress
                   </span>
                 )}
@@ -350,18 +393,16 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
         </div>
 
         {/* Card Body: Mini Grid + Highlight Pill */}
-        <div className="py-3 flex flex-col items-center justify-center gap-2.5">
-          <div className="bg-black/40 border border-white/5 p-2.5 rounded-xl flex flex-col gap-1 shadow-inner">
+        <div className={`${isPlaying ? "py-2" : "py-3"} flex flex-col items-center justify-center gap-2`}>
+          <div className="bg-black/40 border border-white/5 p-2 sm:p-2.5 rounded-xl flex flex-col gap-1 shadow-inner">
             {miniGrid}
           </div>
 
-          {!canViewGuesses && (
+          {!canViewGuesses && !isPlaying && (
             <p className="text-[10px] text-amber-400/80 font-bold uppercase tracking-wider flex items-center gap-1">
               <span>🔒</span> Solve today's puzzle to unmask moves
             </p>
           )}
-
-
         </div>
 
         {/* 1-Tap Reaction Bar & Counts */}
@@ -450,30 +491,32 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
           </div>
         )}
 
-        {/* Action Buttons */}
-        <div className="mt-3 pt-2.5 border-t border-white/5 grid grid-cols-2 gap-2">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenPreview(entry, false);
-            }}
-            className="flex items-center justify-center gap-1.5 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer"
-          >
-            <Eye size={12} />
-            <span>View Game</span>
-          </button>
+        {/* Action Buttons - Only show for completed games */}
+        {!isPlaying && (
+          <div className="mt-3 pt-2.5 border-t border-white/5 grid grid-cols-2 gap-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenPreview(entry, false);
+              }}
+              className="flex items-center justify-center gap-1.5 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer"
+            >
+              <Eye size={12} />
+              <span>View Game</span>
+            </button>
 
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenPreview(entry, true);
-            }}
-            className="flex items-center justify-center gap-1.5 py-2 bg-linear-to-r from-amber-500/20 to-purple-500/20 hover:from-amber-500/30 hover:to-purple-500/30 border border-amber-500/30 hover:border-amber-500/50 text-amber-300 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer"
-          >
-            <span>♟️</span>
-            <span>Analyze Game</span>
-          </button>
-        </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenPreview(entry, true);
+              }}
+              className="flex items-center justify-center gap-1.5 py-2 bg-linear-to-r from-amber-500/20 to-purple-500/20 hover:from-amber-500/30 hover:to-purple-500/30 border border-amber-500/30 hover:border-amber-500/50 text-amber-300 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer"
+            >
+              <span>♟️</span>
+              <span>Analyze Game</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Slide-up Comments Drawer */}
