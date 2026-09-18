@@ -412,6 +412,10 @@ export const SocialStatsModal: React.FC<Props> = ({
       : null;
 
   const handleOpenPreview = (entry: LeaderboardEntry, openAnalysis = false) => {
+    if (!canViewGuess) {
+      triggerToast("Solve today's puzzle to unlock guess previews!", TOAST_DURATION.SHORT);
+      return;
+    }
     const idx = leaderboard.findIndex((e) => e.username === entry.username);
     setSelectedEntryIndex(idx >= 0 ? idx : 0);
     setInitialOpenAnalysis(openAnalysis);
