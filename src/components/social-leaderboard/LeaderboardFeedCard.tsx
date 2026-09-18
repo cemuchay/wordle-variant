@@ -45,6 +45,12 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
   const [isCommentDrawerOpen, setIsCommentDrawerOpen] = useState(false);
   const [playerGuesses, setPlayerGuesses] = useState<any[]>((entry as any).guesses || []);
 
+  useEffect(() => {
+    if ((entry as any).guesses && (entry as any).guesses.length > 0) {
+      setPlayerGuesses((entry as any).guesses);
+    }
+  }, [entry]);
+
   const targetUserId = entry.user_id;
   const attempts = entry.status === "lost" ? "X" : entry.attempts;
   const isFirst = rank === 1;
