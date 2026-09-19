@@ -46,6 +46,7 @@ import { initTelemetry } from "./lib/telemetry";
 import { flushNotificationQueue } from "./lib/clientPush";
 import { useWordGridStore } from "./store/useWordGridStore";
 import { generateShareText } from "./lib/share";
+import { VictorySplashOverlay } from "./components/victory/VictorySplashOverlay";
 
 const StatsModal = safeLazy(() => import("./components/social-leaderboard").then(m => ({ default: m.SocialStatsModal })));
 const ChallengeModal = safeLazy(() => import("./components/ChallengeModal").then(m => ({ default: m.ChallengeModal })));
@@ -300,6 +301,46 @@ function MainApp() {
       return false;
     }
   }, [isHydrated, date, user]);
+
+  // Victory Splash Fireworks & Animation State
+  const [showVictorySplash, setShowVictorySplash] = useState(false);
+  const [victoryScore, setVictoryScore] = useState<number>(1);
+  const hasShownVictorySplashRef = useRef(false);
+
+  useEffect(() => {
+    const isGameWon =
+      state.status === "won" ||
+      (state.isGameOver &&
+        state.guesses.some(
+          (g) =>
+            g.length === (config?.length ?? DEFAULT_WORD_LENGTH) &&
+            g.every((r) => r.status === "correct")
+        ));
+
+    if (
+      isGameWon &&
+      !state.isRevealing &&
+      isHydrated &&
+      !isAlreadyPlayedTodayOnLoad &&
+      !hasShownVictorySplashRef.current
+    ) {
+      hasShownVictorySplashRef.current = true;
+      setVictoryScore(state.guesses.length || 1);
+      setShowVictorySplash(true);
+    }
+  }, [
+    state.status,
+    state.isGameOver,
+    state.isRevealing,
+    state.guesses,
+    isHydrated,
+    isAlreadyPlayedTodayOnLoad,
+    config?.length,
+  ]);
+
+  const handleDismissVictorySplash = useCallback(() => {
+    setShowVictorySplash(false);
+  }, []);
 
   const activeNavigationItem = isChatOpen
     ? "chat"
@@ -1655,6 +1696,17 @@ function MainApp() {
         initialMode={freePlayMode}
         onClose={() => setIsFreePlayOpen(false)}
       />
+
+      <AnimatePresence>
+        {showVictorySplash && (
+          <VictorySplashOverlay
+            score={victoryScore}
+            maxAttempts={config?.maxAttempts ?? MAX_ATTEMPTS}
+            targetWord={config?.word}
+            onDismiss={handleDismissVictorySplash}
+          />
+        )}
+      </AnimatePresence>
     </AppLayout>
   );
 }

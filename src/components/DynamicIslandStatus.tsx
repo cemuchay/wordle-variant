@@ -256,27 +256,31 @@ export const DynamicIslandStatus = () => {
         if (toast.show) return `toast-${toast.message}`;
         if (activeCall) return `call-${activeCall.status}`;
         if (currentVoiceSession) return `voice-${currentVoiceSession.challengeId}`;
-        if (mascot) return `mascot-${mascot.expression}`;
-        if (otherOnlineUsers.length > 0) return 'online';
+        if (mascot) return `mascot-${mascot.expression}_${mascot.label}`;
+        if (otherOnlineUsers.length > 0) {
+            // Include user IDs so any change in who is online triggers status update + rainbow lightup
+            return `online-${otherOnlineUsers.map(u => u.id).sort().join(',')}`;
+        }
         return 'default';
-    }, [isExpanded, toast.show, toast.message, activeCall, currentVoiceSession, mascot, otherOnlineUsers.length]);
+    }, [isExpanded, toast.show, toast.message, activeCall, currentVoiceSession, mascot, otherOnlineUsers]);
 
     // Watch status changes to trigger rainbow lightup, toast-like size expansion, and scale animation
     useEffect(() => {
         const key = getStatusKey();
         if (isFirstRender.current) {
+            isFirstRender.current = false;
             lastStatusKey.current = key;
             return;
         }
         if (key !== lastStatusKey.current) {
             lastStatusKey.current = key;
 
-            // Trigger rainbow border
+            // Trigger rainbow border & background glow
             setShowRainbowBorder(true);
             if (mascotRainbowTimerRef.current) clearTimeout(mascotRainbowTimerRef.current);
             mascotRainbowTimerRef.current = setTimeout(() => {
                 setShowRainbowBorder(false);
-            }, 3000); // 3 seconds of rainbow lightup
+            }, 3500); // 3.5 seconds of rainbow lightup
 
             // Trigger attention expansion (increases height, width, font size like a toast)
             setIsAttentionState(true);
@@ -364,453 +368,547 @@ export const DynamicIslandStatus = () => {
 
     const isConnected = audioChat.isConnected;
 
-    const isToastActive = toast.show || isAttentionState;
+    // Dynamically calculate pill width and height based on text length, attention state, and expanded state
+    const toastMessage = toast.message || '';
+    const toastLength = toastMessage.length;
 
-    // Dynamically calculate pill width based on current status and attention state
-    const getPillWidth = () => {
-        if (isExpanded) return 'min(95vw, 340px)';
-        if (toast.show) {
-            // Temporarily stretch width to 90% to call user's attention
-            return 'min(90vw, 440px)';
+    const getPillDimensions = () => {
+        if (isExpanded) {
+            return {
+                width: 'min(95vw, 340px)',
+                height: 'min(75vh, 480px)',
+                minHeight: 'min(75vh, 480px)',
+                borderRadius: '32px',
+                padding: '0'
+            };
         }
+
+        if (toast.show) {
+            // Calculate dynamic horizontal & vertical expansion according to message length
+            if (toastLength <= 24) {
+                // Short message (e.g. "Copied!", "Game started!")
+                return {
+                    width: 'min(90vw, 250px)',
+                    height: 'auto',
+                    minHeight: '44px',
+                    borderRadius: '22px',
+                    padding: '8px 16px'
+                };
+            } else if (toastLength <= 55) {
+                // Medium message (e.g. "Player played 'SPARK' (+42 pts)!")
+                return {
+                    width: 'min(92vw, 360px)',
+                    height: 'auto',
+                    minHeight: '50px',
+                    borderRadius: '24px',
+                    padding: '10px 18px'
+                };
+            } else if (toastLength <= 110) {
+                // Long message (e.g. multi-word alerts, notifications)
+                return {
+                    width: 'min(94vw, 440px)',
+                    height: 'auto',
+                    minHeight: '60px',
+                    borderRadius: '26px',
+                    padding: '12px 20px'
+                };
+            } else {
+                // Very long message
+                return {
+                    width: 'min(96vw, 480px)',
+                    height: 'auto',
+                    minHeight: '70px',
+                    borderRadius: '28px',
+                    padding: '14px 20px'
+                };
+            }
+        }
+
         if (isAttentionState) {
             // Expanded width like a toast on island update
-            if (activeCall) return 'min(90vw, 290px)';
-            if (currentVoiceSession) return 'min(90vw, 250px)';
-            if (mascot) return 'min(90vw, 260px)';
-            if (otherOnlineUsers.length > 0) return 'min(90vw, 240px)';
-            return 'min(90vw, 210px)';
+            let attentionWidth = 'min(90vw, 210px)';
+            if (activeCall) attentionWidth = 'min(90vw, 290px)';
+            else if (currentVoiceSession) attentionWidth = 'min(90vw, 250px)';
+            else if (mascot) attentionWidth = 'min(90vw, 260px)';
+            else if (otherOnlineUsers.length > 0) attentionWidth = 'min(90vw, 240px)';
+
+            return {
+                width: attentionWidth,
+                height: '46px',
+                minHeight: '46px',
+                borderRadius: '26px',
+                padding: '6px 14px'
+            };
         }
+
         if (user && activeCall) {
-            if (activeCall.status === 'ringing') return '250px';
-            if (activeCall.status === 'calling') return '195px';
-            return '155px'; // connecting / connected
+            let callWidth = '155px';
+            if (activeCall.status === 'ringing') callWidth = '250px';
+            else if (activeCall.status === 'calling') callWidth = '195px';
+            return {
+                width: callWidth,
+                height: '32px',
+                minHeight: '32px',
+                borderRadius: '22px',
+                padding: '0'
+            };
         }
-        if (user && currentVoiceSession) return '195px';
+
+        if (user && currentVoiceSession) {
+            return {
+                width: '195px',
+                height: '32px',
+                minHeight: '32px',
+                borderRadius: '22px',
+                padding: '0'
+            };
+        }
+
         if (mascot) {
-            return otherOnlineUsers.length > 0 ? '225px' : '195px';
+            return {
+                width: otherOnlineUsers.length > 0 ? '225px' : '195px',
+                height: '32px',
+                minHeight: '32px',
+                borderRadius: '22px',
+                padding: '0'
+            };
         }
-        if (user && otherOnlineUsers.length === 1) return '180px';
-        if (user && otherOnlineUsers.length > 1) return '195px';
+
+        if (user && otherOnlineUsers.length === 1) {
+            return {
+                width: '180px',
+                height: '32px',
+                minHeight: '32px',
+                borderRadius: '22px',
+                padding: '0'
+            };
+        }
+
+        if (user && otherOnlineUsers.length > 1) {
+            return {
+                width: '195px',
+                height: '32px',
+                minHeight: '32px',
+                borderRadius: '22px',
+                padding: '0'
+            };
+        }
 
         // Persistent default state (Mascot/User + Time + Signal)
-        return '164px';
+        return {
+            width: '164px',
+            height: '32px',
+            minHeight: '32px',
+            borderRadius: '22px',
+            padding: '0'
+        };
     };
+
+    const pillDimensions = getPillDimensions();
 
     return (
         <div key={resumeKey} className="fixed left-1/2 -translate-x-1/2 pointer-events-none" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 8px)', zIndex: Z_INDEX.DYNAMIC_ISLAND }}>
-            <motion.div
-                layout
-                initial={{ opacity: 0, scale: 0.9, y: -20 }}
-                animate={{
-                    opacity: 1,
-                    scale: scaleMultiplier,
-                    y: isExpanded ? 8 : 0,
-                }}
-                style={{
-                    borderRadius: isExpanded ? '32px' : isToastActive ? '26px' : '22px',
-                    width: getPillWidth(),
-                    height: isExpanded ? 'min(75vh, 480px)' : isToastActive ? '46px' : '32px',
-                    minHeight: isToastActive ? '46px' : '32px',
-                    padding: isToastActive ? '6px 14px' : '0'
-                }}
-                transition={{
-                    layout: {
-                        type: 'spring',
-                        stiffness: 380,
-                        damping: 35
-                    },
-                    opacity: { duration: 0.15 },
-                    scale: { duration: 0.15 },
-                    y: { type: 'spring', stiffness: 380, damping: 35 },
-                }}
-                onClick={() => {
-                    if (toast.show) {
-                        setIsNotificationsOpen(true);
-                        setToast({ ...toast, show: false });
-                    } else {
-                        setIsExpanded(!isExpanded);
-                    }
-                }}
-                className={`
-                    pointer-events-auto cursor-pointer overflow-visible
-                    ${getThemeIslandClasses(currentTheme)}
-                    flex flex-col items-center justify-center transition-colors duration-300
-                `}
-            >
-                {showRainbowBorder && (
-                    <div className="absolute inset-[-1.5px] pointer-events-none z-0">
-                        {/* Glow overlay - masked to bleed only outwards */}
-                        <motion.div
-                            className="absolute -inset-1"
-                            style={{
-                                borderRadius: isExpanded ? '37px' : '25px',
-                                padding: '5.5px',
-                                background: 'linear-gradient(90deg, #ff3366, #ff9933, #33cc66, #3399ff, #9933ff, #ff3366)',
-                                filter: 'blur(3px)',
-                                opacity: 0.75,
-                                mask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
-                                maskComposite: 'exclude',
-                                WebkitMask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
-                                WebkitMaskComposite: 'xor',
-                            }}
-                            animate={{
-                                filter: ['blur(3px) hue-rotate(0deg)', 'blur(3px) hue-rotate(360deg)']
-                            }}
-                            transition={{ repeat: Infinity, duration: 2.5, ease: 'linear' }}
-                        />
-                        {/* Sharp border overlay */}
-                        <motion.div
-                            className="absolute inset-0"
-                            style={{
-                                borderRadius: isExpanded ? '33px' : '21px',
-                                padding: '1.5px',
-                                background: 'linear-gradient(90deg, #ff3366, #ff9933, #33cc66, #3399ff, #9933ff, #ff3366)',
-                                mask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
-                                maskComposite: 'exclude',
-                                WebkitMask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
-                                WebkitMaskComposite: 'xor',
-                            }}
-                            animate={{
-                                filter: ['hue-rotate(0deg)', 'hue-rotate(360deg)']
-                            }}
-                            transition={{ repeat: Infinity, duration: 2.5, ease: 'linear' }}
-                        />
-                    </div>
-                )}
-                <div className="relative z-1 w-full h-full">
-                    {!isExpanded ? (
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ duration: 0.15 }}
-                            className="flex items-center gap-1.5 px-3 h-full w-full justify-between"
-                        >
-                            {/* Persistent Left Section (Online user avatars or mascot fallback) */}
-                            {user && otherOnlineUsers.length > 0 ? (
-                                <div className="flex items-center shrink-0">
-                                    {otherOnlineUsers.length === 1 ? (
-                                        <div title={`${otherOnlineUsers[0].username} online`} className="shrink-0">
-                                            <ProtectedAvatar
-                                                userId={otherOnlineUsers[0].id}
-                                                src={otherOnlineUsers[0].avatar_url}
-                                                username={otherOnlineUsers[0].username}
-                                                className={`${isAttentionState ? 'w-5 h-5' : 'w-4 h-4'} rounded-full border border-white/20 shrink-0 transition-all`}
-                                            />
+                <motion.div
+                    layout
+                    initial={{ opacity: 0, scale: 0.9, y: -20 }}
+                    animate={{
+                        opacity: 1,
+                        scale: scaleMultiplier,
+                        y: isExpanded ? 8 : 0,
+                    }}
+                    style={{
+                        borderRadius: pillDimensions.borderRadius,
+                        width: pillDimensions.width,
+                        height: pillDimensions.height,
+                        minHeight: pillDimensions.minHeight,
+                        padding: pillDimensions.padding
+                    }}
+                    transition={{
+                        layout: {
+                            type: 'spring',
+                            stiffness: 380,
+                            damping: 35
+                        },
+                        opacity: { duration: 0.15 },
+                        scale: { duration: 0.15 },
+                        y: { type: 'spring', stiffness: 380, damping: 35 },
+                    }}
+                    onClick={() => {
+                        if (toast.show) {
+                            setIsNotificationsOpen(true);
+                            setToast({ ...toast, show: false });
+                        } else {
+                            setIsExpanded(!isExpanded);
+                        }
+                    }}
+                    className={`
+                        pointer-events-auto cursor-pointer overflow-visible
+                        ${getThemeIslandClasses(currentTheme)}
+                        flex flex-col items-center justify-center transition-colors duration-300
+                    `}
+                >
+                    {showRainbowBorder && (
+                        <div className="absolute inset-0 pointer-events-none z-0 overflow-visible">
+                            {/* Outer Glow - strictly masked so inner area is completely empty/cut-out */}
+                            <motion.div
+                                className="absolute -inset-1"
+                                style={{
+                                    borderRadius: isExpanded ? '36px' : pillDimensions.borderRadius,
+                                    padding: '3.5px',
+                                    background: 'linear-gradient(90deg, #ff3366, #ff9933, #33cc66, #3399ff, #9933ff, #ff3366)',
+                                    filter: 'blur(4px)',
+                                    opacity: 0.85,
+                                    mask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
+                                    maskComposite: 'exclude',
+                                    WebkitMask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
+                                    WebkitMaskComposite: 'xor',
+                                }}
+                                animate={{
+                                    filter: ['blur(4px) hue-rotate(0deg)', 'blur(4px) hue-rotate(360deg)']
+                                }}
+                                transition={{ repeat: Infinity, duration: 2.2, ease: 'linear' }}
+                            />
+                            {/* Sharp 2px Border Outline - strictly masked to border stroke only */}
+                            <motion.div
+                                className="absolute inset-0"
+                                style={{
+                                    borderRadius: isExpanded ? '32px' : pillDimensions.borderRadius,
+                                    padding: '2px',
+                                    background: 'linear-gradient(90deg, #ff3366, #ff9933, #33cc66, #3399ff, #9933ff, #ff3366)',
+                                    mask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
+                                    maskComposite: 'exclude',
+                                    WebkitMask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
+                                    WebkitMaskComposite: 'xor',
+                                }}
+                                animate={{
+                                    filter: ['hue-rotate(0deg)', 'hue-rotate(360deg)']
+                                }}
+                                transition={{ repeat: Infinity, duration: 2.2, ease: 'linear' }}
+                            />
+                        </div>
+                    )}
+                    <div className="relative z-1 w-full h-full">
+                        {!isExpanded ? (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ duration: 0.15 }}
+                                className={`flex ${toast.show ? 'items-center px-1' : 'items-center px-3'} h-full w-full justify-between`}
+                            >
+                                {/* Persistent Left Section (Online user avatars or mascot fallback) - only when not displaying a full toast */}
+                                {!toast.show && (
+                                    user && otherOnlineUsers.length > 0 ? (
+                                        <div className="flex items-center shrink-0">
+                                            {otherOnlineUsers.length === 1 ? (
+                                                <div title={`${otherOnlineUsers[0].username} online`} className="shrink-0">
+                                                    <ProtectedAvatar
+                                                        userId={otherOnlineUsers[0].id}
+                                                        src={otherOnlineUsers[0].avatar_url}
+                                                        username={otherOnlineUsers[0].username}
+                                                        className={`${isAttentionState ? 'w-5 h-5' : 'w-4 h-4'} rounded-full border border-white/20 shrink-0 transition-all`}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-0.5 shrink-0">
+                                                    <div className="flex -space-x-1 shrink-0">
+                                                        {otherOnlineUsers.slice(0, 2).map((u) => (
+                                                            <ProtectedAvatar
+                                                                key={u.id}
+                                                                userId={u.id}
+                                                                src={u.avatar_url}
+                                                                username={u.username}
+                                                                className={`${isAttentionState ? 'w-4.5 h-4.5' : 'w-3.5 h-3.5'} rounded-full border border-black shrink-0 transition-all`}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                    <span className={`${isAttentionState ? 'text-[8.5px]' : 'text-[7px]'} font-black text-emerald-400 transition-all`}>
+                                                        +{otherOnlineUsers.length}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            <div className={`${isAttentionState ? 'h-4' : 'h-3'} w-1 border-r border-white/10 mx-1.5 shrink-0 transition-all`} />
                                         </div>
                                     ) : (
-                                        <div className="flex items-center gap-0.5 shrink-0">
-                                            <div className="flex -space-x-1 shrink-0">
-                                                {otherOnlineUsers.slice(0, 2).map((u) => (
-                                                    <ProtectedAvatar
-                                                        key={u.id}
-                                                        userId={u.id}
-                                                        src={u.avatar_url}
-                                                        username={u.username}
-                                                        className={`${isAttentionState ? 'w-4.5 h-4.5' : 'w-3.5 h-3.5'} rounded-full border border-black shrink-0 transition-all`}
-                                                    />
-                                                ))}
-                                            </div>
-                                            <span className={`${isAttentionState ? 'text-[8.5px]' : 'text-[7px]'} font-black text-emerald-400 transition-all`}>
-                                                +{otherOnlineUsers.length}
-                                            </span>
+                                        <div className="flex items-center shrink-0">
+                                            <WordUpMascot expression={mascot?.expression || "idle"} size={isAttentionState ? 17 : 13} />
+                                            <div className={`${isAttentionState ? 'h-4' : 'h-3'} w-1 border-r border-white/10 mx-1.5 shrink-0 transition-all`} />
                                         </div>
-                                    )}
-                                    <div className={`${isAttentionState ? 'h-4' : 'h-3'} w-1 border-r border-white/10 mx-1.5 shrink-0 transition-all`} />
-                                </div>
-                            ) : (
-                                <div className="flex items-center shrink-0">
-                                    <WordUpMascot expression={mascot?.expression || "idle"} size={isAttentionState ? 17 : 13} />
-                                    <div className={`${isAttentionState ? 'h-4' : 'h-3'} w-1 border-r border-white/10 mx-1.5 shrink-0 transition-all`} />
-                                </div>
-                            )}
+                                    )
+                                )}
 
-                            {/* Middle/Right Section (Dynamic Content) */}
-                            <div className="flex-1 flex items-center justify-center min-w-0">
-                                <AnimatePresence mode="wait">
-                                     {toast.show ? (
-                                         <motion.div
-                                             key="toast"
-                                             initial={{ opacity: 0, scale: 0.9, y: 5 }}
-                                             animate={{ opacity: 1, scale: 1, y: 0 }}
-                                             exit={{ opacity: 0, scale: 0.9, y: -5 }}
-                                             className="flex items-center gap-2.5 w-full px-2"
-                                         >
-                                             <BellRing size={16} className="text-emerald-400 shrink-0 animate-bounce" />
-                                             <span className="text-xs sm:text-sm font-extrabold text-white flex-1 leading-tight tracking-wide truncate">
-                                                 {toast.message}
-                                             </span>
-                                         </motion.div>
-                                    ) : activeCall ? (
-                                        activeCall.status === 'ringing' ? (
-                                            <div className="flex items-center justify-between w-full" onClick={(e) => e.stopPropagation()}>
-                                                <div className="flex items-center gap-1.5 min-w-0">
+                                {/* Middle/Right Section (Dynamic Content) */}
+                                <div className="flex-1 flex items-center justify-center min-w-0 w-full">
+                                     <AnimatePresence mode="wait">
+                                         {toast.show ? (
+                                             <motion.div
+                                                 key="toast"
+                                                 initial={{ opacity: 0, scale: 0.95, y: 3 }}
+                                                 animate={{ opacity: 1, scale: 1, y: 0 }}
+                                                 exit={{ opacity: 0, scale: 0.95, y: -3 }}
+                                                 className="flex items-center gap-3 w-full py-1"
+                                             >
+                                                 <div className="shrink-0 flex items-center justify-center">
+                                                     <BellRing size={toastLength > 60 ? 20 : 18} className="text-emerald-400 animate-bounce" />
+                                                 </div>
+                                                 <span
+                                                     className={`
+                                                         ${toastLength > 90 ? 'text-[12.5px] leading-snug font-bold' : toastLength > 40 ? 'text-[13.5px] leading-snug font-extrabold' : 'text-sm sm:text-base leading-snug font-black'}
+                                                         text-white flex-1 tracking-wide text-left break-words
+                                                     `}
+                                                 >
+                                                     {toast.message}
+                                                 </span>
+                                             </motion.div>
+                                        ) : activeCall ? (
+                                            activeCall.status === 'ringing' ? (
+                                                <div className="flex items-center justify-between w-full" onClick={(e) => e.stopPropagation()}>
+                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                        <ProtectedAvatar
+                                                            userId={activeCall.targetUser?.id}
+                                                            src={activeCall.targetUser?.avatar_url}
+                                                            username={activeCall.targetUser?.username || ''}
+                                                            className={`${isAttentionState ? 'w-6 h-6' : 'w-4.5 h-4.5'} rounded-full border border-white/20 shrink-0 transition-all`}
+                                                        />
+                                                        <span className={`${isAttentionState ? 'text-xs font-bold' : 'text-[9px] font-bold'} text-white truncate max-w-28 transition-all`}>
+                                                            {activeCall.targetUser?.username} calls
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 shrink-0">
+                                                        <button
+                                                            onClick={acceptCall}
+                                                            className="p-1 bg-emerald-500 hover:bg-emerald-600 text-black rounded-full transition-transform active:scale-95"
+                                                        >
+                                                            <Check size={isAttentionState ? 13 : 10} strokeWidth={3} />
+                                                        </button>
+                                                        <button
+                                                            onClick={rejectCall}
+                                                            className="p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-transform active:scale-95 cursor-pointer"
+                                                        >
+                                                            <X size={isAttentionState ? 13 : 10} strokeWidth={3} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : activeCall.status === 'calling' ? (
+                                                <div className="flex items-center justify-between w-full" onClick={(e) => e.stopPropagation()}>
+                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                        <div className={`${isAttentionState ? 'w-2.5 h-2.5' : 'w-1.5 h-1.5'} rounded-full bg-emerald-500 animate-ping shrink-0`} />
+                                                        <span className={`${isAttentionState ? 'text-xs font-bold' : 'text-[9px] font-bold'} text-zinc-300 truncate max-w-32 transition-all`}>
+                                                            Calling {activeCall.targetUser?.username}...
+                                                        </span>
+                                                    </div>
+                                                    <button
+                                                        onClick={hangUpCall}
+                                                        className="p-1 bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-white rounded-full transition-all"
+                                                    >
+                                                        <PhoneOff size={isAttentionState ? 13 : 10} />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`${isAttentionState ? 'w-2 h-2' : 'w-1.5 h-1.5'} rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-yellow-500'} animate-pulse`} />
+                                                    <Phone size={isAttentionState ? 14 : 11} className={`${isConnected ? 'text-emerald-500' : 'text-yellow-500'} animate-bounce`} />
+                                                    <span className={`${isAttentionState ? 'text-xs' : 'text-[9.5px]'} font-black text-white uppercase tracking-tighter transition-all`}>
+                                                        {isConnected ? 'On Call' : 'Connecting...'}
+                                                    </span>
+                                                </div>
+                                            )
+                                        ) : currentVoiceSession ? (
+                                            <div className="flex items-center gap-1.5">
+                                                <ProtectedAvatar
+                                                    userId={currentVoiceSession.user.id}
+                                                    src={currentVoiceSession.user.avatar_url}
+                                                    username={currentVoiceSession.user.username}
+                                                    className={`${isAttentionState ? 'w-6 h-6' : 'w-4.5 h-4.5'} rounded-full border border-white/20 shrink-0 transition-all`}
+                                                />
+                                                <span className={`${isAttentionState ? 'text-xs' : 'text-[9.5px]'} font-black text-white uppercase tracking-tighter transition-all`}>
+                                                    {currentVoiceSession.user.username} in Voice
+                                                </span>
+                                                <div className={`${isAttentionState ? 'w-2 h-2' : 'w-1.5 h-1.5'} bg-emerald-500 rounded-full animate-pulse`} />
+                                            </div>
+                                        ) : mascot ? (
+                                            <div className="flex items-center gap-1.5 px-2.5 h-full w-full justify-center">
+                                                <span className={`${isAttentionState ? 'text-xs font-black' : 'text-[9px] font-black'} uppercase tracking-[0.08em] text-white/90 truncate max-w-36 select-none transition-all`}>{mascot.label}</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2 px-2 h-full w-full justify-center">
+                                                <span className={`${isAttentionState ? 'text-xs font-black' : 'text-[9.5px] font-black'} tracking-[0.08em] text-white/85 tabular-nums select-none transition-all`}>{localTime}</span>
+                                                <SignalBar
+                                                    height={isAttentionState ? 13 : 10}
+                                                    barWidth={isAttentionState ? 2.5 : 2}
+                                                    className="shrink-0 opacity-90 hover:opacity-100 transition-opacity"
+                                                />
+                                            </div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            </motion.div>
+                        ) : (
+
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ duration: 0.15 }}
+                                className="w-full h-full flex flex-col p-6 overflow-hidden"
+                            >
+                                {/* Call Handling / Setup Sections */}
+                                {activeCall && (
+                                    <div className="mb-6 pb-6 border-b border-white/10 flex flex-col items-center justify-center text-center">
+                                        {activeCall.status === 'ringing' ? (
+                                            <div className="w-full flex flex-col items-center gap-4" onClick={(e) => e.stopPropagation()}>
+                                                <div className="relative">
                                                     <ProtectedAvatar
                                                         userId={activeCall.targetUser?.id}
                                                         src={activeCall.targetUser?.avatar_url}
                                                         username={activeCall.targetUser?.username || ''}
-                                                        className={`${isAttentionState ? 'w-6 h-6' : 'w-4 h-4'} rounded-full border border-white/20 shrink-0 transition-all`}
+                                                        className="w-16 h-16 rounded-full border-2 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)] animate-pulse"
                                                     />
-                                                    <span className={`${isAttentionState ? 'text-xs' : 'text-[8px]'} font-bold text-white truncate max-w-28 transition-all`}>
-                                                        {activeCall.targetUser?.username} calls
-                                                    </span>
+                                                    <div className="absolute -bottom-1 -right-1 bg-emerald-500 p-1.5 rounded-full border border-black text-black">
+                                                        <Phone size={12} className="animate-bounce" />
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center gap-1 shrink-0">
-                                                    <button
-                                                        onClick={acceptCall}
-                                                        className="p-1 bg-emerald-500 hover:bg-emerald-600 text-black rounded-full transition-transform active:scale-95"
-                                                    >
-                                                        <Check size={isAttentionState ? 13 : 10} strokeWidth={3} />
-                                                    </button>
+                                                <div>
+                                                    <h3 className="text-white font-black text-sm uppercase">{activeCall.targetUser?.username}</h3>
+                                                    <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mt-1">Incoming Voice Call</p>
+                                                </div>
+                                                <div className="flex items-center gap-4 w-full px-4 mt-2">
                                                     <button
                                                         onClick={rejectCall}
-                                                        className="p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-transform active:scale-95 cursor-pointer"
+                                                        className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-xl text-xs font-black uppercase transition-all shadow-lg flex items-center justify-center gap-1.5"
                                                     >
-                                                        <X size={isAttentionState ? 13 : 10} strokeWidth={3} />
+                                                        <PhoneOff size={14} />
+                                                        Decline
+                                                    </button>
+                                                    <button
+                                                        onClick={acceptCall}
+                                                        className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-black py-2.5 rounded-xl text-xs font-black uppercase transition-all shadow-lg flex items-center justify-center gap-1.5"
+                                                    >
+                                                        <Check size={14} strokeWidth={2.5} />
+                                                        Accept
                                                     </button>
                                                 </div>
                                             </div>
                                         ) : activeCall.status === 'calling' ? (
-                                            <div className="flex items-center justify-between w-full" onClick={(e) => e.stopPropagation()}>
-                                                <div className="flex items-center gap-1.5 min-w-0">
-                                                    <div className={`${isAttentionState ? 'w-2.5 h-2.5' : 'w-1.5 h-1.5'} rounded-full bg-emerald-500 animate-ping shrink-0`} />
-                                                    <span className={`${isAttentionState ? 'text-xs' : 'text-[8px]'} font-bold text-zinc-300 truncate max-w-32 transition-all`}>
-                                                        Calling {activeCall.targetUser?.username}...
-                                                    </span>
+                                            <div className="w-full flex flex-col items-center gap-4" onClick={(e) => e.stopPropagation()}>
+                                                <div className="relative">
+                                                    <ProtectedAvatar
+                                                        userId={activeCall.targetUser?.id}
+                                                        src={activeCall.targetUser?.avatar_url}
+                                                        username={activeCall.targetUser?.username || ''}
+                                                        className="w-16 h-16 rounded-full border-2 border-zinc-500 shadow-[0_0_20px_rgba(255,255,255,0.05)]"
+                                                    />
+                                                    <div className="absolute -bottom-1 -right-1 bg-zinc-800 p-1.5 rounded-full border border-black text-zinc-400">
+                                                        <Phone size={12} className="animate-pulse" />
+                                                    </div>
                                                 </div>
-                                                <button
-                                                    onClick={hangUpCall}
-                                                    className="p-1 bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-white rounded-full transition-all"
-                                                >
-                                                    <PhoneOff size={isAttentionState ? 13 : 10} />
-                                                </button>
+                                                <div>
+                                                    <h3 className="text-white font-black text-sm uppercase">{activeCall.targetUser?.username}</h3>
+                                                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Dialing...</p>
+                                                </div>
+                                                <div className="w-full px-4 mt-2">
+                                                    <button
+                                                        onClick={hangUpCall}
+                                                        className="w-full bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-xl text-xs font-black uppercase transition-all shadow-lg flex items-center justify-center gap-1.5"
+                                                    >
+                                                        <PhoneOff size={14} />
+                                                        Cancel
+                                                    </button>
+                                                </div>
                                             </div>
                                         ) : (
-                                            <div className="flex items-center gap-2">
-                                                <div className={`${isAttentionState ? 'w-2 h-2' : 'w-1.5 h-1.5'} rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-yellow-500'} animate-pulse`} />
-                                                <Phone size={isAttentionState ? 14 : 10} className={`${isConnected ? 'text-emerald-500' : 'text-yellow-500'} animate-bounce`} />
-                                                <span className={`${isAttentionState ? 'text-xs' : 'text-[8.5px]'} font-black text-white uppercase tracking-tighter transition-all`}>
-                                                    {isConnected ? 'On Call' : 'Connecting...'}
-                                                </span>
+                                            <div className="w-full">
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={`w-2 h-2 ${isConnected ? 'bg-emerald-500' : 'bg-yellow-500'} rounded-full animate-pulse`} />
+                                                        <span className={`text-[10px] font-black ${isConnected ? 'text-emerald-400' : 'text-yellow-500'} uppercase tracking-widest`}>
+                                                            {isConnected ? 'Active Call' : 'Connecting...'}
+                                                        </span>
+                                                    </div>
+                                                    <Phone size={14} className={isConnected ? 'text-emerald-500' : 'text-yellow-500'} />
+                                                </div>
+                                                <div className="bg-white/5 p-4 rounded-2xl flex justify-center" onClick={(e) => e.stopPropagation()}>
+                                                    <AudioChatControls
+                                                        challengeId={activeCall.channelId}
+                                                        userId={user?.id || ''}
+                                                    />
+                                                </div>
                                             </div>
-                                        )
-                                    ) : currentVoiceSession ? (
-                                        <div className="flex items-center gap-1.5">
-                                            <ProtectedAvatar
-                                                userId={currentVoiceSession.user.id}
-                                                src={currentVoiceSession.user.avatar_url}
-                                                username={currentVoiceSession.user.username}
-                                                className={`${isAttentionState ? 'w-6 h-6' : 'w-4 h-4'} rounded-full border border-white/20 shrink-0 transition-all`}
-                                            />
-                                            <span className={`${isAttentionState ? 'text-xs' : 'text-[8.5px]'} font-black text-white uppercase tracking-tighter transition-all`}>
-                                                {currentVoiceSession.user.username} in Voice
-                                            </span>
-                                            <div className={`${isAttentionState ? 'w-2 h-2' : 'w-1.5 h-1.5'} bg-emerald-500 rounded-full animate-pulse`} />
-                                        </div>
-                                    ) : mascot ? (
-                                        <div className="flex items-center gap-1.5 px-2.5 h-full w-full justify-center">
-                                            <span className={`${isAttentionState ? 'text-xs' : 'text-[8px]'} uppercase font-black tracking-[0.08em] text-white/90 truncate max-w-36 select-none transition-all`}>{mascot.label}</span>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-2 px-2 h-full w-full justify-center">
-                                            <span className={`${isAttentionState ? 'text-xs' : 'text-[8.5px]'} font-black tracking-[0.08em] text-white/85 tabular-nums select-none transition-all`}>{localTime}</span>
-                                            <SignalBar
-                                                height={isAttentionState ? 13 : 9}
-                                                barWidth={isAttentionState ? 2.5 : 2}
-                                                className="shrink-0 opacity-90 hover:opacity-100 transition-opacity"
-                                            />
-                                        </div>
-                                    )}
-                                </AnimatePresence>
-                            </div>
-                        </motion.div>
-                    ) : (
+                                        )}
+                                    </div>
+                                )}
 
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ duration: 0.15 }}
-                            className="w-full h-full flex flex-col p-6 overflow-hidden"
-                        >
-                            {/* Call Handling / Setup Sections */}
-                            {activeCall && (
-                                <div className="mb-6 pb-6 border-b border-white/10 flex flex-col items-center justify-center text-center">
-                                    {activeCall.status === 'ringing' ? (
-                                        <div className="w-full flex flex-col items-center gap-4" onClick={(e) => e.stopPropagation()}>
+                                {/* Active Voice Sessions in Rooms I'm part of (Only if not in private call) */}
+                                {!activeCall && currentVoiceSession && (
+                                    <div className="mb-6 pb-6 border-b border-white/10">
+                                        <div className="flex flex-col items-center text-center gap-4">
                                             <div className="relative">
                                                 <ProtectedAvatar
-                                                    userId={activeCall.targetUser?.id}
-                                                    src={activeCall.targetUser?.avatar_url}
-                                                    username={activeCall.targetUser?.username || ''}
-                                                    className="w-16 h-16 rounded-full border-2 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)] animate-pulse"
+                                                    userId={currentVoiceSession.user.id}
+                                                    src={currentVoiceSession.user.avatar_url}
+                                                    username={currentVoiceSession.user.username}
+                                                    className="w-16 h-16 rounded-full border-2 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)]"
                                                 />
-                                                <div className="absolute -bottom-1 -right-1 bg-emerald-500 p-1.5 rounded-full border border-black text-black">
-                                                    <Phone size={12} className="animate-bounce" />
+                                                <div className="absolute -bottom-1 -right-1 bg-black p-1 rounded-full border border-emerald-500">
+                                                    <Phone size={12} className="text-emerald-500" />
                                                 </div>
                                             </div>
                                             <div>
-                                                <h3 className="text-white font-black text-sm uppercase">{activeCall.targetUser?.username}</h3>
-                                                <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mt-1">Incoming Voice Call</p>
+                                                <h3 className="text-white font-black text-sm uppercase">{currentVoiceSession.user.username}</h3>
+                                                <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest mt-1">Active in Voice Chat</p>
                                             </div>
-                                            <div className="flex items-center gap-4 w-full px-4 mt-2">
+                                            <div className="w-full">
                                                 <button
-                                                    onClick={rejectCall}
-                                                    className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-xl text-xs font-black uppercase transition-all shadow-lg flex items-center justify-center gap-1.5"
+                                                    onClick={(e) => handleGoToLobby(e, currentVoiceSession.challengeId)}
+                                                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
                                                 >
-                                                    <PhoneOff size={14} />
-                                                    Decline
-                                                </button>
-                                                <button
-                                                    onClick={acceptCall}
-                                                    className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-black py-2.5 rounded-xl text-xs font-black uppercase transition-all shadow-lg flex items-center justify-center gap-1.5"
-                                                >
-                                                    <Check size={14} strokeWidth={2.5} />
-                                                    Accept
+                                                    <span>Join Room</span>
+                                                    {onlineUsers.filter(u => u.activeVoiceRoomId === currentVoiceSession.challengeId).length > 0 && (
+                                                        <span className="bg-black/20 px-1.5 py-0.5 rounded-full text-[8px]">
+                                                            {onlineUsers.filter(u => u.activeVoiceRoomId === currentVoiceSession.challengeId).length}
+                                                        </span>
+                                                    )}
                                                 </button>
                                             </div>
-                                        </div>
-                                    ) : activeCall.status === 'calling' ? (
-                                        <div className="w-full flex flex-col items-center gap-4" onClick={(e) => e.stopPropagation()}>
-                                            <div className="relative">
-                                                <ProtectedAvatar
-                                                    userId={activeCall.targetUser?.id}
-                                                    src={activeCall.targetUser?.avatar_url}
-                                                    username={activeCall.targetUser?.username || ''}
-                                                    className="w-16 h-16 rounded-full border-2 border-zinc-500 shadow-[0_0_20px_rgba(255,255,255,0.05)]"
-                                                />
-                                                <div className="absolute -bottom-1 -right-1 bg-zinc-800 p-1.5 rounded-full border border-black text-zinc-400">
-                                                    <Phone size={12} className="animate-pulse" />
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <h3 className="text-white font-black text-sm uppercase">{activeCall.targetUser?.username}</h3>
-                                                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Dialing...</p>
-                                            </div>
-                                            <div className="w-full px-4 mt-2">
-                                                <button
-                                                    onClick={hangUpCall}
-                                                    className="w-full bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-xl text-xs font-black uppercase transition-all shadow-lg flex items-center justify-center gap-1.5"
-                                                >
-                                                    <PhoneOff size={14} />
-                                                    Cancel
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="w-full">
-                                            <div className="flex items-center justify-between mb-4">
-                                                <div className="flex items-center gap-2">
-                                                    <div className={`w-2 h-2 ${isConnected ? 'bg-emerald-500' : 'bg-yellow-500'} rounded-full animate-pulse`} />
-                                                    <span className={`text-[10px] font-black ${isConnected ? 'text-emerald-400' : 'text-yellow-500'} uppercase tracking-widest`}>
-                                                        {isConnected ? 'Active Call' : 'Connecting...'}
-                                                    </span>
-                                                </div>
-                                                <Phone size={14} className={isConnected ? 'text-emerald-500' : 'text-yellow-500'} />
-                                            </div>
-                                            <div className="bg-white/5 p-4 rounded-2xl flex justify-center" onClick={(e) => e.stopPropagation()}>
-                                                <AudioChatControls
-                                                    challengeId={activeCall.channelId}
-                                                    userId={user?.id || ''}
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Active Voice Sessions in Rooms I'm part of (Only if not in private call) */}
-                            {!activeCall && currentVoiceSession && (
-                                <div className="mb-6 pb-6 border-b border-white/10">
-                                    <div className="flex flex-col items-center text-center gap-4">
-                                        <div className="relative">
-                                            <ProtectedAvatar
-                                                userId={currentVoiceSession.user.id}
-                                                src={currentVoiceSession.user.avatar_url}
-                                                username={currentVoiceSession.user.username}
-                                                className="w-16 h-16 rounded-full border-2 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)]"
-                                            />
-                                            <div className="absolute -bottom-1 -right-1 bg-black p-1 rounded-full border border-emerald-500">
-                                                <Phone size={12} className="text-emerald-500" />
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <h3 className="text-white font-black text-sm uppercase">{currentVoiceSession.user.username}</h3>
-                                            <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest mt-1">Active in Voice Chat</p>
-                                        </div>
-                                        <div className="w-full">
-                                            <button
-                                                onClick={(e) => handleGoToLobby(e, currentVoiceSession.challengeId)}
-                                                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
-                                            >
-                                                <span>Join Room</span>
-                                                {onlineUsers.filter(u => u.activeVoiceRoomId === currentVoiceSession.challengeId).length > 0 && (
-                                                    <span className="bg-black/20 px-1.5 py-0.5 rounded-full text-[8px]">
-                                                        {onlineUsers.filter(u => u.activeVoiceRoomId === currentVoiceSession.challengeId).length}
-                                                    </span>
-                                                )}
-                                            </button>
                                         </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
 
-                            <div className="flex items-center justify-between mb-4 shrink-0">
-                                <h2 className="text-sm font-black uppercase tracking-widest text-white flex items-center gap-2">
-                                    <Users size={16} className="text-emerald-400" />
-                                    Community
-                                </h2>
-                                <div className="flex items-center gap-3">
-                                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
-                                        <SignalBar height={10} barWidth={2.5} showLabel />
+                                <div className="flex items-center justify-between mb-4 shrink-0">
+                                    <h2 className="text-sm font-black uppercase tracking-widest text-white flex items-center gap-2">
+                                        <Users size={16} className="text-emerald-400" />
+                                        Community
+                                    </h2>
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
+                                            <SignalBar height={10} barWidth={2.5} showLabel />
+                                        </div>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setIsExpanded(false); }}
+                                            className="text-gray-500 hover:text-white transition-colors cursor-pointer"
+                                        >
+                                            <span className="text-[10px] font-black">CLOSE</span>
+                                        </button>
                                     </div>
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); setIsExpanded(false); }}
-                                        className="text-gray-500 hover:text-white transition-colors cursor-pointer"
-                                    >
-                                        <span className="text-[10px] font-black">CLOSE</span>
-                                    </button>
                                 </div>
-                            </div>
 
-                            {!user ? (
-                                <div className="flex-1 flex flex-col items-center justify-center text-center p-4 space-y-3">
-                                    <Users size={32} className="text-zinc-500 animate-pulse" />
-                                    <p className="text-xs text-zinc-400 font-bold uppercase tracking-wider leading-relaxed">
-                                        Sign in to see online users & join voice chats
-                                    </p>
-                                </div>
-                            ) : (
-                                <div className="flex-1 overflow-y-auto pr-2 scrollbar-hide">
-                                    <div className="space-y-4">
-                                        {sortedProfiles.map((p) => {
-                                            const isOnline = onlineUsers.some(u => u.id === p.id);
-                                            const inVoiceRoom = onlineUsers.find(u => u.id === p.id)?.activeVoiceRoomId;
+                                {!user ? (
+                                    <div className="flex-1 flex flex-col items-center justify-center text-center p-4 space-y-3">
+                                        <Users size={32} className="text-zinc-500 animate-pulse" />
+                                        <p className="text-xs text-zinc-400 font-bold uppercase tracking-wider leading-relaxed">
+                                            Sign in to see online users & join voice chats
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="flex-1 overflow-y-auto pr-2 scrollbar-hide">
+                                        <div className="space-y-4">
+                                            {sortedProfiles.map((p) => {
+                                                const isOnline = onlineUsers.some(u => u.id === p.id);
+                                                const inVoiceRoom = onlineUsers.find(u => u.id === p.id)?.activeVoiceRoomId;
 
-                                            return (
-                                                <div key={p.id} className="flex items-center justify-between group">
-                                                    <div className="flex items-center gap-3">
-                                                        <div
-                                                            className="relative cursor-pointer hover:scale-105 transition-transform"
-                                                            onClick={(e) => {
-                                                                if (p.id) {
-                                                                    e.stopPropagation();
-                                                                    window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: p.id } }));
-                                                                }
-                                                            }}
-                                                        >
-                                                            <ProtectedAvatar
-                                                                userId={p.id}
-                                                                src={p.avatar_url}
-                                                                username={p.username}
-                                                                className={`w-10 h-10 rounded-full border transition-all ${isOnline ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-white/10'}`}
-                                                            />
-                                                            {isOnline && (
-                                                                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-black" />
-                                                            )}
-                                                        </div>
-                                                        <div className="flex flex-col">
-                                                            <span
-                                                                className="text-left text-xs font-bold text-white group-hover:text-emerald-400 cursor-pointer hover:underline transition-colors"
+                                                return (
+                                                    <div key={p.id} className="flex items-center justify-between group">
+                                                        <div className="flex items-center gap-3">
+                                                            <div
+                                                                className="relative cursor-pointer hover:scale-105 transition-transform"
                                                                 onClick={(e) => {
                                                                     if (p.id) {
                                                                         e.stopPropagation();
@@ -818,94 +916,114 @@ export const DynamicIslandStatus = () => {
                                                                     }
                                                                 }}
                                                             >
-                                                                {formatUsername(p.username)} {p.id === user?.id && <span className="text-[8px] text-gray-500 ml-1">(YOU)</span>}
-                                                                <ReigningBadge userId={p.id} type="weekly" />
-                                                                <ReigningBadge userId={p.id} type="bot_marathon" />
-                                                            </span>
-                                                            <div className="flex items-center gap-1 text-[9px] text-gray-500">
-                                                                {inVoiceRoom ? (
-                                                                    <span className="text-emerald-500 font-bold uppercase tracking-tighter">In Voice Chat</span>
-                                                                ) : isOnline ? (
-                                                                    <span className="text-emerald-500 font-bold uppercase tracking-tighter">Active Now</span>
-                                                                ) : (
-                                                                    <>
-                                                                        <Clock size={8} />
-                                                                        <span className="text-white">Seen {formatLastSeen(p.last_seen_at)}</span>
-                                                                    </>
+                                                                <ProtectedAvatar
+                                                                    userId={p.id}
+                                                                    src={p.avatar_url}
+                                                                    username={p.username}
+                                                                    className={`w-10 h-10 rounded-full border transition-all ${isOnline ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-white/10'}`}
+                                                                />
+                                                                {isOnline && (
+                                                                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-black" />
                                                                 )}
                                                             </div>
+                                                            <div className="flex flex-col">
+                                                                <span
+                                                                    className="text-left text-xs font-bold text-white group-hover:text-emerald-400 cursor-pointer hover:underline transition-colors"
+                                                                    onClick={(e) => {
+                                                                        if (p.id) {
+                                                                            e.stopPropagation();
+                                                                            window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: p.id } }));
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    {formatUsername(p.username)} {p.id === user?.id && <span className="text-[8px] text-gray-500 ml-1">(YOU)</span>}
+                                                                    <ReigningBadge userId={p.id} type="weekly" />
+                                                                    <ReigningBadge userId={p.id} type="bot_marathon" />
+                                                                </span>
+                                                                <div className="flex items-center gap-1 text-[9px] text-gray-500">
+                                                                    {inVoiceRoom ? (
+                                                                        <span className="text-emerald-500 font-bold uppercase tracking-tighter">In Voice Chat</span>
+                                                                    ) : isOnline ? (
+                                                                        <span className="text-emerald-500 font-bold uppercase tracking-tighter">Active Now</span>
+                                                                    ) : (
+                                                                        <>
+                                                                            <Clock size={8} />
+                                                                            <span className="text-white">Seen {formatLastSeen(p.last_seen_at)}</span>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                                            {p.id !== user?.id && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setPendingChallengeUserId(p.id);
+                                                                        setIsChallengeOpen(true);
+                                                                        setIsExpanded(false);
+                                                                    }}
+                                                                    className="p-1.5 bg-correct/10 hover:bg-correct text-correct hover:text-black rounded-lg transition-all"
+                                                                    title={`Challenge ${p.username}`}
+                                                                >
+                                                                    <Trophy size={10} />
+                                                                </button>
+                                                            )}
+
+                                                            {p.id !== user?.id && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setPendingDMUserId(p.id);
+                                                                        setIsChatOpen(true);
+                                                                        setIsExpanded(false);
+                                                                    }}
+                                                                    className="p-1.5 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-all"
+                                                                    title={`Message ${p.username}`}
+                                                                >
+                                                                    <MessageCircle size={10} />
+                                                                </button>
+                                                            )}
+
+                                                            {isOnline && p.id !== user?.id && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (activeCall) {
+                                                                            triggerToast("You are already in a call.", TOAST_DURATION.LONG);
+                                                                            return;
+                                                                        }
+                                                                        initiatePrivateCall({
+                                                                            id: p.id,
+                                                                            username: p.username,
+                                                                            avatar_url: p.avatar_url
+                                                                        });
+                                                                        setIsExpanded(false);
+                                                                    }}
+                                                                    className="p-1.5 bg-emerald-500/20 hover:bg-emerald-500 text-emerald-500 hover:text-black rounded-lg transition-all"
+                                                                    title={`Call ${p.username}`}
+                                                                >
+                                                                    <Phone size={10} />
+                                                                </button>
+                                                            )}
+
+                                                            {inVoiceRoom && inVoiceRoom !== activeCall?.channelId && (
+                                                                <button
+                                                                    onClick={(e) => handleGoToLobby(e, inVoiceRoom)}
+                                                                    className="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all"
+                                                                >
+                                                                    Join
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </div>
-
-                                                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                                                        {p.id !== user?.id && (
-                                                            <button
-                                                                onClick={() => {
-                                                                    setPendingChallengeUserId(p.id);
-                                                                    setIsChallengeOpen(true);
-                                                                    setIsExpanded(false);
-                                                                }}
-                                                                className="p-1.5 bg-correct/10 hover:bg-correct text-correct hover:text-black rounded-lg transition-all"
-                                                                title={`Challenge ${p.username}`}
-                                                            >
-                                                                <Trophy size={10} />
-                                                            </button>
-                                                        )}
-
-                                                        {p.id !== user?.id && (
-                                                            <button
-                                                                onClick={() => {
-                                                                    setPendingDMUserId(p.id);
-                                                                    setIsChatOpen(true);
-                                                                    setIsExpanded(false);
-                                                                }}
-                                                                className="p-1.5 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-all"
-                                                                title={`Message ${p.username}`}
-                                                            >
-                                                                <MessageCircle size={10} />
-                                                            </button>
-                                                        )}
-
-                                                        {isOnline && p.id !== user?.id && (
-                                                            <button
-                                                                onClick={() => {
-                                                                    if (activeCall) {
-                                                                        triggerToast("You are already in a call.", TOAST_DURATION.LONG);
-                                                                        return;
-                                                                    }
-                                                                    initiatePrivateCall({
-                                                                        id: p.id,
-                                                                        username: p.username,
-                                                                        avatar_url: p.avatar_url
-                                                                    });
-                                                                    setIsExpanded(false);
-                                                                }}
-                                                                className="p-1.5 bg-emerald-500/20 hover:bg-emerald-500 text-emerald-500 hover:text-black rounded-lg transition-all"
-                                                                title={`Call ${p.username}`}
-                                                            >
-                                                                <Phone size={10} />
-                                                            </button>
-                                                        )}
-
-                                                        {inVoiceRoom && inVoiceRoom !== activeCall?.channelId && (
-                                                            <button
-                                                                onClick={(e) => handleGoToLobby(e, inVoiceRoom)}
-                                                                className="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all"
-                                                            >
-                                                                Join
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
+                                                );
+                                            })}
+                                        </div>
                                     </div>
-                                </div>
-                            )}
-                        </motion.div>
-                    )}
-                </div>
-            </motion.div>
-        </div>
+                                )}
+                            </motion.div>
+                        )}
+                    </div>
+                </motion.div>
+            </div>
     );
 };

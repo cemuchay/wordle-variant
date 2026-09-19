@@ -29,13 +29,13 @@ import { uploadVoiceAsset, uploadImageAsset, insertMessageWithRetry } from "../.
 import { VoiceRecorder } from "../../utils/voiceRecorder";
 import { isReactionRow, markGroupsRead, resolveTickState } from "../../utils/readReceipts";
 import { sendDirectMessagePushNotification } from "../../lib/clientPush";
-import formatLastSeen from "../../utils/formatLastSeen";
-import TypingBubble from "./TypingBubble";
+import ChatActivityIndicator from "./ChatActivityIndicator";
 import { useTypingPresence } from "../../hooks/useTypingPresence";
 import { usePeerReceipts } from "../../hooks/usePeerReceipts";
 import MessageInfoModal from "./ChatMessage/MessageInfoModal";
 import { getDailyConfig, deobfuscateWord } from "../../lib/game-logic";
 import { getLocalSalt } from "../../hooks/useGameEngine/utils";
+import formatLastSeen from "@/utils/formatLastSeen";
 
 const CLOSE_DELAY = 60000; // 1 full minute
 // Desktop docked panel width (anchored beside the bubble)
@@ -143,11 +143,10 @@ function SpoilerWord({
             }
             setRevealed((prev) => !prev);
          }}
-         className={`inline-flex items-center gap-1 mx-0.5 px-1.5 py-0.5 rounded text-[11px] font-bold cursor-pointer transition-all duration-200 select-none ${
-            revealed
+         className={`inline-flex items-center gap-1 mx-0.5 px-1.5 py-0.5 rounded text-[11px] font-bold cursor-pointer transition-all duration-200 select-none ${revealed
                ? "bg-amber-500/20 text-amber-300 ring-1 ring-amber-400/50 shadow-sm"
                : "bg-slate-800/90 text-transparent filter blur-[4px] hover:blur-[2px] ring-1 ring-white/20 select-none cursor-pointer"
-         }`}
+            }`}
          title={
             !canReveal
                ? "🔒 Complete today's game first to unlock spoilers!"
@@ -635,6 +634,7 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
 
          setIsRecording(true);
          setRecordingTime(0);
+         setSelfRecording(true);
          timerRef.current = window.setInterval(() => {
             setRecordingTime((prev) => prev + 1);
          }, 1000);
@@ -649,6 +649,7 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
       const audioBlob = wavRecorderRef.current.stop();
       wavRecorderRef.current = null;
       setIsRecording(false);
+      setSelfRecording(false);
       if (timerRef.current) {
          clearInterval(timerRef.current);
          timerRef.current = null;
@@ -666,6 +667,7 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
       wavRecorderRef.current.cancel();
       wavRecorderRef.current = null;
       setIsRecording(false);
+      setSelfRecording(false);
       if (timerRef.current) {
          clearInterval(timerRef.current);
          timerRef.current = null;
@@ -1273,21 +1275,21 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
 
    // Typing presence — subscribed only while a conversation is open
    const isConversationOpen = !!selectedGroupId && (isFullMode || isOverlayOpen);
-   const { typingNames, setSelfTyping } = useTypingPresence(
+   const { typingNames, recordingNames, setSelfTyping, setSelfRecording } = useTypingPresence(
       selectedGroupId,
       user?.id,
       isConversationOpen,
       profile?.username || user?.user_metadata?.username || null,
    );
 
-   // Pause/clear inactivity timer while other users are typing
+   // Pause/clear inactivity timer while other users are typing or recording audio
    useEffect(() => {
-      if (typingNames.length > 0) {
+      if (typingNames.length > 0 || recordingNames.length > 0) {
          clearInactivityTimer();
       } else if (isOverlayOpen) {
          resetInactivityTimer();
       }
-   }, [typingNames.length, isOverlayOpen]);
+   }, [typingNames.length, recordingNames.length, isOverlayOpen]);
 
    const peerReceipts = usePeerReceipts(selectedGroupId, user?.id, isConversationOpen);
    const [infoMsg, setInfoMsg] = useState<any>(null);
@@ -2312,11 +2314,10 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                     <div
                                        key={gid}
                                        onClick={() => openConversationBubble(gid)}
-                                       className={`group flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold cursor-pointer transition-all shrink-0 border ${
-                                          isSelected
+                                       className={`group flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold cursor-pointer transition-all shrink-0 border ${isSelected
                                              ? "bg-indigo-600/30 text-indigo-200 border-indigo-500/50 shadow-sm"
                                              : "bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 border-white/5"
-                                       }`}
+                                          }`}
                                     >
                                        {isDM && partner ? (
                                           <ProtectedAvatar
@@ -2872,9 +2873,10 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                        </div>
                                     );
                                  })}
-                                 {typingNames.length > 0 && (
-                                    <TypingBubble name={typingNames.length === 1 ? typingNames[0] : typingNames.join(", ")} />
-                                 )}
+                                 <ChatActivityIndicator
+                                    typingNames={typingNames}
+                                    recordingNames={recordingNames}
+                                 />
                                  {/* Bottom scroll anchor sentinel */}
                                  <div ref={messagesEndRef} className="h-1 shrink-0 pointer-events-none" />
 
@@ -3013,7 +3015,7 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                              handleSendReply();
                                           }
                                           if (e.key === 'Escape') {
-                                                                      setMentionState(null);
+                                             setMentionState(null);
                                           }
                                        }}
                                        className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500/50 transition-colors resize-none overflow-hidden"
@@ -3190,9 +3192,8 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                     return (
                                        <label
                                           key={p.id}
-                                          className={`flex items-center justify-between p-1.5 rounded-lg cursor-pointer transition-colors ${
-                                             isChecked ? "bg-correct/10 border border-correct/30" : "hover:bg-white/5"
-                                          }`}
+                                          className={`flex items-center justify-between p-1.5 rounded-lg cursor-pointer transition-colors ${isChecked ? "bg-correct/10 border border-correct/30" : "hover:bg-white/5"
+                                             }`}
                                        >
                                           <div className="flex items-center gap-2 min-w-0">
                                              <ProtectedAvatar
