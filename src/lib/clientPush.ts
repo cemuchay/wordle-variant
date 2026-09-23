@@ -283,13 +283,31 @@ export async function sendWordUpMatchCompletedNotification(
    senderName: string,
    category: string,
    matchId: string,
+   scores?: { myScore: number; oppScore: number }
 ): Promise<boolean> {
    const formattedCategory = (category || "general").replace(/_/g, " ");
+   let message = `${senderName} completed the match in ${formattedCategory}. Check the final scores!`;
+   let title = "WordUp Battle Finished! 🏆";
+
+   if (scores) {
+      const { myScore, oppScore } = scores; // myScore is sender's score, oppScore is target recipient's score
+      if (oppScore > myScore) {
+         title = "You Won the WordUp Battle! 🏆";
+         message = `You won the async match on "${formattedCategory}" (${oppScore}-${myScore})!`;
+      } else if (oppScore < myScore) {
+         title = "WordUp Battle Finished ⚔️";
+         message = `${senderName} won the async match on "${formattedCategory}" (${myScore}-${oppScore}).`;
+      } else {
+         title = "WordUp Battle Tied! 🤝";
+         message = `The async match on "${formattedCategory}" ended in a tie (${myScore}-${oppScore})!`;
+      }
+   }
+
    return sendClientNotification({
       user_id: targetUserId,
       type: "CHALLENGE_COMPLETED",
-      title: "WordUp Battle Finished! 🏆",
-      message: `${senderName} completed the match in ${formattedCategory}. Check the final scores!`,
+      title,
+      message,
       data: {
          mode: "wordup_async",
          matchId,

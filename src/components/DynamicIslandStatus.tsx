@@ -18,7 +18,6 @@ import { TIMEOUT } from '../constants/game';
 
 export const DynamicIslandStatus = () => {
     const { user } = useAuth();
-    const setPendingDMUserId = useAppStore(s => s.setPendingDMUserId);
     const setPendingChallengeUserId = useAppStore(s => s.setPendingChallengeUserId);
     const {
         activeCall,
@@ -973,8 +972,7 @@ export const DynamicIslandStatus = () => {
                                                             {p.id !== user?.id && (
                                                                 <button
                                                                     onClick={() => {
-                                                                        setPendingDMUserId(p.id);
-                                                                        setIsChatOpen(true);
+                                                                        window.dispatchEvent(new CustomEvent('open-chat-dm', { detail: { userId: p.id } }));
                                                                         setIsExpanded(false);
                                                                     }}
                                                                     className="p-1.5 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-all"

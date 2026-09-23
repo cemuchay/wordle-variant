@@ -51,6 +51,7 @@ export const WordUpContainer = ({
    const [pausedMatches, setPausedMatches] = useState<PausedMatch[]>(() => getPausedGames());
    const [soundEnabled, setSoundEnabled] = useState(() => wordupAudio.isEnabled());
    const [showSoundPrompt, setShowSoundPrompt] = useState(false);
+   const [dontAskAgain, setDontAskAgain] = useState(false);
    const [lastCategory, setLastCategory] = useState<string | null>(null);
    const [marathonConfigModalOpen, setMarathonConfigModalOpen] = useState(false);
    const [marathonConfigCategory, setMarathonConfigCategory] = useState<string>("mixed");
@@ -252,6 +253,9 @@ export const WordUpContainer = ({
    }, [effectiveUser, marathonConfigCategory, setWordupMode, triggerToast]);
 
    useEffect(() => {
+      const neverAsk = localStorage.getItem("wordup_sound_prompt_never_ask") === "true";
+      if (neverAsk) return;
+
       const todayStr = new Date().toISOString().split("T")[0];
       const lastPromptDate = localStorage.getItem("wordup_sound_prompt_date");
       const isSoundOff = !wordupAudio.isEnabled();
@@ -376,6 +380,9 @@ export const WordUpContainer = ({
                soundEnabled={soundEnabled}
                onToggleSound={() => {
                   const val = !soundEnabled;
+                  if (val) {
+                     localStorage.removeItem("wordup_sound_prompt_never_ask");
+                  }
                   wordupAudio.setEnabled(val);
                   setSoundEnabled(val);
                }}
@@ -451,25 +458,45 @@ export const WordUpContainer = ({
                         Enhance your experience with in-game sound effects for correct answers, timers, and match results.
                      </p>
                   </div>
-                  <div className="flex gap-2 pt-1">
-                     <button
-                        onClick={() => {
-                           setShowSoundPrompt(false);
-                        }}
-                        className="flex-1 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-[9px] font-black uppercase tracking-wider text-white/60 hover:text-white transition-all cursor-pointer"
-                     >
-                        Keep Muted
-                     </button>
-                     <button
-                        onClick={() => {
-                           wordupAudio.setEnabled(true);
-                           setSoundEnabled(true);
-                           setShowSoundPrompt(false);
-                        }}
-                        className="flex-1 py-2.5 rounded-xl bg-[#E85151] hover:bg-[#d44343] text-[9px] font-black uppercase tracking-wider text-white shadow-md shadow-[#E85151]/20 transition-all cursor-pointer"
-                     >
-                        Enable
-                     </button>
+                  <div className="flex flex-col gap-3 pt-1">
+                     <label className="flex items-center justify-center gap-2 cursor-pointer select-none text-xs text-white/70 hover:text-white transition-colors">
+                        <input
+                           type="checkbox"
+                           checked={dontAskAgain}
+                           onChange={(e) => setDontAskAgain(e.target.checked)}
+                           className="w-3.5 h-3.5 rounded border-white/20 bg-white/5 text-[#E85151] focus:ring-0 focus:ring-offset-0 accent-[#E85151] cursor-pointer"
+                        />
+                        <span className="text-[11px] font-medium">Don't ask again</span>
+                     </label>
+
+                     <div className="flex gap-2">
+                        <button
+                           onClick={() => {
+                              if (dontAskAgain) {
+                                 localStorage.setItem("wordup_sound_prompt_never_ask", "true");
+                              }
+                              setShowSoundPrompt(false);
+                           }}
+                           className="flex-1 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-[10px] font-black uppercase tracking-wider text-white/60 hover:text-white transition-all cursor-pointer"
+                        >
+                           Keep Muted
+                        </button>
+                        <button
+                           onClick={() => {
+                              if (dontAskAgain) {
+                                 localStorage.setItem("wordup_sound_prompt_never_ask", "true");
+                              } else {
+                                 localStorage.removeItem("wordup_sound_prompt_never_ask");
+                              }
+                              wordupAudio.setEnabled(true);
+                              setSoundEnabled(true);
+                              setShowSoundPrompt(false);
+                           }}
+                           className="flex-1 py-2.5 rounded-xl bg-[#E85151] hover:bg-[#d44343] text-[10px] font-black uppercase tracking-wider text-white shadow-md shadow-[#E85151]/20 transition-all cursor-pointer"
+                        >
+                           Enable
+                        </button>
+                     </div>
                   </div>
                </div>
             </div>
