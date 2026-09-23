@@ -19,7 +19,6 @@ import { gameEngineReducer, initialState } from "./useGameEngine.types";
 import { GRACE_DECAY } from "@/wordup/shared/constants";
 import { TOAST_DURATION } from "../../../constants/ui";
 import { removePausedGame } from "../../shared/pauseStorage";
-import { sendWordUpTurnNotification, sendWordUpMatchCompletedNotification } from "../../../lib/clientPush";
 
 function getQuestionDuration(type: string): number {
    return QUESTION_DURATION[type] ?? QUESTION_DURATION.default;
@@ -308,31 +307,22 @@ export function useGameEngine(props: EngineProps) {
                true,
             );
 
-            const oppId = isP1 ? upd.player2_id : upd.player1_id;
-            const myName = "Your opponent";
-
-            if (myDone && oppDone) {
-               safeSessionStorage.setItem("wordup_completed_" + upd.id, "true");
-               safeLocalStorage.removeItem("wordup_async_active_game");
-               const myScore =
-                  S.current.role === "player1" ? upd.p1_score : upd.p2_score;
-               const oppScore =
-                  S.current.role === "player1" ? upd.p2_score : upd.p1_score;
-               if (myScore > oppScore) wordupAudio.playVictory();
-               else if (myScore < oppScore) wordupAudio.playDefeat();
-               dispatch({ type: "SET_PHASE", phase: "gameover" });
-               onGameOver(upd);
-               if (oppId) {
-                  sendWordUpMatchCompletedNotification(oppId, myName, upd.category, upd.id);
-               }
-            } else if (myDone) {
-               safeLocalStorage.removeItem("wordup_async_active_game");
-               dispatch({ type: "SET_PHASE", phase: "turn_submitted" });
-               if (oppId) {
-                  sendWordUpTurnNotification(oppId, myName, upd.category, upd.id);
-               }
-            }
-         } catch (e) {
+             if (myDone && oppDone) {
+                safeSessionStorage.setItem("wordup_completed_" + upd.id, "true");
+                safeLocalStorage.removeItem("wordup_async_active_game");
+                const myScore =
+                   S.current.role === "player1" ? upd.p1_score : upd.p2_score;
+                const oppScore =
+                   S.current.role === "player1" ? upd.p2_score : upd.p1_score;
+                if (myScore > oppScore) wordupAudio.playVictory();
+                else if (myScore < oppScore) wordupAudio.playDefeat();
+                dispatch({ type: "SET_PHASE", phase: "gameover" });
+                onGameOver(upd);
+             } else if (myDone) {
+                safeLocalStorage.removeItem("wordup_async_active_game");
+                dispatch({ type: "SET_PHASE", phase: "turn_submitted" });
+             }
+          } catch (e) {
             console.error("[WordUp] Async persist failed:", e);
             triggerToast("Failed to save progress.", TOAST_DURATION.VERY_LONG);
          }

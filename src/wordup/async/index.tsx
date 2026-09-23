@@ -24,7 +24,6 @@ import { RATING, XP } from "../../constants/wordup";
 import { safeLocalStorage } from "../../utils/storage";
 import formatUsername from '../../utils/formatUsername';
 import { TOAST_DURATION } from '../../constants/ui';
-import { sendWordUpInviteNotification } from '../../lib/clientPush';
 
 interface AsyncViewProps {
    onBack?: () => void;
@@ -257,11 +256,6 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
          return;
       }
 
-      const myName = formatUsername(effectiveUser.user_metadata?.username) || effectiveUser.email?.split("@")[0] || "Someone";
-
-      // Dispatch persistent client push notification to targetUser
-      sendWordUpInviteNotification(targetUser.id, myName, category, mId);
-
       const isOnline = onlineUsers.some((u: any) => u.id === targetUser.id);
 
       if (!isOnline) {
@@ -272,6 +266,7 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
 
       const targetChannel = supabase.channel(`user_signals_${targetUser.id}`);
       challengeChannelsRef.current.push(targetChannel);
+      const myName = formatUsername(effectiveUser.user_metadata?.username) || effectiveUser.username || effectiveUser.email?.split("@")[0] || "Someone";
       targetChannel.subscribe((status) => {
          if (status === "SUBSCRIBED") {
             targetChannel.send({

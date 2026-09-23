@@ -264,6 +264,36 @@ const renderFormattedMessageText = (
    });
 };
 
+const formatMessageTimestamp = (dateStr: string): string => {
+   if (!dateStr) return "";
+   const date = new Date(dateStr);
+   if (isNaN(date.getTime())) return "";
+
+   const now = new Date();
+   const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+   const isToday = date.toDateString() === now.toDateString();
+   if (isToday) {
+      return timeStr;
+   }
+
+   const yesterday = new Date(now);
+   yesterday.setDate(now.getDate() - 1);
+   const isYesterday = date.toDateString() === yesterday.toDateString();
+   if (isYesterday) {
+      return `Yesterday, ${timeStr}`;
+   }
+
+   const isSameYear = date.getFullYear() === now.getFullYear();
+   const dateStrFormatted = date.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      ...(isSameYear ? {} : { year: 'numeric' }),
+   });
+
+   return `${dateStrFormatted}, ${timeStr}`;
+};
+
 interface FloatingChatBubbleProps {
    mode?: "bubble" | "full" | "auto";
    onCloseFull?: () => void;
@@ -1885,11 +1915,19 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
       return () => cancelAnimationFrame(raf);
    }, [firstUnreadId, selectedGroupId, allRoomMessages, windowFloorId]);
 
-   // Listen for external open-chat-room triggers and incoming reaction splash events
+   // Listen for external open-chat-room, open-chat-dm triggers and incoming reaction splash events
    useEffect(() => {
       const handleOpenRoom = (e: CustomEvent<{ groupId: string }>) => {
          if (e.detail?.groupId) {
             setSelectedGroupId(e.detail.groupId);
+            setIsOverlayOpen(true);
+            clearInactivityTimer();
+         }
+      };
+
+      const handleOpenDM = (e: CustomEvent<{ userId: string }>) => {
+         if (e.detail?.userId) {
+            handleStartDM(e.detail.userId);
             setIsOverlayOpen(true);
             clearInactivityTimer();
          }
@@ -1905,12 +1943,14 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
       };
 
       window.addEventListener('open-chat-room' as any, handleOpenRoom);
+      window.addEventListener('open-chat-dm' as any, handleOpenDM);
       window.addEventListener('new-message-reaction' as any, handleIncomingReaction);
       return () => {
          window.removeEventListener('open-chat-room' as any, handleOpenRoom);
+         window.removeEventListener('open-chat-dm' as any, handleOpenDM);
          window.removeEventListener('new-message-reaction' as any, handleIncomingReaction);
       };
-   }, [user?.id]);
+   }, [user?.id, handleStartDM]);
 
    // Reset snapshot on room change
    useEffect(() => {
@@ -2696,8 +2736,8 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                                    <span className={`text-[10px] font-black uppercase tracking-wider ${isMe ? "text-indigo-400" : isGroupChat ? userColor.name : "text-indigo-400"}`}>
                                                       {msg.profiles?.username || "User"}
                                                    </span>
-                                                   <span className="text-[8px] text-gray-500 inline-flex items-center gap-1">
-                                                      {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                   <span className="text-[10px] text-white/90 font-semibold inline-flex items-center gap-1">
+                                                      {formatMessageTimestamp(msg.created_at)}
                                                       {isMe && !msg.is_deleted && (
                                                          msg.status === "sending" ? (
                                                             <span className="animate-spin text-white/50 text-[8px]">⌛</span>

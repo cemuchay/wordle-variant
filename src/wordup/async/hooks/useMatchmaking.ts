@@ -81,7 +81,7 @@ export const useAsyncMatchmaking = (
          triggerToast("Failed to create match. Try again.", TOAST_DURATION.LONG);
          return null;
       }
-   }, [user, category, triggerToast]);
+   }, [user, effectiveCategory, triggerToast]);
 
    const sendInvite = useCallback(async (targetUser: any, onComplete: (matchId: string | null) => void) => {
       if (!user) return onComplete(null);
