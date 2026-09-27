@@ -13,6 +13,7 @@ import { ReactionPicker } from './ReactionPicker';
 import { ReactionModal } from './ReactionModal';
 import { ReactionBadge } from './ReactionBadge';
 import { ReactionSplash } from './ReactionSplash';
+import { ReactionDetailsOverlay } from './ReactionDetailsOverlay';
 import { ConnectedAudioPlayer } from './ConnectedAudioPlayer';
 import { TOAST_DURATION } from '../../../constants/ui';
 import { ChatImage } from './ChatImage';
@@ -473,36 +474,12 @@ const ChatMessage = memo(({
 
                             <AnimatePresence>
                                 {showReactionDetails && (
-                                    <motion.div
-                                        ref={detailsRef}
-                                        initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                                        exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                                        className={`absolute bottom-full mb-2 ${isMe ? 'left-0' : 'right-0'} bg-[#1f2c34] border border-white/15 rounded-2xl p-2 shadow-2xl z-50 min-w-[140px] max-w-[200px]`}
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <div className="flex flex-col gap-1.5">
-                                            {Object.entries(msg.reactions).map(([uid, emoji]) => {
-                                                const profile = (allProfiles || users).find(p => p.id === uid);
-                                                return (
-                                                    <div key={uid} className="flex items-center justify-between gap-3 px-2 py-1 hover:bg-white/5 rounded-lg transition-colors">
-                                                        <div className="flex items-center gap-2 min-w-0">
-                                                            <ProtectedAvatar
-                                                                userId={uid}
-                                                                src={profile?.avatar_url}
-                                                                username={profile?.username || 'Unknown'}
-                                                                className="w-4 h-4 rounded-full shrink-0"
-                                                            />
-                                                            <span className="text-[10px] font-black text-white truncate">
-                                                                {uid === currentUserId ? 'You' : (profile?.username || 'Someone')}
-                                                            </span>
-                                                        </div>
-                                                        <span className="text-[12px] shrink-0">{emoji as string}</span>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </motion.div>
+                                    <ReactionDetailsOverlay
+                                        reactions={msg.reactions}
+                                        users={allProfiles || users}
+                                        currentUserId={currentUserId}
+                                        onClose={() => setShowReactionDetails(false)}
+                                    />
                                 )}
                             </AnimatePresence>
                         </>
