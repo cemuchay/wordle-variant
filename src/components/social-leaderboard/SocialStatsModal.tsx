@@ -10,7 +10,6 @@ import {
   Trophy,
   User,
   X,
-  Zap,
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TIMEOUT } from "../../constants/game";
@@ -788,7 +787,7 @@ export const SocialStatsModal: React.FC<Props> = ({
                       <LayoutGrid size={12} /> Social Feed
                     </button>
 
-                    <button
+                    {/* <button
                       onClick={() => handleSetViewMode("newsfeed")}
                       className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${viewMode === "newsfeed"
                         ? "bg-blue-500 text-white shadow-sm shadow-blue-500/20 font-black"
@@ -796,7 +795,7 @@ export const SocialStatsModal: React.FC<Props> = ({
                         }`}
                     >
                       <Zap size={12} className={viewMode === "newsfeed" ? "text-yellow-300 fill-yellow-300" : ""} /> Newsfeed
-                    </button>
+                    </button> */}
 
                   </div>
                 </div>
