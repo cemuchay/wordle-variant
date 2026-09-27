@@ -10,7 +10,6 @@ import {
   Trophy,
   User,
   X,
-  Zap,
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TIMEOUT } from "../../constants/game";
