@@ -20,6 +20,8 @@ import { ReactionPicker } from "./ChatMessage/ReactionPicker";
 import { ReactionModal } from "./ChatMessage/ReactionModal";
 import { ReactionBadge } from "./ChatMessage/ReactionBadge";
 import { ReactionSplash } from "./ChatMessage/ReactionSplash";
+import { ReactionDetailsOverlay } from "./ChatMessage/ReactionDetailsOverlay";
+import { GroupUserActionModal } from "./GroupUserActionModal";
 import { safeLocalStorage } from "../../utils/storage";
 import { requestNotificationPermission } from "../../utils/notifications";
 import { Z_INDEX } from "../../constants/ui";
@@ -382,13 +384,13 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
 
    const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
-   // Multi-bubble management (max 3 recent conversations)
+   // Multi-bubble management (max 2 recent conversations)
    const [activeBubbleGroupIds, setActiveBubbleGroupIds] = useState<string[]>(() => {
       try {
          const saved = safeLocalStorage.getItem('floating_bubble_recent_rooms');
          if (saved) {
             const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) return parsed.slice(0, 3);
+            if (Array.isArray(parsed)) return parsed.slice(0, 2);
          }
       } catch { }
       return [];
@@ -398,7 +400,7 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
       visitedGroupsRef.current.add(groupId);
       setSelectedGroupId(groupId);
       setActiveBubbleGroupIds((prev) => {
-         const next = [groupId, ...prev.filter(id => id !== groupId)].slice(0, 3);
+         const next = [groupId, ...prev.filter(id => id !== groupId)].slice(0, 2);
          try {
             safeLocalStorage.setItem('floating_bubble_recent_rooms', JSON.stringify(next));
          } catch { }
@@ -536,6 +538,13 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
    const [reactingModalMessageId, setReactingModalMessageId] = useState<string | null>(null);
    const [showReactionDetailsId, setShowReactionDetailsId] = useState<string | null>(null);
    const [activeSplashes, setActiveSplashes] = useState<Record<string, string>>({});
+
+   // Group chat user interaction popup
+   const [selectedGroupUserAction, setSelectedGroupUserAction] = useState<{
+      userId: string;
+      username: string;
+      avatarUrl?: string;
+   } | null>(null);
 
    // Reply tracking
    const [replyingToMsg, setReplyingToMsg] = useState<any>(null);
@@ -2699,41 +2708,35 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                              )}
                                           </AnimatePresence>
 
-                                          {/* Reaction Details */}
-                                          <AnimatePresence>
-                                             {showReactionDetailsId === msg.id && msg.reactions && Object.keys(msg.reactions).length > 0 && (
-                                                <motion.div
-                                                   ref={detailsRef}
-                                                   initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                                                   animate={{ opacity: 1, scale: 1, y: 0 }}
-                                                   exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                                                   className={`absolute bottom-full mb-2 ${isMe ? 'left-0' : 'right-0'} bg-slate-900 border border-white/15 rounded-2xl p-2 shadow-2xl z-50 min-w-[140px] max-w-[200px]`}
-                                                   onClick={(e) => e.stopPropagation()}
-                                                >
-                                                   <div className="flex flex-col gap-1.5">
-                                                      {Object.entries(msg.reactions).map(([uid, emoji]) => (
-                                                         <div key={uid} className="flex items-center justify-between gap-3 px-2 py-1 hover:bg-white/5 rounded-lg transition-colors">
-                                                            <span className="text-[10px] font-black text-white truncate">
-                                                               {getUserName(uid)}
-                                                            </span>
-                                                            <span className="text-[12px] shrink-0">{emoji as string}</span>
-                                                         </div>
-                                                      ))}
-                                                   </div>
-                                                </motion.div>
-                                             )}
-                                          </AnimatePresence>
 
                                           <div className={`flex items-start gap-2.5 ${isMe ? "flex-row-reverse" : ""}`}>
                                              <ProtectedAvatar
                                                 userId={msg.user_id}
                                                 src={msg.profiles?.avatar_url}
                                                 username={msg.profiles?.username}
-                                                className={`w-8 h-8 rounded-full border bg-slate-900 shrink-0 ${!isMe && isGroupChat ? userColor.border : "border-white/10"}`}
+                                                className={`w-8 h-8 rounded-full border bg-slate-900 shrink-0 ${!isMe && isGroupChat ? `${userColor.border} cursor-pointer hover:scale-105 active:scale-95 transition-transform` : "border-white/10"}`}
+                                                onClick={!isMe && isGroupChat && msg.user_id ? (e) => {
+                                                   e.stopPropagation();
+                                                   setSelectedGroupUserAction({
+                                                      userId: msg.user_id,
+                                                      username: msg.profiles?.username || "Player",
+                                                      avatarUrl: msg.profiles?.avatar_url,
+                                                   });
+                                                } : undefined}
                                              />
                                              <div className={`min-w-0 max-w-[75%] ${isMe ? "items-end" : ""}`}>
                                                 <div className="flex items-baseline gap-1.5 flex-wrap">
-                                                   <span className={`text-[10px] font-black uppercase tracking-wider ${isMe ? "text-indigo-400" : isGroupChat ? userColor.name : "text-indigo-400"}`}>
+                                                   <span
+                                                      onClick={!isMe && isGroupChat && msg.user_id ? (e) => {
+                                                         e.stopPropagation();
+                                                         setSelectedGroupUserAction({
+                                                            userId: msg.user_id,
+                                                            username: msg.profiles?.username || "Player",
+                                                            avatarUrl: msg.profiles?.avatar_url,
+                                                         });
+                                                      } : undefined}
+                                                      className={`text-[10px] font-black uppercase tracking-wider ${isMe ? "text-indigo-400" : isGroupChat ? `${userColor.name} cursor-pointer hover:underline` : "text-indigo-400"}`}
+                                                   >
                                                       {msg.profiles?.username || "User"}
                                                    </span>
                                                    <span className="text-[10px] text-white/90 font-semibold inline-flex items-center gap-1">
@@ -3324,6 +3327,34 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
             }
             peerReceipts={peerReceipts}
             resolveName={(uid) => getUserName(uid)}
+         />
+
+         {/* Standardized Centered Reaction Details Overlay */}
+         <AnimatePresence>
+            {showReactionDetailsId && (() => {
+               const targetMsg = activeRoomMessages.find((m: any) => m.id === showReactionDetailsId);
+               if (!targetMsg || !targetMsg.reactions || Object.keys(targetMsg.reactions).length === 0) return null;
+               return (
+                  <ReactionDetailsOverlay
+                     reactions={targetMsg.reactions}
+                     users={allProfiles || profilesList}
+                     currentUserId={user?.id}
+                     onClose={() => setShowReactionDetailsId(null)}
+                  />
+               );
+            })()}
+         </AnimatePresence>
+
+         {/* Group Chat User Action Modal */}
+         <GroupUserActionModal
+            targetUser={selectedGroupUserAction}
+            onClose={() => setSelectedGroupUserAction(null)}
+            onViewProfile={(uid) => {
+               window.dispatchEvent(new CustomEvent("open-user-profile", { detail: { userId: uid } }));
+            }}
+            onReplyPrivately={(uid) => {
+               handleStartDM(uid);
+            }}
          />
 
          {/* Dismiss Zone overlay at the bottom center */}
