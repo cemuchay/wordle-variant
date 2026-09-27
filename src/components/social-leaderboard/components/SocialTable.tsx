@@ -53,22 +53,22 @@ const SocialTable = ({
                     }
                 }}
                 className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer hover:border-gray-600 ${isPlaying
-                        ? "bg-cyan-950/20 border-cyan-500/40 hover:border-cyan-400/60"
-                        : isFirst
-                            ? "bg-yellow-500/10 border-yellow-500/40"
-                            : entry.user_id === user?.id
-                                ? "bg-emerald-500/10 border-emerald-500/40"
-                                : "bg-gray-800/40 border-gray-800"
+                    ? "bg-cyan-950/20 border-cyan-500/40 hover:border-cyan-400/60"
+                    : isFirst
+                        ? "bg-yellow-500/10 border-yellow-500/40"
+                        : entry.user_id === user?.id
+                            ? "bg-emerald-500/10 border-emerald-500/40"
+                            : "bg-gray-800/40 border-gray-800"
                     }`}
             >
                 <div className="flex items-center gap-3">
                     <div className="flex flex-col items-center justify-center w-6 shrink-0">
                         <span
                             className={`text-xs font-black font-mono text-center ${isPlaying
-                                    ? "text-cyan-400"
-                                    : isFirst
-                                        ? "text-yellow-400"
-                                        : "text-gray-400"
+                                ? "text-cyan-400"
+                                : isFirst
+                                    ? "text-yellow-400"
+                                    : "text-gray-400"
                                 }`}
                         >
                             {currentRank}
@@ -91,7 +91,7 @@ const SocialTable = ({
                     <div className="relative shrink-0">
                         {isFirst && !isPlaying && (
                             <span
-                                className="absolute -top-4 left-1/2 -translate-x-1/2 text-base z-10 select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] filter brightness-110 font-bold"
+                                className="absolute -top-[1.5rem] left-[-0.17rem] sm:left-[-0.17rem] sm:-top-[1.5rem] text-2xl sm:text-2xl select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] filter brightness-110 font-bold"
                                 role="img"
                                 aria-label="crown"
                             >
@@ -103,10 +103,10 @@ const SocialTable = ({
                             src={entry.avatar_url}
                             username={entry.username}
                             className={`w-7 h-7 rounded-full border ${isPlaying
-                                    ? "border-cyan-400 ring-1 ring-cyan-400/40"
-                                    : isFirst
-                                        ? "border-yellow-400 ring-1 ring-yellow-400/40"
-                                        : "border-gray-700"
+                                ? "border-cyan-400 ring-1 ring-cyan-400/40"
+                                : isFirst
+                                    ? "border-yellow-400 ring-1 ring-yellow-400/40"
+                                    : "border-gray-700"
                                 }`}
                         />
                     </div>
@@ -114,10 +114,10 @@ const SocialTable = ({
                         <div className="flex items-center gap-1.5 flex-wrap">
                             <span
                                 className={`text-xs font-bold truncate max-w-30 block ${isPlaying
-                                        ? "text-cyan-200"
-                                        : isFirst
-                                            ? "text-yellow-200"
-                                            : "text-white"
+                                    ? "text-cyan-200"
+                                    : isFirst
+                                        ? "text-yellow-200"
+                                        : "text-white"
                                     }`}
                             >
                                 {formatUsername(entry.username)}
@@ -206,9 +206,8 @@ const SocialTable = ({
                             </span>
                         ) : movement?.delta !== undefined && movement.delta !== 0 ? (
                             <span
-                                className={`text-[7px] font-black font-mono leading-none ${
-                                    movement.delta > 0 ? "text-emerald-400" : "text-rose-400"
-                                }`}
+                                className={`text-[7px] font-black font-mono leading-none ${movement.delta > 0 ? "text-emerald-400" : "text-rose-400"
+                                    }`}
                             >
                                 {movement.delta > 0 ? `▲+${movement.delta}` : `▼${movement.delta}`}
                             </span>

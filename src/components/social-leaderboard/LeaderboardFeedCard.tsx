@@ -277,15 +277,14 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
     <>
       <div
         onClick={() => onOpenPreview(entry, false)}
-        className={`border rounded-2xl transition-all duration-300 relative shadow-xl hover:border-gray-600 cursor-pointer ${
-          isPlaying
-            ? "p-3 border-cyan-500/40 bg-cyan-950/20 shadow-[0_0_20px_rgba(6,182,212,0.08)]"
-            : isFirst
-              ? "p-4 border-yellow-500/50 bg-linear-to-b from-yellow-500/10 via-gray-900 to-gray-900 shadow-[0_0_20px_rgba(234,179,8,0.12)]"
-              : isCurrentUser
-                ? "p-4 border-emerald-500/40 bg-emerald-950/10"
-                : "p-4 border-gray-800 bg-gray-900/90"
-        }`}
+        className={`border rounded-2xl transition-all duration-300 relative shadow-xl hover:border-gray-600 cursor-pointer ${isPlaying
+          ? "p-3 border-cyan-500/40 bg-cyan-950/20 shadow-[0_0_20px_rgba(6,182,212,0.08)]"
+          : isFirst
+            ? "p-4 border-yellow-500/50 bg-linear-to-b from-yellow-500/10 via-gray-900 to-gray-900 shadow-[0_0_20px_rgba(234,179,8,0.12)]"
+            : isCurrentUser
+              ? "p-4 border-emerald-500/40 bg-emerald-950/10"
+              : "p-4 border-gray-800 bg-gray-900/90"
+          }`}
       >
         {/* Top Player Header */}
         <div className={`flex items-center justify-between ${isPlaying ? "pb-2" : "pb-3"} border-b border-white/5`}>
@@ -293,21 +292,20 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
             {/* Rank badge + Movement Indicator */}
             <div className="relative flex flex-col items-center justify-center">
               <span
-                className={`text-sm font-black font-mono w-6 text-center ${
-                  isPlaying
-                    ? "text-cyan-400"
-                    : isFirst
-                      ? "text-yellow-400 text-base"
-                      : rank <= 3
-                        ? "text-amber-300"
-                        : "text-gray-500"
-                }`}
+                className={`text-sm font-black font-mono w-6 text-center ${isPlaying
+                  ? "text-cyan-400"
+                  : isFirst
+                    ? "text-yellow-400 text-base"
+                    : rank <= 3
+                      ? "text-amber-300"
+                      : "text-gray-500"
+                  }`}
               >
                 #{rank}
               </span>
               {isFirst && !isPlaying && (
                 <span
-                  className="absolute -top-2.5 left-1 text-base select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] filter brightness-110 font-bold"
+                  className="absolute -top-[1.925rem] left-[2.35rem] sm:left-[2.35rem] sm:-top-[1.925rem] text-2xl sm:text-2xl select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] filter brightness-110 font-bold"
                   role="img"
                   aria-label="crown"
                 >
@@ -321,9 +319,8 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
                 </span>
               ) : movement?.delta !== undefined && movement.delta !== 0 ? (
                 <span
-                  className={`text-[8px] font-mono font-bold flex items-center mt-0.5 ${
-                    movement.delta > 0 ? "text-emerald-400" : "text-rose-400"
-                  }`}
+                  className={`text-[8px] font-mono font-bold flex items-center mt-0.5 ${movement.delta > 0 ? "text-emerald-400" : "text-rose-400"
+                    }`}
                   title={`Previously #${movement.prevRank}`}
                 >
                   {movement.delta > 0 ? `▲+${movement.delta}` : `▼${movement.delta}`}
@@ -335,25 +332,23 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
               userId={entry.user_id}
               src={entry.avatar_url}
               username={entry.username}
-              className={`w-9 h-9 rounded-full border ${
-                isPlaying
-                  ? "border-cyan-400 ring-2 ring-cyan-400/20"
-                  : isFirst
-                    ? "border-yellow-400 ring-2 ring-yellow-400/20"
-                    : "border-gray-700"
-              }`}
+              className={`w-9 h-9 rounded-full border ${isPlaying
+                ? "border-cyan-400 ring-2 ring-cyan-400/20"
+                : isFirst
+                  ? "border-yellow-400 ring-2 ring-yellow-400/20"
+                  : "border-gray-700"
+                }`}
             />
 
             <div>
               <div className="flex items-center gap-1.5">
                 <span
-                  className={`text-xs sm:text-sm font-black tracking-tight truncate max-w-[130px] sm:max-w-[180px] ${
-                    isPlaying
-                      ? "text-cyan-200"
-                      : isFirst
-                        ? "text-yellow-200"
-                        : "text-white"
-                  }`}
+                  className={`text-xs sm:text-sm font-black tracking-tight truncate max-w-[130px] sm:max-w-[180px] ${isPlaying
+                    ? "text-cyan-200"
+                    : isFirst
+                      ? "text-yellow-200"
+                      : "text-white"
+                    }`}
                 >
                   {formatUsername(entry.username)}
                 </span>
