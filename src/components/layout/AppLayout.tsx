@@ -5,6 +5,7 @@ import { AppNavigation } from './AppNavigation';
 import { DynamicIslandStatus } from '../DynamicIslandStatus';
 import { useAppStore } from '../../store/useAppStore';
 import { useApp } from '../../context/AppContext';
+import { useNotifications } from '../../hooks/useNotifications';
 import { applyTheme } from '../../utils/theme';
 import type { SyncStatus } from '../../types/game';
 
@@ -74,7 +75,8 @@ export const AppLayout = ({
         }
     }, [theme, preferences, setPreferences]);
 
-    const { isDynamicIslandVisible } = useApp();
+    const { isDynamicIslandVisible, profile } = useApp();
+    const { unreadCount: notificationsUnreadCount } = useNotifications(profile?.id, { enableRealtime: false });
 
     // Determine if game for the day has not been completed (in-progress daily game)
     const isDailyGameInProgress = headerProps && !headerProps.isGameOver && !hideHeader;
@@ -149,7 +151,7 @@ export const AppLayout = ({
                 >
                     <button
                         onClick={handleToggleHeaderMenu}
-                        className={`w-8 h-8 rounded-full border transition-all cursor-pointer shadow-lg active:scale-95 flex items-center justify-center ${
+                        className={`w-8 h-8 rounded-full border transition-all cursor-pointer shadow-lg active:scale-95 flex items-center justify-center relative ${
                             isHeaderMenuOpen
                                 ? 'bg-indigo-600 text-white border-indigo-400 shadow-indigo-600/30'
                                 : 'bg-[#0b101d]/90 hover:bg-slate-800 text-gray-300 hover:text-white border-slate-700/80 backdrop-blur-md'
@@ -157,6 +159,13 @@ export const AppLayout = ({
                         title={isHeaderMenuOpen ? "Close Menu" : "Header Options"}
                     >
                         {isHeaderMenuOpen ? <X size={15} /> : <Menu size={15} />}
+
+                        {/* Unread Notifications Counter Badge */}
+                        {notificationsUnreadCount > 0 && !isHeaderMenuOpen && (
+                            <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-red-500 text-[8px] font-black text-white ring-2 ring-[#0b101d] animate-in zoom-in duration-300 shadow-md">
+                                {notificationsUnreadCount > 9 ? '9+' : notificationsUnreadCount}
+                            </span>
+                        )}
                     </button>
                 </div>
             )}

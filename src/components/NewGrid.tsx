@@ -258,6 +258,11 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
     ? 0
     : Math.max(0, maxAttempts - guesses.length - (!isGameOver && revealingRowIndex === null ? 1 : 0));
 
+  // Quick Nav Carousel State (infinite swipe, 3 items per slide)
+  const [navSlideIndex, setNavSlideIndex] = useState(0);
+  const touchStartXRef = useRef<number | null>(null);
+  const touchEndXRef = useRef<number | null>(null);
+
   const lastGuess = guesses[guesses.length - 1];
   let hasRepeatedLetters = false;
   if (lastGuess) {
@@ -415,100 +420,118 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
       )}
 
       {/* Top Lightweight Quick Nav Buttons (Hidden in challenge/archive/guest modes) */}
-      {!shouldHideNavButtons && (
-        <div className="flex items-center justify-start sm:justify-center gap-1.5 sm:gap-2 mb-2 w-full max-w-full overflow-x-auto scrollbar-hide shrink-0 px-0.5 py-0.5 ms-7">
-          {!isGameOver && canShowHint && onHint && (() => {
-            const isLocked = isHintLocked ?? (guesses.length < 2);
-            const isUnavailable = isLocked || !!usedHint;
-            return (
-              <button
-                onClick={onHint}
-                disabled={isUnavailable}
-                className={`shrink-0 px-2.5 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg transition-all flex items-center gap-1.5 shadow-xs relative ${isUnavailable
-                  ? 'bg-black/80 text-gray-500 border border-gray-800 opacity-50 cursor-not-allowed pointer-events-none'
-                  : 'bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30 border border-yellow-500/40 cursor-pointer active:scale-95 animate-pulse'
-                  }`}
-                title={usedHint ? "Hint Used" : isLocked ? "Unlock hint by guessing 2+ words" : "Get Hint"}
-              >
-                <Lightbulb size={12} className={isUnavailable ? "text-gray-600" : "text-yellow-400 fill-yellow-400/20"} />
-                <span>{usedHint ? "hint used" : isLocked ? "hint 🔒" : "get hint"}</span>
-                {isLocked && !usedHint && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-[80%] h-[1.5px] bg-red-600/60 rotate-45" />
-                  </div>
-                )}
-              </button>
-            );
-          })()}
+      {!shouldHideNavButtons && (() => {
+        // Collect active nav button elements
+        const navItems: React.ReactNode[] = [];
 
-          {!isGameOver && onClearRow && (
+        if (!isGameOver && canShowHint && onHint) {
+          const isLocked = isHintLocked ?? (guesses.length < 2);
+          const isUnavailable = isLocked || !!usedHint;
+          navItems.push(
             <button
+              key="btn-hint"
+              onClick={onHint}
+              disabled={isUnavailable}
+              className={`shrink-0 w-full px-2 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg transition-all flex items-center justify-center gap-1 shadow-xs relative ${isUnavailable
+                ? 'bg-black/80 text-gray-500 border border-gray-800 opacity-50 cursor-not-allowed pointer-events-none'
+                : 'bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30 border border-yellow-500/40 cursor-pointer active:scale-95 animate-pulse'
+                }`}
+              title={usedHint ? "Hint Used" : isLocked ? "Unlock hint by guessing 2+ words" : "Get Hint"}
+            >
+              <Lightbulb size={12} className={isUnavailable ? "text-gray-600" : "text-yellow-400 fill-yellow-400/20"} />
+              <span className="truncate">{usedHint ? "hint used" : isLocked ? "hint 🔒" : "get hint"}</span>
+              {isLocked && !usedHint && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-[80%] h-[1.5px] bg-red-600/60 rotate-45" />
+                </div>
+              )}
+            </button>
+          );
+        }
+
+        if (!isGameOver && onClearRow) {
+          navItems.push(
+            <button
+              key="btn-clear"
               onClick={onClearRow}
               disabled={!currentGuess || currentGuess.length === 0}
-              className={`shrink-0 px-2.5 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg transition-all flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95 ${!currentGuess || currentGuess.length === 0
+              className={`shrink-0 w-full px-2 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg transition-all flex items-center justify-center gap-1 shadow-xs cursor-pointer active:scale-95 ${!currentGuess || currentGuess.length === 0
                 ? 'bg-white/5 text-gray-500 border border-white/5 opacity-40 cursor-not-allowed pointer-events-none'
                 : 'bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 hover:text-rose-200 border border-rose-500/30'
                 }`}
               title="Clear current typed guess row"
             >
               <RotateCcw size={11} className={!currentGuess || currentGuess.length === 0 ? "text-gray-500" : "text-rose-400"} />
-              <span>clear row</span>
+              <span className="truncate">clear row</span>
             </button>
-          )}
+          );
+        }
 
-          <StreakCounter
-            size="small"
-            currentStreak={stats?.currentStreak ?? 0}
-            maxStreak={stats?.maxStreak ?? 0}
-          />
+        navItems.push(
+          <div key="item-streak" className="w-full flex justify-center">
+            <StreakCounter
+              size="small"
+              currentStreak={stats?.currentStreak ?? 0}
+              maxStreak={stats?.maxStreak ?? 0}
+            />
+          </div>
+        );
 
-          {isGameOver && onToggleBoardCollapse && (
+        if (isGameOver && onToggleBoardCollapse) {
+          navItems.push(
             <button
+              key="btn-collapse"
               onClick={onToggleBoardCollapse}
-              className="shrink-0 px-2.5 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg bg-white/10 hover:bg-white/20 text-white/90 border border-white/20 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs"
+              className="shrink-0 w-full px-2 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg bg-white/10 hover:bg-white/20 text-white/90 border border-white/20 transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 shadow-xs"
               title={isBoardCollapsed ? "View Full Board (6 rows)" : "Collapse Completed Board"}
             >
               {isBoardCollapsed ? (
                 <>
                   <Maximize2 size={12} className="text-white shrink-0" />
-                  <span>view full board</span>
+                  <span className="truncate">full board</span>
                 </>
               ) : (
                 <>
                   <Minimize2 size={12} className="text-white shrink-0" />
-                  <span>compact board</span>
+                  <span className="truncate">compact</span>
                 </>
               )}
             </button>
-          )}
+          );
+        }
 
-          {isGameOver && (
+        if (isGameOver) {
+          navItems.push(
             <button
+              key="btn-share"
               onClick={handleShareResults}
               disabled={isSharing}
-              className="shrink-0 px-2.5 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs disabled:opacity-50"
+              className="shrink-0 w-full px-2 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 shadow-xs disabled:opacity-50"
               title="Share game results"
             >
               {isSharing ? (
                 <>
                   <Loader2 size={12} className="animate-spin text-emerald-400 shrink-0" />
-                  <span>sharing...</span>
+                  <span className="truncate">sharing...</span>
                 </>
               ) : isShareCopied ? (
                 <>
                   <Check size={12} className="text-emerald-400 shrink-0" />
-                  <span>copied!</span>
+                  <span className="truncate">copied!</span>
                 </>
               ) : (
                 <>
                   <Share2 size={12} className="text-emerald-400 shrink-0" />
-                  <span>share</span>
+                  <span className="truncate">share</span>
                 </>
               )}
             </button>
-          )}
+          );
+        }
 
+        navItems.push(
           <button
+            key="btn-archive"
             onClick={() => {
               if (onOpenArchive) {
                 onOpenArchive();
@@ -516,15 +539,18 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
                 window.dispatchEvent(new CustomEvent('open-free-play', { detail: { mode: 'archive' } }));
               }
             }}
-            className="shrink-0 px-2.5 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-indigo-200 border border-indigo-500/25 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs"
+            className="shrink-0 w-full px-2 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-indigo-200 border border-indigo-500/25 transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 shadow-xs"
             title="Variant Archive"
           >
             <Calendar size={12} className="text-indigo-400 shrink-0" />
-            <span>archive</span>
+            <span className="truncate">archive</span>
             <ChevronRight size={13} className="opacity-80 shrink-0" />
           </button>
+        );
 
+        navItems.push(
           <button
+            key="btn-event"
             onClick={() => {
               if (onOpenDailyEvent) {
                 onOpenDailyEvent();
@@ -532,20 +558,106 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
                 window.dispatchEvent(new CustomEvent('open-challenges'));
               }
             }}
-            className="shrink-0 px-2.5 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 hover:text-emerald-200 border border-emerald-500/25 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs"
+            className="shrink-0 w-full px-2 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 hover:text-emerald-200 border border-emerald-500/25 transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 shadow-xs"
             title="Daily Event / Bot Event"
           >
             <Sparkles size={12} className="text-emerald-400 shrink-0" />
-            <span>daily event</span>
+            <span className="truncate">daily event</span>
             <ChevronRight size={13} className="opacity-80 shrink-0" />
           </button>
-        </div>
-      )}
+        );
+
+        // Group into slides of 3 items each
+        const itemsPerSlide = 3;
+        const totalSlides = Math.max(1, Math.ceil(navItems.length / itemsPerSlide));
+        const activeSlide = ((navSlideIndex % totalSlides) + totalSlides) % totalSlides;
+
+        const handleTouchStart = (e: React.TouchEvent) => {
+          touchStartXRef.current = e.touches[0].clientX;
+          touchEndXRef.current = null;
+        };
+
+        const handleTouchMove = (e: React.TouchEvent) => {
+          touchEndXRef.current = e.touches[0].clientX;
+        };
+
+        const handleTouchEnd = () => {
+          if (touchStartXRef.current !== null && touchEndXRef.current !== null) {
+            const diff = touchStartXRef.current - touchEndXRef.current;
+            if (Math.abs(diff) > 35) {
+              if (diff > 0) {
+                // Swipe left -> next slide (infinite loop)
+                setNavSlideIndex((prev) => (prev + 1) % totalSlides);
+              } else {
+                // Swipe right -> prev slide (infinite loop)
+                setNavSlideIndex((prev) => (prev - 1 + totalSlides) % totalSlides);
+              }
+            }
+          }
+          touchStartXRef.current = null;
+          touchEndXRef.current = null;
+        };
+
+        const currentSlideItems = navItems.slice(
+          activeSlide * itemsPerSlide,
+          activeSlide * itemsPerSlide + itemsPerSlide
+        );
+
+        return (
+          <div className="w-full max-w-[90vw] sm:max-w-md mx-auto mb-2.5 select-none flex flex-col items-center">
+            {/* Carousel Container */}
+            <div
+              className="w-full overflow-hidden touch-pan-y flex justify-center"
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
+              <div
+                className={`items-center min-h-[34px] px-1 py-0.5 w-full ${currentSlideItems.length === 3
+                  ? 'grid grid-cols-3 gap-1.5 sm:gap-2'
+                  : 'flex justify-center gap-1.5 sm:gap-2'
+                  }`}
+              >
+                {currentSlideItems.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex items-center justify-center min-w-0 ${currentSlideItems.length === 3
+                      ? 'w-full'
+                      : currentSlideItems.length === 2
+                        ? 'w-1/2 max-w-[140px]'
+                        : 'w-full max-w-[150px]'
+                      }`}
+                  >
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Carousel Dot Indicators (When more than 1 slide) */}
+            {totalSlides > 1 && (
+              <div className="flex items-center justify-center gap-1.5 mt-1">
+                {Array.from({ length: totalSlides }).map((_, sIdx) => (
+                  <button
+                    key={sIdx}
+                    onClick={() => setNavSlideIndex(sIdx)}
+                    className={`transition-all rounded-full cursor-pointer ${sIdx === activeSlide
+                      ? 'w-3.5 h-1 bg-amber-400'
+                      : 'w-1.5 h-1 bg-white/20 hover:bg-white/40'
+                      }`}
+                    title={`Slide ${sIdx + 1}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
 
       {/*Right Side Rules */}
       {(onToggleRules || wordLength > 5) && (
-        <div className="absolute top-0 -right-4 flex items-center gap-2 md:left-full md:ml-3 md:top-2 md:flex-col md:right-auto z-30 shrink-0">
+        <div className="absolute top-12 right-2 flex items-center gap-2 md:left-full md:ml-3 md:top-2 md:flex-col md:right-auto z-30 shrink-0">
           {onToggleRules && (
             <div className="relative">
               <button

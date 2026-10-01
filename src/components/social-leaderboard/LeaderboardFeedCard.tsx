@@ -305,7 +305,7 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
               </span>
               {isFirst && !isPlaying && (
                 <span
-                  className="absolute -top-[1.925rem] left-[2.35rem] sm:left-[2.35rem] sm:-top-[1.925rem] text-2xl sm:text-2xl select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] filter brightness-110 font-bold"
+                  className="absolute -top-[1.925rem] left-[2.5rem] sm:left-[2.35rem] sm:-top-[1.925rem] text-2xl sm:text-2xl select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] filter brightness-110 font-bold"
                   role="img"
                   aria-label="crown"
                 >

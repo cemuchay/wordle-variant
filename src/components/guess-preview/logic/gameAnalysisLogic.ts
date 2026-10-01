@@ -6,6 +6,11 @@ import {
    isHintDisabled,
    getHint,
 } from "../../../lib/game-logic";
+import {
+   getCuratedOptimalStarter,
+   calculateWordEliminationScore,
+   OPTIMAL_STARTERS_BY_LENGTH,
+} from "../../../data/researchInsights";
 
 export interface MoveAnalysis {
    turn: number;
@@ -137,67 +142,20 @@ function findBestEntropyStarter(
    candidatePool: string[],
    wordLength: number,
 ): string {
-   const curatedStarters: Record<number, string[]> = {
-      3: ["TEA", "OAT", "ERA", "TAN", "RAT", "SEA", "RED"],
-      4: [
-         "SOAR",
-         "ROSE",
-         "LATE",
-         "TORE",
-         "TARE",
-         "EAST",
-         "BEAR",
-         "WIND",
-         "RANT",
-      ],
-      5: [
-         "CRANE",
-         "STARE",
-         "SLATE",
-         "TRACE",
-         "ROAST",
-         "AUDIO",
-         "ADIEU",
-         "RAISE",
-      ],
-      6: ["PLANET", "COARSE", "SENIOR", "STREAM", "CASTLE", "STRIPE"],
-      7: ["STARING", "OUTDATE", "COARSER", "PAINTER"],
-      8: ["STARLING", "REASTING", "RELATION"],
-   };
-
-   const curated = curatedStarters[wordLength];
+   const curated = OPTIMAL_STARTERS_BY_LENGTH[wordLength];
    if (curated) {
       const validInPool = curated.filter((w) => candidatePool.includes(w));
       if (validInPool.length > 0) return validInPool[0];
    }
 
-   const vowels = new Set(["A", "E", "I", "O", "U"]);
-   const commonConsonants = new Set(["R", "S", "T", "L", "N"]);
-
-   let bestWord = candidatePool[0] || "CRANE";
-   let bestScore = -1;
-
-   for (const w of candidatePool) {
-      const uniqueChars = new Set(w.split(""));
-      let score = uniqueChars.size * 3;
-      uniqueChars.forEach((ch) => {
-         if (vowels.has(ch)) score += 2;
-         if (commonConsonants.has(ch)) score += 1.5;
-      });
-      if (score > bestScore) {
-         bestScore = score;
-         bestWord = w;
-      }
-   }
-
-   return bestWord;
+   return getCuratedOptimalStarter(wordLength, candidatePool);
 }
 
 /**
  * Finds the optimal bot move for a state. Supports strategic elimination moves
  * that intentionally drop green/yellow letters to clear candidate traps, BUT NEVER
  * plays discarded letters ("absent" / gray letters from previous guesses).
- * Only plays present, correct, or undiscovered letters.
+ * Evaluates candidate words using information entropy partition theory and positional research weights.
  */
 export function findOptimalBotMove(
    poolBefore: string[],
@@ -221,33 +179,10 @@ export function findOptimalBotMove(
       return {
          word: starter,
          reason:
-            "High entropy starter testing common vowels and high-frequency consonants.",
+            "Research-backed optimal starter with maximum information entropy and optimal positional frequency coverage.",
          expectedPoolReduction: "85%+",
       };
    }
-
-   // Find distinguishing letters among remaining candidates
-   const charCountsInPool = new Map<string, number>();
-   poolBefore.forEach((w) => {
-      new Set(w.split("")).forEach((c) => {
-         charCountsInPool.set(c, (charCountsInPool.get(c) || 0) + 1);
-      });
-   });
-
-   const distinguishingChars = Array.from(charCountsInPool.entries())
-      .filter(([, count]) => count > 0 && count < poolBeforeCount)
-      .map(([char]) => char);
-
-   if (distinguishingChars.length === 0) {
-      return {
-         word: poolBefore[0],
-         reason: "Candidate answer chosen from remaining pool.",
-         expectedPoolReduction: `${Math.round(((poolBeforeCount - 1) / poolBeforeCount) * 100)}%`,
-      };
-   }
-
-   let bestTestWord = poolBefore[0];
-   let maxScore = -1;
 
    // Filter allowed candidate list so that NO discarded/absent letters are reused by the bot
    const baseList = allowedWords.length > 0 ? allowedWords : poolBefore;
@@ -263,49 +198,51 @@ export function findOptimalBotMove(
 
    const poolToSearch = candidateList.length > 0 ? candidateList : poolBefore;
 
+   let bestWord = poolBefore[0];
+   let maxScore = -Infinity;
+   let bestTestedInfo: string[] = [];
+   let bestIsCandidate = false;
+
    for (const w of poolToSearch) {
-      const uniqueChars = new Set(w.split(""));
-      let distinguishingTested = 0;
-      distinguishingChars.forEach((ch) => {
-         if (uniqueChars.has(ch)) distinguishingTested++;
-      });
-
-      if (distinguishingTested === 0 && poolBeforeCount > 1) continue;
-
       const isCandidate = poolBefore.includes(w);
-      const candidateBonus =
-         poolBeforeCount <= 2 ? 18 : poolBeforeCount === 3 ? 12 : 7;
-      const score =
-         distinguishingTested * 12 +
-         (isCandidate ? candidateBonus : 0) +
-         uniqueChars.size * 0.5;
+      const { totalScore, testedDistinguishingLetters, testedCount } =
+         calculateWordEliminationScore(
+            w,
+            poolBefore,
+            wordLength,
+            isCandidate,
+         );
 
-      if (score > maxScore) {
-         maxScore = score;
-         bestTestWord = w;
+      if (testedCount === 0 && poolBeforeCount > 1 && !isCandidate) continue;
+
+      if (totalScore > maxScore) {
+         maxScore = totalScore;
+         bestWord = w;
+         bestTestedInfo = testedDistinguishingLetters;
+         bestIsCandidate = isCandidate;
       }
    }
 
-   const isCandidate = poolBefore.includes(bestTestWord);
-   const testedList = Array.from(new Set(bestTestWord.split(""))).filter((c) =>
-      distinguishingChars.includes(c),
-   );
-   const testedStr =
-      testedList.length > 0
-         ? testedList.join(", ")
-         : distinguishingChars.slice(0, 4).join(", ");
-
    let botReason: string;
-   if (isCandidate) {
-      botReason = `Candidate answer testing key letter(s) (${testedStr}) from remaining ${poolBeforeCount} possibilities.`;
+   const testedStr =
+      bestTestedInfo.length > 0
+         ? bestTestedInfo.join(", ")
+         : "remaining candidate letters";
+
+   if (bestIsCandidate) {
+      if (poolBeforeCount <= 3) {
+         botReason = `Candidate answer chosen from ${poolBeforeCount} remaining possibilities for maximum win probability.`;
+      } else {
+         botReason = `Candidate answer testing key letter(s) (${testedStr}) from remaining ${poolBeforeCount} possibilities with high positional alignment.`;
+      }
    } else {
-      botReason = `Strategic elimination play: tests ${testedList.length} distinguishing letters (${testedStr}) using fresh/undiscovered letters across ${poolBeforeCount} candidates without repeating discarded letters.`;
+      botReason = `Strategic elimination play: tests ${bestTestedInfo.length} distinguishing letters (${testedStr}) across ${poolBeforeCount} candidates using fresh/undiscovered letters without repeating discarded letters.`;
    }
 
    const expectedPoolReduction = `${Math.min(99, Math.round(((poolBeforeCount - 1) / poolBeforeCount) * 100))}%`;
 
    return {
-      word: bestTestWord,
+      word: bestWord,
       reason: botReason,
       expectedPoolReduction,
    };
