@@ -91,7 +91,7 @@ const SocialTable = ({
                     <div className="relative shrink-0">
                         {isFirst && !isPlaying && (
                             <span
-                                className="absolute -top-[1.5rem] left-[-0.17rem] sm:left-[-0.17rem] sm:-top-[1.5rem] text-2xl sm:text-2xl select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] filter brightness-110 font-bold"
+                                className="absolute -top-6 left-0 sm:left-[-0.17rem] sm:-top-[1.5rem] text-2xl sm:text-2xl select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] filter brightness-110 font-bold"
                                 role="img"
                                 aria-label="crown"
                             >
