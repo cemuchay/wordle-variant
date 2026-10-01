@@ -85,15 +85,6 @@ export const AppHeader = ({
                                 >
                                     <RotateCcw size={ICON_SIZE} />
                                 </button>
-                                {/* {isGameOver && (
-                                    <button
-                                        onClick={onShare}
-                                        className="p-1.5 text-white hover:text-white rounded-lg hover:bg-white/5 transition-all cursor-pointer"
-                                        title="Share"
-                                    >
-                                        <Share size={ICON_SIZE} />
-                                    </button>
-                                )} */}
                             </div>
 
                             {/* Divider */}

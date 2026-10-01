@@ -4,7 +4,10 @@ import { Search, Filter, RefreshCw, X, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useAdminStatus } from '../../hooks/useAdminStatus';
 
+import { calculateWordEliminationScore } from '../../data/researchInsights';
+
 type ListType = 'official' | 'allowed';
+type SortOrder = 'elimination' | 'alphabetical';
 
 export const WordFinderPage: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
@@ -17,6 +20,10 @@ export const WordFinderPage: React.FC = () => {
   const [listType, setListType] = useState<ListType>(() => {
     const saved = sessionStorage.getItem('wf_listType');
     return (saved as ListType) || 'official';
+  });
+  const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
+    const saved = sessionStorage.getItem('wf_sortOrder');
+    return (saved as SortOrder) || 'elimination';
   });
   const [words, setWords] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -60,6 +67,7 @@ export const WordFinderPage: React.FC = () => {
   // Save states to sessionStorage
   useEffect(() => { sessionStorage.setItem('wf_wordLength', String(wordLength)); }, [wordLength]);
   useEffect(() => { sessionStorage.setItem('wf_listType', listType); }, [listType]);
+  useEffect(() => { sessionStorage.setItem('wf_sortOrder', sortOrder); }, [sortOrder]);
   useEffect(() => { sessionStorage.setItem('wf_mode1Type', mode1Type); }, [mode1Type]);
   useEffect(() => { sessionStorage.setItem('wf_mode1Letters', mode1Letters); }, [mode1Letters]);
   useEffect(() => { sessionStorage.setItem('wf_slots', JSON.stringify(slots)); }, [slots]);
@@ -220,6 +228,35 @@ export const WordFinderPage: React.FC = () => {
     });
   }, [words, loading, mode1Letters, mode1Type, slots, yellowSlots, wordLength, excludeLetters, mustContainLetters, excludedWordsSet]);
 
+  // Ranked matching candidate words with detailed elimination scores
+  const rankedMatchingWords = useMemo(() => {
+    if (!filteredWords.length) return [];
+
+    const scored = filteredWords.map((word) => {
+      const { totalScore, strategicScore, testedDistinguishingLetters, testedCount, positionalBonus } =
+        calculateWordEliminationScore(word, filteredWords, wordLength, true);
+      return {
+        word,
+        totalScore,
+        strategicScore,
+        testedDistinguishingLetters,
+        testedCount,
+        positionalBonus,
+      };
+    });
+
+    if (sortOrder === 'alphabetical') {
+      return [...scored].sort((a, b) => a.word.localeCompare(b.word));
+    }
+
+    // Sort by total elimination value (entropy partition + positional frequency + candidate bonus)
+    return [...scored].sort((a, b) => {
+      if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
+      if (b.testedCount !== a.testedCount) return b.testedCount - a.testedCount;
+      return a.word.localeCompare(b.word);
+    });
+  }, [filteredWords, wordLength, sortOrder]);
+
   const handleSlotChange = (index: number, val: string) => {
     const char = val.slice(-1).toUpperCase();
     const next = [...slots];
@@ -286,44 +323,30 @@ export const WordFinderPage: React.FC = () => {
       }
     });
 
-    // 2. Search full word dictionary for optimal elimination words based on strategic pool reduction (information gain)
-    const numCandidates = filteredWords.length;
-
+    // 2. Search full word dictionary for optimal elimination words based on research-backed entropy & positional weights
     const scoredEliminationWords = words
       .map((w) => {
-        const uniqueChars = new Set(w.split(''));
-        let strategicScore = 0;
-        let testedCount = 0;
-        const testedCharsWithCounts: string[] = [];
-
-        distinguishingLetterInfo.forEach(({ char, count }) => {
-          if (uniqueChars.has(char)) {
-            testedCount += 1;
-            // Information theory partition efficiency: count * (numCandidates - count)
-            // Letters present in ~50% of candidate words maximize entropy reduction
-            const partitionEfficiency = count * (numCandidates - count);
-            strategicScore += partitionEfficiency;
-            testedCharsWithCounts.push(`${char} (x${count})`);
-          }
-        });
-
         const isCandidate = filteredWords.includes(w);
+        const { totalScore, strategicScore, testedDistinguishingLetters, testedCount, positionalBonus } =
+          calculateWordEliminationScore(w, filteredWords, wordLength, isCandidate);
 
         return {
           word: w,
           score: testedCount,
           strategicScore,
-          testedCharsWithCounts,
+          totalScore,
+          positionalBonus,
+          testedCharsWithCounts: testedDistinguishingLetters,
           isCandidate,
         };
       })
-      .filter((item) => item.strategicScore > 0)
+      .filter((item) => item.strategicScore > 0 || item.isCandidate)
       .sort((a, b) => {
-        // 1. Highest strategic expected pool reduction score
-        if (b.strategicScore !== a.strategicScore) {
-          return b.strategicScore - a.strategicScore;
+        // 1. Highest total score (strategic entropy partition + direct candidate bonus + positional fit)
+        if (b.totalScore !== a.totalScore) {
+          return b.totalScore - a.totalScore;
         }
-        // 2. Prefer words that are themselves possible candidate answers (direct win chance)
+        // 2. Prefer words that are themselves possible candidate answers
         if (b.isCandidate !== a.isCandidate) {
           return b.isCandidate ? 1 : -1;
         }
@@ -604,7 +627,7 @@ export const WordFinderPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Unique Words Test / Optimal Elimination Words Section (< 45 words) */}
+        {/* Unique Words Test / Optimal Elimination Words Section (< 100 words) */}
         {eliminationCandidates && eliminationCandidates.distinguishingLetterInfo.length > 0 && (
           <div className="bg-slate-900 border border-amber-500/40 rounded-2xl p-5 shadow-xl space-y-4 animate-in fade-in duration-300">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -612,10 +635,10 @@ export const WordFinderPage: React.FC = () => {
                 <span className="text-lg">⚡</span>
                 <div>
                   <h3 className="text-sm font-black uppercase tracking-wider text-amber-400">
-                    Unique Words Test & Elimination Suggestions
+                    Unique Words Test & Optimal Elimination Words
                   </h3>
                   <p className="text-[11px] text-slate-400 font-bold">
-                    Remaining possibilities are few ({filteredWords.length}). Use these words to eliminate multiple letters at once.
+                    Remaining candidates ({filteredWords.length}). Ranked by entropy partition value and research letter frequencies.
                   </p>
                 </div>
               </div>
@@ -627,7 +650,7 @@ export const WordFinderPage: React.FC = () => {
             {/* Distinguishing Letters Pool with Word Counts eg C (x3) */}
             <div>
               <p className="text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2">
-                Distinguishing Letters to Test (frequency in remaining candidate words):
+                Distinguishing Letters to Test (frequency across remaining candidates):
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {eliminationCandidates.distinguishingLetterInfo.map(({ char, count }) => (
@@ -645,15 +668,16 @@ export const WordFinderPage: React.FC = () => {
             {/* Top Elimination Words Recommendations */}
             <div>
               <p className="text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2">
-                Best Elimination Words to Narrow Down Choices:
+                Best Elimination Words to Narrow Down Choices (Ranked by Elimination Value):
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {eliminationCandidates.topEliminationWords.map((item) => (
+                {eliminationCandidates.topEliminationWords.map((item, idx) => (
                   <div
                     key={item.word}
                     className="bg-slate-950 border border-slate-800 hover:border-amber-500/50 rounded-xl p-2.5 flex items-center justify-between transition-all"
                   >
                     <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black text-amber-500/80 font-mono w-4">#{idx + 1}</span>
                       <span className="font-mono text-sm font-black text-white tracking-widest">{item.word}</span>
                       {item.isCandidate && (
                         <span className="text-[9px] font-black px-1.5 py-0.5 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded">
@@ -661,7 +685,7 @@ export const WordFinderPage: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1.5">
                       <span className="text-[10px] font-bold text-slate-400">Tests ({item.score}):</span>
                       <span className="text-xs font-black text-amber-300 tracking-wider">
                         {item.testedCharsWithCounts.join(', ')}
@@ -676,29 +700,67 @@ export const WordFinderPage: React.FC = () => {
 
         {/* Results Section */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold uppercase tracking-wider text-white">Matching Words</span>
               <span className="bg-amber-500/20 text-amber-400 text-xs font-black px-2.5 py-0.5 rounded-full border border-amber-500/30">
                 {filteredWords.length}
               </span>
             </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Sort:</span>
+              <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+                <button
+                  onClick={() => setSortOrder('elimination')}
+                  className={`px-2.5 py-1 font-bold rounded-lg transition-colors cursor-pointer ${
+                    sortOrder === 'elimination'
+                      ? 'bg-amber-500 text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Ranked by highest elimination value and positional entropy"
+                >
+                  Best Elimination
+                </button>
+                <button
+                  onClick={() => setSortOrder('alphabetical')}
+                  className={`px-2.5 py-1 font-bold rounded-lg transition-colors cursor-pointer ${
+                    sortOrder === 'alphabetical'
+                      ? 'bg-amber-500 text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  A-Z
+                </button>
+              </div>
+            </div>
+
             {loading && <span className="text-xs text-amber-400 animate-pulse font-bold">Loading dictionary...</span>}
           </div>
 
-          {!loading && filteredWords.length === 0 ? (
+          {!loading && rankedMatchingWords.length === 0 ? (
             <div className="text-center py-8 text-slate-500 text-sm font-medium">
               No matching words found for your current criteria.
             </div>
           ) : (
             <div className="max-h-96 overflow-y-auto pr-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-              {filteredWords.map((word) => (
+              {rankedMatchingWords.map((item, index) => (
                 <div
-                  key={word}
-                  className="bg-slate-950 border border-slate-800 hover:border-amber-500/50 hover:bg-slate-800/50 rounded-xl px-3 py-2 text-center text-sm font-black tracking-widest text-slate-200 transition-all font-mono select-all cursor-pointer"
-                  title="Click or double-click to select word"
+                  key={item.word}
+                  className="relative group bg-slate-950 border border-slate-800 hover:border-amber-500/50 hover:bg-slate-800/50 rounded-xl px-2.5 py-2 text-center transition-all font-mono select-all cursor-pointer"
+                  title={
+                    sortOrder === 'elimination'
+                      ? `Elimination Rank #${index + 1} | Score: ${Math.round(item.totalScore)} | Distinguishing tests: ${item.testedCount}`
+                      : 'Click to copy'
+                  }
                 >
-                  {word}
+                  <div className="text-sm font-black tracking-widest text-slate-200">{item.word}</div>
+                  {sortOrder === 'elimination' && filteredWords.length > 1 && (
+                    <div className="text-[9px] font-bold text-amber-400/70 mt-0.5 flex items-center justify-center gap-1">
+                      <span>#{index + 1}</span>
+                      {item.testedCount > 0 && <span>• {item.testedCount} tests</span>}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

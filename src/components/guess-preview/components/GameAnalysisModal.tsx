@@ -57,39 +57,39 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
 
   return (
     <div
-
-      className="fixed inset-0 z-100 bg-black/90 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-200 overflow-hidden h-full min-h-0"
+      className="fixed inset-0 z-[120] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 pt-10 sm:pt-6 animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="bg-gray-900 border border-gray-700 w-full max-w-xl rounded-2xl p-6 sm:p-6 shadow-2xl relative h-full flex flex-col flex-1 min-h-0 overflow-hidden text-white"
+        className="bg-gray-900 border border-gray-700 w-full max-w-xl rounded-2xl shadow-2xl relative max-h-[88vh] h-[85vh] flex flex-col overflow-hidden text-white"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Fixed Header */}
+        <div className="flex items-center justify-between border-b border-gray-800 px-5 py-8 shrink-0 bg-gray-900 z-10">
+          <div className="flex items-center gap-2.5">
+            <span className="text-2xl">♟️</span>
+            <div>
+              <h2 className="text-base sm:text-lg font-black uppercase tracking-wider text-white flex items-center gap-2">
+                Game Analysis
+              </h2>
+              <p className="text-xs font-bold text-gray-400">
+                Objective Move Scrutiny for {formatUsername(username)}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700 p-2 rounded-xl transition-colors cursor-pointer border border-gray-700 shadow-sm"
+            title="Close analysis"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
         {/* Modal Scroll Content */}
-        <div className="flex-1 min-h-0 overflow-y-auto py-4 px-1 space-y-5 scrollbar-none scrollbar-hide [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <div className="flex items-center justify-between border-b border-gray-800 p-3 pt-7 mt-7 mb-3 shrink-0">
-            <div className="flex items-center gap-2.5">
-              <span className="text-2xl">♟️</span>
-              <div>
-                <h2 className="text-base sm:text-lg font-black uppercase tracking-wider text-white flex items-center gap-2">
-                  Game Analysis
-                </h2>
-                <p className="text-xs font-bold text-white opacity-90">
-                  Objective Move Scrutiny for {formatUsername(username)}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-white hover:bg-white/10 p-1.5 rounded-full transition-colors cursor-pointer"
-              title="Close analysis"
-            >
-              <X size={20} />
-            </button>
-          </div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-5 scrollbar-none scrollbar-hide [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {loading ? (
-            <div className="py-20 flex flex-col items-center justify-center gap-4">
+            <div className="py-24 flex flex-col items-center justify-center gap-4">
               <Loader2 className="animate-spin text-amber-400" size={36} />
               <p className="text-sm font-black text-white uppercase tracking-widest animate-pulse">
                 Simulating Bot match & analyzing moves...
@@ -302,60 +302,67 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
                   return (
                     <div
                       key={move.turn}
-                      className="bg-gray-950 border border-gray-800 rounded-2xl transition-all duration-200"
+                      className="bg-gray-950 border border-gray-800 rounded-2xl transition-all duration-200 overflow-hidden"
                     >
                       {/* Accordion Header */}
                       <button
                         onClick={() => setExpandedTurn(isExpanded ? null : move.turn)}
-                        className="w-full p-3.5 flex items-center justify-between hover:bg-white/5 transition-colors cursor-pointer"
+                        className="w-full p-3.5 flex flex-col gap-2.5 hover:bg-white/5 transition-colors cursor-pointer text-left"
                       >
-                        <div className="flex items-center gap-3">
-                          <span className="w-7 h-7 rounded-full bg-gray-800 text-white text-xs font-black flex items-center justify-center shrink-0 border border-gray-700">
-                            {move.turn}
-                          </span>
+                        {/* Top Row: Turn Number + Letter Tiles + Chevron */}
+                        <div className="flex items-center justify-between gap-2 w-full">
+                          <div className="flex items-center gap-2.5 min-w-0 flex-wrap">
+                            <span className="w-7 h-7 rounded-full bg-gray-800 text-white text-xs font-black flex items-center justify-center shrink-0 border border-gray-700">
+                              {move.turn}
+                            </span>
 
-                          {/* Guess Letter Tiles */}
-                          <div className="flex gap-1.5">
-                            {Array.isArray(row) &&
-                              row.map((cell: any, idx: number) => (
-                                <div
-                                  key={idx}
-                                  className={`flex items-center justify-center font-black uppercase shadow-inner ${getTileSizeClass(
-                                    move.targetWord.length
-                                  )} ${cell.status === 'correct'
-                                    ? 'bg-correct text-white'
-                                    : cell.status === 'present'
-                                      ? 'bg-present text-white'
-                                      : 'bg-gray-800 text-white border border-gray-700'
-                                    } `}
-                                >
-                                  {cell.letter}
-                                </div>
-                              ))}
+                            {/* Guess Letter Tiles */}
+                            <div className="flex gap-1.5 flex-wrap">
+                              {Array.isArray(row) &&
+                                row.map((cell: any, idx: number) => (
+                                  <div
+                                    key={idx}
+                                    className={`flex items-center justify-center font-black uppercase shadow-inner rounded-md ${getTileSizeClass(
+                                      move.targetWord.length
+                                    )} ${cell.status === 'correct'
+                                      ? 'bg-correct text-white'
+                                      : cell.status === 'present'
+                                        ? 'bg-present text-white'
+                                        : 'bg-gray-800 text-white border border-gray-700'
+                                      } `}
+                                  >
+                                    {cell.letter}
+                                  </div>
+                                ))}
+                            </div>
                           </div>
 
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {isExpanded ? (
+                              <ChevronUp size={18} className="text-gray-400" />
+                            ) : (
+                              <ChevronDown size={18} className="text-gray-400" />
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Dedicated Bottom Row: Move Classification & Agreement Rating */}
+                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-gray-900 w-full text-xs">
                           {/* Classification Tag */}
                           <span
-                            className={`text-xs font-black px-2.5 py-0.5 rounded-full border ${move.classificationColor}`}
+                            className={`text-xs font-black px-2.5 py-0.5 rounded-full border shrink-0 ${move.classificationColor}`}
                           >
                             {move.classification}
                           </span>
-                        </div>
 
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <span className="text-sm font-mono font-black text-amber-400 block">
-                              {Number(move.moveRating).toFixed(2)}/10
-                            </span>
-                            <span className="text-[10px] font-bold text-white block">
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-[11px] font-bold text-gray-400">
                               {move.agreementScore}% Agreement
                             </span>
+                            <span className="text-xs font-mono font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-lg">
+                              {Number(move.moveRating).toFixed(2)}/10
+                            </span>
                           </div>
-                          {isExpanded ? (
-                            <ChevronUp size={18} className="text-white" />
-                          ) : (
-                            <ChevronDown size={18} className="text-white" />
-                          )}
                         </div>
                       </button>
 
@@ -432,10 +439,10 @@ export const GameAnalysisModal: React.FC<GameAnalysisModalProps> = ({
           )}
         </div>
         {/* Footer */}
-        <div className="border-t border-gray-800 shrink-0">
+        <div className="border-t border-gray-800 p-4 shrink-0 bg-gray-900/90 backdrop-blur-md">
           <button
             onClick={onClose}
-            className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-colors cursor-pointer"
+            className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-colors cursor-pointer shadow-md"
           >
             Close Analysis
           </button>
