@@ -52,6 +52,7 @@ const StatsModal = safeLazy(() => import("./components/social-leaderboard").then
 const ChallengeModal = safeLazy(() => import("./components/ChallengeModal").then(m => ({ default: m.ChallengeModal })));
 const WordUpContainer = safeLazy(() => import("./wordup/WordUpContainer").then(m => ({ default: m.WordUpContainer })));
 const WordGridContainer = safeLazy(() => import("./wordgrid/WordGridContainer").then(m => ({ default: m.WordGridContainer })));
+const WordScrambleContainer = safeLazy(() => import("./wordscramble/WordScrambleContainer").then(m => ({ default: m.WordScrambleContainer })));
 const AdminPage = safeLazy(() => import("./components/admin/AdminPage").then(m => ({ default: m.AdminPage })));
 const UnsubscribePage = safeLazy(() => import("./components/UnsubscribePage").then(m => ({ default: m.UnsubscribePage })));
 const WeeklyWrappedModal = safeLazy(() => import("./components/WeeklyWrappedModal").then(m => ({ default: m.WeeklyWrappedModal })));
@@ -283,7 +284,7 @@ function MainApp() {
   const setShowNotifications = useAppStore(s => s.setShowNotifications);
 
   const [isMoreOpen, setIsMoreOpen] = useState(false);
-  const [moreGameMode, setMoreGameMode] = useState<'select' | 'wordup' | 'wordgrid'>('select');
+  const [moreGameMode, setMoreGameMode] = useState<'select' | 'wordup' | 'wordgrid' | 'wordscramble'>('select');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [viewedProfileId, setViewedProfileId] = useState<string | null>(null);
   const [isFreePlayOpen, setIsFreePlayOpen] = useState(false);
@@ -1079,13 +1080,13 @@ function MainApp() {
         ? "#0f172a"
         : "#121213";
 
-  const hideHeader = isPlayingChallenge || isBattlePlaying || isChatConversationOpen || !!selectedChallenge || activeNavigationItem === "leaderboard" || isTutorialOpen || isWordupTutorialOpen || (activeNavigationItem === "more" && moreGameMode === "wordgrid");
+  const hideHeader = isPlayingChallenge || isBattlePlaying || isChatConversationOpen || !!selectedChallenge || activeNavigationItem === "leaderboard" || isTutorialOpen || isWordupTutorialOpen || (activeNavigationItem === "more" && (moreGameMode === "wordgrid" || moreGameMode === "wordscramble"));
 
   return (
     <AppLayout
       theme={currentTheme}
       hideHeader={hideHeader}
-      hideNavigation={isPlayingChallenge || isBattlePlaying || isFreePlayOpen}
+      hideNavigation={isPlayingChallenge || isBattlePlaying || isFreePlayOpen || (activeNavigationItem === "more" && (moreGameMode === "wordscramble" || moreGameMode === "wordgrid"))}
       headerProps={{
         hideGameplayActions: activeNavigationItem !== "play",
         onOpenSettings: () => setIsSettingsOpen(true),
@@ -1296,7 +1297,7 @@ function MainApp() {
             )}
 
             {(activeNavigationItem === "wordup" || activeNavigationItem === "more") && (
-              <div className="h-full flex flex-col items-center justify-center p-2 bg-dark w-full">
+              <div className={`h-full flex flex-col items-center p-2 bg-dark w-full ${moreGameMode === "wordscramble" ? "overflow-y-auto justify-start" : "justify-center"}`}>
                 {activeNavigationItem === "more" && moreGameMode === "select" ? (
                   <MoreGamesList
                     setMoreGameMode={setMoreGameMode}
@@ -1304,6 +1305,10 @@ function MainApp() {
                     wordupUnreadCount={wordupUnreadCount}
                     wordgridUnreadCount={wordgridUnreadCount}
                   />
+                ) : moreGameMode === "wordscramble" ? (
+                  <Suspense fallback={<div className="text-xs text-pink-400 animate-pulse font-bold">Loading Word Scramble Matrix...</div>}>
+                    <WordScrambleContainer onBackToMenu={() => setMoreGameMode("select")} />
+                  </Suspense>
                 ) : moreGameMode === "wordgrid" ? (
                   <Suspense fallback={<div className="text-xs text-gray-400 animate-pulse font-bold">Loading WordGrid...</div>}>
                     <WordGridContainer onBackToClassic={() => setMoreGameMode("select")} />
