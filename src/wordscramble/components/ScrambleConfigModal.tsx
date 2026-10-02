@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import type { ScrambleConfig, ScrambleGameMode } from '../engine/types';
-import { Play, Sparkles, Clock, Infinity as InfinityIcon } from 'lucide-react';
+import { Play, Sparkles, Clock, Infinity as InfinityIcon, Loader2, AlertCircle } from 'lucide-react';
 
 interface ScrambleConfigModalProps {
   isOpen: boolean;
   onStartGame: (config: ScrambleConfig) => void;
   onClose?: () => void;
+  isLoading?: boolean;
+  errorMessage?: string | null;
 }
 
 const AVAILABLE_LENGTHS = [3, 4, 5, 6, 7, 8, 9, 10];
@@ -14,6 +16,8 @@ const AVAILABLE_LENGTHS = [3, 4, 5, 6, 7, 8, 9, 10];
 export const ScrambleConfigModal: React.FC<ScrambleConfigModalProps> = ({
   isOpen,
   onStartGame,
+  isLoading = false,
+  errorMessage = null,
 }) => {
   const [selectedLengths, setSelectedLengths] = useState<number[]>([5]);
   const [mode, setMode] = useState<ScrambleGameMode>('timed');
@@ -46,20 +50,20 @@ export const ScrambleConfigModal: React.FC<ScrambleConfigModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
       <motion.div
         initial={{ scale: 0.9, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
-        className="w-full max-w-lg p-6 rounded-3xl bg-slate-900 border border-indigo-500/30 shadow-[0_0_50px_rgba(99,102,241,0.25)] text-slate-100"
+        className="w-full max-w-lg max-h-[92vh] overflow-y-auto p-4 sm:p-6 rounded-3xl bg-slate-900 border border-indigo-500/30 shadow-[0_0_50px_rgba(99,102,241,0.25)] text-slate-100 my-auto"
       >
-        <div className="text-center mb-6">
-          <div className="inline-flex p-3 rounded-2xl bg-gradient-to-tr from-pink-500 via-amber-400 to-cyan-400 text-slate-950 font-black mb-3 shadow-[0_0_20px_rgba(236,72,153,0.5)]">
-            <Sparkles className="w-8 h-8" />
+        <div className="text-center mb-4 sm:mb-6">
+          <div className="inline-flex p-2.5 sm:p-3 rounded-2xl bg-gradient-to-tr from-pink-500 via-amber-400 to-cyan-400 text-slate-950 font-black mb-2 sm:mb-3 shadow-[0_0_20px_rgba(236,72,153,0.5)]">
+            <Sparkles className="w-6 h-6 sm:w-8 sm:h-8" />
           </div>
-          <h2 className="text-2xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-amber-300 to-cyan-400">
+          <h2 className="text-xl sm:text-2xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-amber-300 to-cyan-400">
             Word Scramble Matrix
           </h2>
-          <p className="text-xs text-slate-400 mt-1 font-medium">
+          <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 font-medium">
             Form valid words from the rainbow tile pool!
           </p>
         </div>
@@ -170,13 +174,31 @@ export const ScrambleConfigModal: React.FC<ScrambleConfigModalProps> = ({
           </div>
         )}
 
+        {/* Error message banner */}
+        {errorMessage && (
+          <div className="mb-4 p-3 rounded-xl bg-rose-950/80 border border-rose-600/50 flex items-center gap-2.5 text-xs text-rose-200">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
         {/* Start Game Button */}
         <button
           onClick={handleStart}
-          className="w-full py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 text-slate-950 shadow-[0_0_25px_rgba(52,211,153,0.7)] hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
+          disabled={isLoading}
+          className="w-full py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 text-slate-950 shadow-[0_0_25px_rgba(52,211,153,0.7)] hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Play className="w-6 h-6 fill-current" />
-          <span>START GAME</span>
+          {isLoading ? (
+            <>
+              <Loader2 className="w-6 h-6 animate-spin" />
+              <span>PREPARING BOARD...</span>
+            </>
+          ) : (
+            <>
+              <Play className="w-6 h-6 fill-current" />
+              <span>START GAME</span>
+            </>
+          )}
         </button>
       </motion.div>
     </div>

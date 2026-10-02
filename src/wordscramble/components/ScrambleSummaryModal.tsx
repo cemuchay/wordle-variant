@@ -33,20 +33,20 @@ export const ScrambleSummaryModal: React.FC<ScrambleSummaryModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-lg">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-lg overflow-y-auto">
       <motion.div
         initial={{ scale: 0.9, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
-        className="w-full max-w-lg p-6 rounded-3xl bg-slate-900 border border-indigo-500/40 shadow-[0_0_60px_rgba(99,102,241,0.3)] text-slate-100"
+        className="w-full max-w-lg max-h-[92vh] overflow-y-auto p-4 sm:p-6 rounded-3xl bg-slate-900 border border-indigo-500/40 shadow-[0_0_60px_rgba(99,102,241,0.3)] text-slate-100 my-auto"
       >
-        <div className="text-center mb-6">
-          <div className="inline-flex p-3.5 rounded-2xl bg-gradient-to-tr from-amber-400 via-orange-500 to-rose-500 text-slate-950 font-black mb-2 shadow-[0_0_25px_rgba(251,146,60,0.6)]">
-            <Trophy className="w-9 h-9" />
+        <div className="text-center mb-4 sm:mb-6">
+          <div className="inline-flex p-3 rounded-2xl bg-gradient-to-tr from-amber-400 via-orange-500 to-rose-500 text-slate-950 font-black mb-2 shadow-[0_0_25px_rgba(251,146,60,0.6)]">
+            <Trophy className="w-8 h-8 sm:w-9 sm:h-9" />
           </div>
-          <h2 className="text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-rose-400 to-cyan-400">
+          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-rose-400 to-cyan-400">
             Game Over!
           </h2>
-          <p className="text-xs text-slate-400 font-medium mt-1">
+          <p className="text-[11px] sm:text-xs text-slate-400 font-medium mt-1">
             Excellent game! Here is your performance breakdown:
           </p>
         </div>

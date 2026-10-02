@@ -1086,7 +1086,7 @@ function MainApp() {
     <AppLayout
       theme={currentTheme}
       hideHeader={hideHeader}
-      hideNavigation={isPlayingChallenge || isBattlePlaying || isFreePlayOpen}
+      hideNavigation={isPlayingChallenge || isBattlePlaying || isFreePlayOpen || (activeNavigationItem === "more" && (moreGameMode === "wordscramble" || moreGameMode === "wordgrid"))}
       headerProps={{
         hideGameplayActions: activeNavigationItem !== "play",
         onOpenSettings: () => setIsSettingsOpen(true),
@@ -1297,7 +1297,7 @@ function MainApp() {
             )}
 
             {(activeNavigationItem === "wordup" || activeNavigationItem === "more") && (
-              <div className="h-full flex flex-col items-center justify-center p-2 bg-dark w-full">
+              <div className={`h-full flex flex-col items-center p-2 bg-dark w-full ${moreGameMode === "wordscramble" ? "overflow-y-auto justify-start" : "justify-center"}`}>
                 {activeNavigationItem === "more" && moreGameMode === "select" ? (
                   <MoreGamesList
                     setMoreGameMode={setMoreGameMode}
