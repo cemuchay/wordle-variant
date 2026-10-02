@@ -1,4 +1,5 @@
 import type { ScrambleSessionStats } from '../engine/types';
+import { safeLocalStorage } from '../../utils/storage';
 
 export interface IScrambleRepository {
   saveSession(session: ScrambleSessionStats): Promise<void>;
@@ -18,23 +19,23 @@ export class LocalStorageScrambleRepository implements IScrambleRepository {
     try {
       const existing = await this.getSessions();
       const updated = [session, ...existing].slice(0, 100);
-      localStorage.setItem(this.SESSIONS_KEY, JSON.stringify(updated));
+      safeLocalStorage.setItem(this.SESSIONS_KEY, JSON.stringify(updated));
 
       // Update High Scores map by mode and letter config key
       const key = `${session.gameMode}_${session.selectedLengths.sort().join('-')}`;
       const highScores = await this.getHighScores();
       if (!highScores[key] || session.score > highScores[key]) {
         highScores[key] = session.score;
-        localStorage.setItem(this.HIGHSCORES_KEY, JSON.stringify(highScores));
+        safeLocalStorage.setItem(this.HIGHSCORES_KEY, JSON.stringify(highScores));
       }
     } catch (e) {
-      console.warn('Failed to save scramble session to localStorage:', e);
+      console.warn('Failed to save scramble session to safeLocalStorage:', e);
     }
   }
 
   async getSessions(): Promise<ScrambleSessionStats[]> {
     try {
-      const raw = localStorage.getItem(this.SESSIONS_KEY);
+      const raw = safeLocalStorage.getItem(this.SESSIONS_KEY);
       return raw ? JSON.parse(raw) : [];
     } catch {
       return [];
@@ -43,7 +44,7 @@ export class LocalStorageScrambleRepository implements IScrambleRepository {
 
   async getHighScores(): Promise<Record<string, number>> {
     try {
-      const raw = localStorage.getItem(this.HIGHSCORES_KEY);
+      const raw = safeLocalStorage.getItem(this.HIGHSCORES_KEY);
       return raw ? JSON.parse(raw) : {};
     } catch {
       return {};
@@ -52,7 +53,7 @@ export class LocalStorageScrambleRepository implements IScrambleRepository {
 
   async saveActiveGame(state: any): Promise<void> {
     try {
-      localStorage.setItem(this.ACTIVE_GAME_KEY, JSON.stringify(state));
+      safeLocalStorage.setItem(this.ACTIVE_GAME_KEY, JSON.stringify(state));
     } catch (e) {
       console.warn('Failed to cache active scramble game:', e);
     }
@@ -60,7 +61,7 @@ export class LocalStorageScrambleRepository implements IScrambleRepository {
 
   async loadActiveGame(): Promise<any | null> {
     try {
-      const raw = localStorage.getItem(this.ACTIVE_GAME_KEY);
+      const raw = safeLocalStorage.getItem(this.ACTIVE_GAME_KEY);
       return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
@@ -69,7 +70,7 @@ export class LocalStorageScrambleRepository implements IScrambleRepository {
 
   async clearActiveGame(): Promise<void> {
     try {
-      localStorage.removeItem(this.ACTIVE_GAME_KEY);
+      safeLocalStorage.removeItem(this.ACTIVE_GAME_KEY);
     } catch {}
   }
 }

@@ -34,7 +34,7 @@ const MoreGamesList = ({
                             Word Scramble Matrix
                         </p>
                         <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-pink-500 to-cyan-500 text-[9px] font-black text-slate-950 uppercase tracking-widest shadow-sm">
-                            NEW
+                            Beta
                         </span>
                     </div>
                     <p className="text-[12px] text-slate-200 font-medium leading-normal mt-0.5">

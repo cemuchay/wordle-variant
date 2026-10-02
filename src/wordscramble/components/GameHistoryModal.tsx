@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import type { ScrambleSessionStats } from '../engine/types';
-import { History, Trophy, Flame, Clock, X } from 'lucide-react';
+import { History, Flame, X } from 'lucide-react';
 
 interface GameHistoryModalProps {
   isOpen: boolean;

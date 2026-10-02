@@ -122,7 +122,7 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
     return () => clearInterval(timer);
   }, [state.status, state.config.mode]);
 
-  // Persist session to repository on Game Over
+  // Persist session to repository on Game Over and clean up active game
   useEffect(() => {
     if (state.status === 'game_over') {
       const longest = state.foundWords.reduce(
@@ -140,9 +140,38 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
         highestStreak: state.highestStreak,
         timeSpentSeconds: state.config.durationSeconds - state.remainingSeconds,
         completedAt: new Date().toISOString(),
-      }).then(() => loadHistory());
+      }).then(() => {
+        repository.clearActiveGame();
+        loadHistory();
+      });
+    } else if (state.status === 'playing' || state.status === 'paused') {
+      // Save in-progress game to safeLocalStorage
+      repository.saveActiveGame({
+        status: state.status,
+        config: state.config,
+        tiles: state.tiles,
+        stagedTileIds: state.stagedTileIds,
+        score: state.score,
+        streak: state.streak,
+        highestStreak: state.highestStreak,
+        remainingSeconds: state.remainingSeconds,
+        foundWords: state.foundWords,
+        savedAt: new Date().toISOString(),
+      });
     }
-  }, [state.status, loadHistory, repository]);
+  }, [
+    state.status,
+    state.tiles,
+    state.stagedTileIds,
+    state.score,
+    state.streak,
+    state.highestStreak,
+    state.remainingSeconds,
+    state.foundWords,
+    state.config,
+    loadHistory,
+    repository
+  ]);
 
   // Staged tiles calculation
   const stagedTiles = useMemo(() => {
@@ -153,13 +182,18 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
 
   const isValidLength = state.config.selectedLengths.includes(stagedTiles.length);
 
-  // Auto-Submit: when staged word matches accepted length and exists in valid dictionary
+  // Auto-Submit: ONLY when exactly 1 word length is configured in game options
   useEffect(() => {
     if (state.status !== 'playing' || stagedTiles.length === 0) return;
+    // Condition 2: Only auto submit when only 1 word length is configured
+    if (state.config.selectedLengths.length !== 1) return;
+
+    const targetLen = state.config.selectedLengths[0];
+    if (stagedTiles.length !== targetLen) return;
+
     const formedWord = stagedTiles.map((t) => t.letter).join('').toUpperCase();
 
     if (
-      state.config.selectedLengths.includes(formedWord.length) &&
       validDictionary.has(formedWord) &&
       !state.foundWords.some((f) => f.word === formedWord)
     ) {

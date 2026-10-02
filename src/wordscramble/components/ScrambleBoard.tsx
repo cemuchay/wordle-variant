@@ -29,7 +29,7 @@ export const ScrambleBoard: React.FC<ScrambleBoardProps> = ({
 
       <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-1.5 sm:gap-2 place-items-center min-h-[120px]">
         {tiles.map((tile) => {
-          const isAvailable = tile.status === 'available';
+
           const isStaged = tile.status === 'staged';
           const isConsumed = tile.status === 'consumed';
           const palette = RAINBOW_TILE_PALETTES[tile.colorIndex % RAINBOW_TILE_PALETTES.length];
