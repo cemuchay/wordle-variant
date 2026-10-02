@@ -34,10 +34,11 @@ describe('ScrambleEngine & Pool Generator', () => {
     expect(words[2].length).toBe(5);
   });
 
-  it('generates properly formatted rainbow tiles from spooled words', () => {
+  it('generates properly formatted rainbow tiles from spooled words including bonus helper tiles', () => {
     const words = ['APPLE', 'CRANE'];
     const tiles = generateTilesFromWords(words, 0);
-    expect(tiles).toHaveLength(10);
+    // 10 base letters + 1 bonus butter tile = 11 tiles
+    expect(tiles).toHaveLength(11);
     expect(tiles.every((t) => t.status === 'available')).toBe(true);
     expect(tiles.every((t) => t.colorIndex >= 0 && t.colorIndex < 8)).toBe(true);
   });
@@ -57,7 +58,8 @@ describe('ScrambleEngine & Pool Generator', () => {
     });
 
     expect(state.status).toBe('playing');
-    expect(state.tiles).toHaveLength(20); // 4 words * 5 letters
+    // 4 words * 5 letters = 20 letters + 2 bonus butter tiles = 22 tiles
+    expect(state.tiles).toHaveLength(22);
     expect(state.remainingSeconds).toBe(90);
     expect(state.score).toBe(0);
   });
@@ -157,6 +159,63 @@ describe('ScrambleEngine & Pool Generator', () => {
     // Submission should be rejected
     expect(state.foundWords).toHaveLength(0);
     expect(state.streak).toBe(0);
+  });
+
+  it('allows swapping / reordering staged tiles', () => {
+    let state = scrambleReducer(initialScrambleState, {
+      type: 'START_GAME',
+      config: {
+        selectedLengths: [3],
+        mode: 'untimed',
+        durationSeconds: 0,
+        wordsPerSpool: 1,
+        useScrabbleDict: true,
+        seed: 'seed_swap',
+      },
+      wordListMap: { 3: ['CAT'] },
+    });
+
+    const tileIds = state.tiles.slice(0, 3).map((t) => t.id);
+    tileIds.forEach((id) => {
+      state = scrambleReducer(state, { type: 'STAGE_TILE', tileId: id });
+    });
+
+    expect(state.stagedTileIds).toEqual([tileIds[0], tileIds[1], tileIds[2]]);
+
+    // Swap index 0 and index 2
+    state = scrambleReducer(state, {
+      type: 'SWAP_STAGED_TILES',
+      fromIndex: 0,
+      toIndex: 2,
+    });
+
+    expect(state.stagedTileIds).toEqual([tileIds[1], tileIds[2], tileIds[0]]);
+  });
+
+  it('handles pause and resume game states properly', () => {
+    let state = scrambleReducer(initialScrambleState, {
+      type: 'START_GAME',
+      config: {
+        selectedLengths: [5],
+        mode: 'timed',
+        durationSeconds: 90,
+        wordsPerSpool: 2,
+        useScrabbleDict: true,
+      },
+      wordListMap: mockWordLists,
+    });
+
+    expect(state.status).toBe('playing');
+
+    state = scrambleReducer(state, { type: 'PAUSE_GAME' });
+    expect(state.status).toBe('paused');
+
+    // Timer tick should not decrement while paused
+    state = scrambleReducer(state, { type: 'TICK_TIMER' });
+    expect(state.remainingSeconds).toBe(90);
+
+    state = scrambleReducer(state, { type: 'RESUME_GAME' });
+    expect(state.status).toBe('playing');
   });
 
   it('calculates score with streak bonuses correctly', () => {

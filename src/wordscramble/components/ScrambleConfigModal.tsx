@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import type { ScrambleConfig, ScrambleGameMode } from '../engine/types';
-import { Play, Sparkles, Clock, Infinity as InfinityIcon, Loader2, AlertCircle } from 'lucide-react';
+import { Play, Sparkles, Clock, Infinity as InfinityIcon, Loader2, AlertCircle, History } from 'lucide-react';
 
 interface ScrambleConfigModalProps {
   isOpen: boolean;
   onStartGame: (config: ScrambleConfig) => void;
   onClose?: () => void;
+  onOpenHistory?: () => void;
   isLoading?: boolean;
   errorMessage?: string | null;
 }
@@ -16,6 +17,7 @@ const AVAILABLE_LENGTHS = [3, 4, 5, 6, 7, 8, 9, 10];
 export const ScrambleConfigModal: React.FC<ScrambleConfigModalProps> = ({
   isOpen,
   onStartGame,
+  onOpenHistory,
   isLoading = false,
   errorMessage = null,
 }) => {
@@ -200,6 +202,18 @@ export const ScrambleConfigModal: React.FC<ScrambleConfigModalProps> = ({
             </>
           )}
         </button>
+
+        {/* View Game History inside Word Scramble Lobby */}
+        {onOpenHistory && (
+          <button
+            type="button"
+            onClick={onOpenHistory}
+            className="w-full mt-3 py-3 rounded-2xl border border-indigo-500/30 bg-indigo-950/40 hover:bg-indigo-900/60 text-xs font-bold text-indigo-200 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+          >
+            <History className="w-4 h-4 text-cyan-400" />
+            <span>View Word Scramble History</span>
+          </button>
+        )}
       </motion.div>
     </div>
   );

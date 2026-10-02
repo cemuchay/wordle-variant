@@ -7,8 +7,11 @@ export type ScrambleAction =
   | { type: 'UNSTAGE_TILE'; tileId: string }
   | { type: 'UNSTAGE_LAST_TILE' }
   | { type: 'CLEAR_STAGING' }
+  | { type: 'SWAP_STAGED_TILES'; fromIndex: number; toIndex: number }
   | { type: 'SUBMIT_WORD'; validDictionary: Set<string>; wordListMap: Record<number, string[]> }
   | { type: 'SHUFFLE_TILES' }
+  | { type: 'PAUSE_GAME' }
+  | { type: 'RESUME_GAME' }
   | { type: 'TICK_TIMER' }
   | { type: 'END_GAME' };
 
@@ -117,6 +120,44 @@ export function scrambleReducer(
           stagedSet.has(t.id) ? { ...t, status: 'available' } : t
         ),
         stagedTileIds: [],
+      };
+    }
+
+    case 'SWAP_STAGED_TILES': {
+      if (state.status !== 'playing') return state;
+      const { fromIndex, toIndex } = action;
+      if (
+        fromIndex < 0 ||
+        fromIndex >= state.stagedTileIds.length ||
+        toIndex < 0 ||
+        toIndex >= state.stagedTileIds.length
+      ) {
+        return state;
+      }
+
+      const updated = [...state.stagedTileIds];
+      const [moved] = updated.splice(fromIndex, 1);
+      updated.splice(toIndex, 0, moved);
+
+      return {
+        ...state,
+        stagedTileIds: updated,
+      };
+    }
+
+    case 'PAUSE_GAME': {
+      if (state.status !== 'playing') return state;
+      return {
+        ...state,
+        status: 'paused',
+      };
+    }
+
+    case 'RESUME_GAME': {
+      if (state.status !== 'paused') return state;
+      return {
+        ...state,
+        status: 'playing',
       };
     }
 

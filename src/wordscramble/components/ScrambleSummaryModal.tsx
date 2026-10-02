@@ -7,6 +7,7 @@ interface ScrambleSummaryModalProps {
   isOpen: boolean;
   gameState: ScrambleGameState;
   onPlayAgain: () => void;
+  onReturnToLobby?: () => void;
   onOpenSettings?: () => void;
 }
 
@@ -14,6 +15,7 @@ export const ScrambleSummaryModal: React.FC<ScrambleSummaryModalProps> = ({
   isOpen,
   gameState,
   onPlayAgain,
+  onReturnToLobby,
 }) => {
   if (!isOpen) return null;
 
@@ -101,23 +103,34 @@ export const ScrambleSummaryModal: React.FC<ScrambleSummaryModalProps> = ({
           </div>
         </div>
 
-        {/* Buttons */}
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={onPlayAgain}
-            className="py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-400 to-teal-400 text-slate-950 shadow-[0_0_20px_rgba(52,211,153,0.5)] hover:brightness-110 active:scale-95 transition-all cursor-pointer"
-          >
-            <RotateCcw className="w-4 h-4" />
-            <span>PLAY AGAIN</span>
-          </button>
+        {/* Action Buttons */}
+        <div className="flex flex-col gap-2.5">
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={onPlayAgain}
+              className="py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-400 to-teal-400 text-slate-950 shadow-[0_0_20px_rgba(52,211,153,0.5)] hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>PLAY AGAIN</span>
+            </button>
 
-          <button
-            onClick={handleShare}
-            className="py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-100 active:scale-95 transition-all cursor-pointer"
-          >
-            <Share2 className="w-4 h-4 text-cyan-400" />
-            <span>SHARE</span>
-          </button>
+            <button
+              onClick={handleShare}
+              className="py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-100 active:scale-95 transition-all cursor-pointer"
+            >
+              <Share2 className="w-4 h-4 text-cyan-400" />
+              <span>SHARE</span>
+            </button>
+          </div>
+
+          {onReturnToLobby && (
+            <button
+              onClick={onReturnToLobby}
+              className="w-full py-3 rounded-xl border border-white/10 hover:bg-white/5 text-xs font-black uppercase tracking-wider text-slate-300 hover:text-white transition-all cursor-pointer"
+            >
+              Return to More Games Lobby
+            </button>
+          )}
         </div>
       </motion.div>
     </div>

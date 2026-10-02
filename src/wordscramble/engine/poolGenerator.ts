@@ -42,20 +42,28 @@ export function spoolSecretWords(
 }
 
 /**
- * Creates and scatters tiles from a list of base words
+ * Creates and scatters tiles from a list of base words + bonus helper tiles (vowels/common consonants)
  */
 export function generateTilesFromWords(
   words: string[],
   startIdOffset: number = 0,
   rng: () => number = Math.random
 ): ScrambleTile[] {
-  const letterPool: { letter: string; wordOrigin: string }[] = [];
+  const letterPool: { letter: string; isBonus?: boolean }[] = [];
 
   words.forEach((w) => {
     w.toUpperCase().split('').forEach((l) => {
-      letterPool.push({ letter: l, wordOrigin: w });
+      letterPool.push({ letter: l, isBonus: false });
     });
   });
+
+  // Add bonus helper tiles (butter tiles): popular vowels (A, E, I, O) & consonants (R, S, T, N, L)
+  const BUTTER_TILES = ['E', 'A', 'I', 'O', 'R', 'S', 'T', 'L', 'N'];
+  const bonusCount = Math.min(3, Math.max(1, Math.floor(words.length / 2)));
+  for (let i = 0; i < bonusCount; i++) {
+    const randomBonusLetter = BUTTER_TILES[Math.floor(rng() * BUTTER_TILES.length)];
+    letterPool.push({ letter: randomBonusLetter, isBonus: true });
+  }
 
   // Fisher-Yates shuffle
   for (let i = letterPool.length - 1; i > 0; i--) {

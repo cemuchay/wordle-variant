@@ -9,7 +9,9 @@ import { SubmissionTray } from './components/SubmissionTray';
 import { FoundWordsList } from './components/FoundWordsList';
 import { ScrambleConfigModal } from './components/ScrambleConfigModal';
 import { ScrambleSummaryModal } from './components/ScrambleSummaryModal';
-import { ArrowLeft, Settings } from 'lucide-react';
+import { GameHistoryModal } from './components/GameHistoryModal';
+import { ArrowLeft, Settings, History } from 'lucide-react';
+import type { ScrambleSessionStats } from './engine/types';
 
 interface WordScrambleContainerProps {
   onBackToMenu?: () => void;
@@ -20,12 +22,24 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
 }) => {
   const [state, dispatch] = useReducer(scrambleReducer, initialScrambleState);
   const [isConfigOpen, setIsConfigOpen] = useState(true);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [historySessions, setHistorySessions] = useState<ScrambleSessionStats[]>([]);
   const [validDictionary, setValidDictionary] = useState<Set<string>>(new Set());
   const [wordListMap, setWordListMap] = useState<Record<number, string[]>>({});
   const [isLoadingWords, setIsLoadingWords] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const repository = useMemo(() => new LocalStorageScrambleRepository(), []);
+
+  // Load history sessions on mount or when opening history
+  const loadHistory = useCallback(async () => {
+    const data = await repository.getSessions();
+    setHistorySessions(data);
+  }, [repository]);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
 
   // Preload and build active dictionary whenever target lengths change with thorough error handling
   const prepareDictionaries = useCallback(async (lengths: number[]): Promise<{
@@ -86,7 +100,6 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
       setErrorMessage(null);
       const { wordListMap: preparedMap } = await prepareDictionaries(config.selectedLengths);
       
-      // Ensure we have at least one valid list
       const hasWords = config.selectedLengths.some((len) => (preparedMap[len] || []).length > 0);
       if (!hasWords) {
         throw new Error('No words available for selected lengths. Please try another selection.');
@@ -100,7 +113,7 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
     }
   };
 
-  // Timer Tick
+  // Timer Tick (only when active and playing)
   useEffect(() => {
     if (state.status !== 'playing' || state.config.mode === 'untimed') return;
     const timer = setInterval(() => {
@@ -127,14 +140,41 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
         highestStreak: state.highestStreak,
         timeSpentSeconds: state.config.durationSeconds - state.remainingSeconds,
         completedAt: new Date().toISOString(),
+      }).then(() => loadHistory());
+    }
+  }, [state.status, loadHistory, repository]);
+
+  // Staged tiles calculation
+  const stagedTiles = useMemo(() => {
+    return state.stagedTileIds
+      .map((id) => state.tiles.find((t) => t.id === id))
+      .filter((t): t is ScrambleTile => Boolean(t));
+  }, [state.stagedTileIds, state.tiles]);
+
+  const isValidLength = state.config.selectedLengths.includes(stagedTiles.length);
+
+  // Auto-Submit: when staged word matches accepted length and exists in valid dictionary
+  useEffect(() => {
+    if (state.status !== 'playing' || stagedTiles.length === 0) return;
+    const formedWord = stagedTiles.map((t) => t.letter).join('').toUpperCase();
+
+    if (
+      state.config.selectedLengths.includes(formedWord.length) &&
+      validDictionary.has(formedWord) &&
+      !state.foundWords.some((f) => f.word === formedWord)
+    ) {
+      dispatch({
+        type: 'SUBMIT_WORD',
+        validDictionary,
+        wordListMap,
       });
     }
-  }, [state.status]);
+  }, [stagedTiles, validDictionary, wordListMap, state.status, state.config.selectedLengths, state.foundWords]);
 
   // Desktop Physical Keyboard Support
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (state.status !== 'playing' || isConfigOpen) return;
+      if (state.status !== 'playing' || isConfigOpen || isHistoryOpen) return;
 
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -166,16 +206,7 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [state.status, state.tiles, isConfigOpen, validDictionary, wordListMap]);
-
-  // Staged tiles
-  const stagedTiles = useMemo(() => {
-    return state.stagedTileIds
-      .map((id) => state.tiles.find((t) => t.id === id))
-      .filter((t): t is ScrambleTile => Boolean(t));
-  }, [state.stagedTileIds, state.tiles]);
-
-  const isValidLength = state.config.selectedLengths.includes(stagedTiles.length);
+  }, [state.status, state.tiles, isConfigOpen, isHistoryOpen, validDictionary, wordListMap]);
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-slate-950 via-slate-900 to-indigo-950 text-slate-100 flex flex-col items-center pt-8 sm:pt-12 pb-24 px-3 sm:px-5 select-none overflow-y-auto">
@@ -183,76 +214,115 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
       <header className="w-full max-w-xl flex items-center justify-between mb-4 mt-2">
         <button
           onClick={onBackToMenu}
-          className="p-2.5 rounded-xl bg-slate-900 border border-slate-700/80 hover:bg-slate-800 text-slate-300 transition-all flex items-center gap-1.5 text-xs font-bold"
+          className="p-2 sm:p-2.5 rounded-xl bg-slate-900 border border-slate-700/80 hover:bg-slate-800 text-slate-300 transition-all flex items-center gap-1.5 text-xs font-bold cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>More Games</span>
         </button>
 
         <div className="flex items-center gap-2">
-          <span className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-amber-300 to-cyan-400">
+          <span className="text-xs sm:text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-amber-300 to-cyan-400">
             WORD SCRAMBLE MATRIX
           </span>
         </div>
 
-        <button
-          onClick={() => setIsConfigOpen(true)}
-          className="p-2.5 rounded-xl bg-slate-900 border border-slate-700/80 hover:bg-slate-800 text-slate-300 transition-all"
-        >
-          <Settings className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => {
+              loadHistory();
+              setIsHistoryOpen(true);
+            }}
+            className="p-2 sm:p-2.5 rounded-xl bg-slate-900 border border-slate-700/80 hover:bg-slate-800 text-slate-300 transition-all cursor-pointer"
+            title="View Game History"
+          >
+            <History className="w-4 h-4 text-cyan-400" />
+          </button>
+
+          <button
+            onClick={() => setIsConfigOpen(true)}
+            className="p-2 sm:p-2.5 rounded-xl bg-slate-900 border border-slate-700/80 hover:bg-slate-800 text-slate-300 transition-all cursor-pointer"
+            title="Game Settings"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+        </div>
       </header>
 
-      {/* Main Game Surface */}
-      <main className="w-full max-w-xl flex flex-col flex-1">
-        <ScrambleHeader
-          score={state.score}
-          streak={state.streak}
-          remainingSeconds={state.remainingSeconds}
-          mode={state.config.mode}
-          targetLengths={state.config.selectedLengths}
-        />
+      {/* Main Game Surface: Responsive Desktop 2-Column & Mobile 1-Column */}
+      <main className="w-full max-w-4xl flex flex-col lg:flex-row items-start justify-center gap-4 flex-1">
+        {/* Left Column on Desktop (Board Matrix), Top on Mobile */}
+        <section className="w-full lg:w-7/12 flex flex-col gap-2.5">
+          <ScrambleBoard
+            tiles={state.tiles}
+            onTileClick={(id) => dispatch({ type: 'STAGE_TILE', tileId: id })}
+            disabled={state.status !== 'playing'}
+          />
 
-        <SubmissionTray
-          stagedTiles={stagedTiles}
-          targetLengths={state.config.selectedLengths}
-          onUnstageTile={(id) => dispatch({ type: 'UNSTAGE_TILE', tileId: id })}
-          onBackspace={() => dispatch({ type: 'UNSTAGE_LAST_TILE' })}
-          onClear={() => dispatch({ type: 'CLEAR_STAGING' })}
-          onSubmit={() =>
-            dispatch({
-              type: 'SUBMIT_WORD',
-              validDictionary,
-              wordListMap,
-            })
-          }
-          onShuffle={() => dispatch({ type: 'SHUFFLE_TILES' })}
-          isValidLength={isValidLength}
-          disabled={state.status !== 'playing'}
-        />
+          {/* Staging & Action Tray */}
+          <SubmissionTray
+            stagedTiles={stagedTiles}
+            targetLengths={state.config.selectedLengths}
+            onUnstageTile={(id) => dispatch({ type: 'UNSTAGE_TILE', tileId: id })}
+            onSwapTiles={(from, to) => dispatch({ type: 'SWAP_STAGED_TILES', fromIndex: from, toIndex: to })}
+            onBackspace={() => dispatch({ type: 'UNSTAGE_LAST_TILE' })}
+            onClear={() => dispatch({ type: 'CLEAR_STAGING' })}
+            onSubmit={() =>
+              dispatch({
+                type: 'SUBMIT_WORD',
+                validDictionary,
+                wordListMap,
+              })
+            }
+            onShuffle={() => dispatch({ type: 'SHUFFLE_TILES' })}
+            isValidLength={isValidLength}
+            disabled={state.status !== 'playing'}
+          />
+        </section>
 
-        <ScrambleBoard
-          tiles={state.tiles}
-          onTileClick={(id) => dispatch({ type: 'STAGE_TILE', tileId: id })}
-          disabled={state.status !== 'playing'}
-        />
+        {/* Right Column on Desktop (Score & Options & Discovered Words), Bottom on Mobile */}
+        <section className="w-full lg:w-5/12 flex flex-col gap-2.5">
+          <ScrambleHeader
+            score={state.score}
+            streak={state.streak}
+            remainingSeconds={state.remainingSeconds}
+            mode={state.config.mode}
+            targetLengths={state.config.selectedLengths}
+            isPaused={state.status === 'paused'}
+            onTogglePause={() => {
+              if (state.status === 'playing') dispatch({ type: 'PAUSE_GAME' });
+              else if (state.status === 'paused') dispatch({ type: 'RESUME_GAME' });
+            }}
+          />
 
-        <FoundWordsList foundWords={state.foundWords} />
+          <FoundWordsList foundWords={state.foundWords} />
+        </section>
       </main>
 
-      {/* Configuration & Start Modal */}
+      {/* Configuration & Start Modal (Word Scramble Lobby) */}
       <ScrambleConfigModal
         isOpen={isConfigOpen}
         onStartGame={handleStartGame}
+        onOpenHistory={() => {
+          loadHistory();
+          setIsHistoryOpen(true);
+        }}
         isLoading={isLoadingWords}
         errorMessage={errorMessage}
       />
 
-      {/* Game Over Summary Modal */}
+      {/* Game History Modal */}
+      <GameHistoryModal
+        isOpen={isHistoryOpen}
+        sessions={historySessions}
+        onClose={() => setIsHistoryOpen(false)}
+      />
+
+      {/* Game Over Summary Modal with Return to Lobby */}
       <ScrambleSummaryModal
         isOpen={state.status === 'game_over'}
         gameState={state}
         onPlayAgain={() => handleStartGame(state.config)}
+        onReturnToLobby={onBackToMenu}
         onOpenSettings={() => setIsConfigOpen(true)}
       />
     </div>
