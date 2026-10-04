@@ -143,12 +143,12 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
     prevFoundWordsLengthRef.current = state.foundWords.length;
   }, [state.foundWords, state.streak, view]);
 
-  // Auto-dismiss splash animation after 2.5 seconds
+  // Auto-dismiss splash animation quickly (instant celebratory impact)
   useEffect(() => {
     if (!splashData) return;
     const timer = setTimeout(() => {
       setSplashData(null);
-    }, 2500);
+    }, 1200);
     return () => clearTimeout(timer);
   }, [splashData]);
 
@@ -184,8 +184,14 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
       }).then(() => {
         repository.clearActiveGame();
       });
-    } else if (state.status === 'playing' || state.status === 'paused') {
-      // Save in-progress game to safeLocalStorage
+    }
+  }, [view, state.status, state.foundWords, state.score, state.highestStreak, state.config, state.remainingSeconds, repository]);
+
+  // Debounced auto-save for active game in progress (avoids disk stalls on every 1-second timer tick)
+  useEffect(() => {
+    if (view !== 'game' || (state.status !== 'playing' && state.status !== 'paused')) return;
+
+    const timeout = setTimeout(() => {
       repository.saveActiveGame({
         status: state.status,
         config: state.config,
@@ -198,7 +204,9 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
         foundWords: state.foundWords,
         savedAt: new Date().toISOString(),
       });
-    }
+    }, 1500);
+
+    return () => clearTimeout(timeout);
   }, [
     view,
     state.status,
@@ -207,7 +215,6 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
     state.score,
     state.streak,
     state.highestStreak,
-    state.remainingSeconds,
     state.foundWords,
     state.config,
     repository
@@ -283,7 +290,7 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
   }, [view, state.status, state.tiles, validDictionary, wordListMap]);
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-b from-slate-950 via-slate-900 to-indigo-950 text-slate-100 flex flex-col items-center pt-6 sm:pt-10 pb-24 px-3 sm:px-5 select-none overflow-y-auto relative">
+    <div className="min-h-screen w-full bg-gradient-to-b from-slate-950 via-slate-900 to-indigo-950 text-slate-100 flex flex-col items-center pt-4 sm:pt-8 pb-20 px-3 sm:px-5 select-none overflow-y-auto overscroll-contain relative touch-pan-y">
       {/* Accepted Word Splash Popup Notification */}
       <ScrambleWordSplash
         splash={splashData}

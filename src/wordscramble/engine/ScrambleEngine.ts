@@ -236,11 +236,13 @@ export function scrambleReducer(
       let newSecretWords = state.secretSpoolWords;
       const hardCap = state.maxCapacity || 30;
 
-      // In Timed Mode: if cleared threshold words or available tiles < 10, spool new words & refill
-      // Replace consumed slots in-place or backfill up to the hard cap so grid NEVER overflows
+      // In Timed Mode: refill ONLY when available tiles drop below threshold (< 10)
+      // Runs only once when tiles drop below the threshold, refilling consumed slots up to hardCap
       if (state.config.mode === 'timed') {
         const availableCount = updatedTiles.filter((t) => t.status === 'available').length;
-        if (wordsCleared >= state.targetRefillThreshold || availableCount < 10) {
+        const REFILL_THRESHOLD = 10;
+        
+        if (availableCount < REFILL_THRESHOLD) {
           const freshWords = spoolSecretWords(
             action.wordListMap,
             state.config.selectedLengths,
