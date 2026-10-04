@@ -33,9 +33,7 @@ const MoreGamesList = ({
                         <p className="text-xs font-black uppercase text-transparent bg-clip-text bg-gradient-to-r from-pink-300 via-amber-200 to-cyan-300 tracking-wide">
                             Word Scramble Matrix
                         </p>
-                        <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-pink-500 to-cyan-500 text-[9px] font-black text-slate-950 uppercase tracking-widest shadow-sm">
-                            Beta
-                        </span>
+
                     </div>
                     <p className="text-[12px] text-slate-200 font-medium leading-normal mt-0.5">
                         Spool 3L-10L anagram letter matrices in Timed Rush or Untimed Puzzle mode!

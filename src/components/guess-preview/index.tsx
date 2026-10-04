@@ -678,11 +678,10 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
           <button
             onClick={() => hasPrevPlayer && onNavigateIndex(initialIndex - 1)}
             disabled={!hasPrevPlayer}
-            className={`flex items-center gap-1 font-black uppercase text-[10px] tracking-wider transition-all px-2 py-1 rounded-lg ${
-              hasPrevPlayer
+            className={`flex items-center gap-1 font-black uppercase text-[10px] tracking-wider transition-all px-2 py-1 rounded-lg ${hasPrevPlayer
                 ? "text-gray-300 hover:text-white hover:bg-white/10 cursor-pointer"
                 : "text-gray-600 opacity-40 cursor-not-allowed"
-            }`}
+              }`}
             title={prevEntry ? `Previous: ${formatUsername(prevEntry.username)}` : "No previous player"}
           >
             <span>←</span>
@@ -698,11 +697,10 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
           <button
             onClick={() => hasNextPlayer && onNavigateIndex(initialIndex + 1)}
             disabled={!hasNextPlayer}
-            className={`flex items-center gap-1 font-black uppercase text-[10px] tracking-wider transition-all px-2 py-1 rounded-lg ${
-              hasNextPlayer
+            className={`flex items-center gap-1 font-black uppercase text-[10px] tracking-wider transition-all px-2 py-1 rounded-lg ${hasNextPlayer
                 ? "text-gray-300 hover:text-white hover:bg-white/10 cursor-pointer"
                 : "text-gray-600 opacity-40 cursor-not-allowed"
-            }`}
+              }`}
             title={nextEntry ? `Next: ${formatUsername(nextEntry.username)}` : "No next player"}
           >
             <span className="max-w-[80px] truncate">{nextEntry ? formatUsername(nextEntry.username) : "Next"}</span>
@@ -734,7 +732,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
               if (container && target) {
                 const containerRect = container.getBoundingClientRect();
                 const targetRect = target.getBoundingClientRect();
-                
+
                 // Exact target position relative to scroll container
                 const currentScrollTop = container.scrollTop;
                 const offsetFromContainer = targetRect.top - containerRect.top;
@@ -865,7 +863,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
                   className="w-full py-2.5 px-4 bg-linear-to-r from-amber-500/20 via-indigo-500/20 to-purple-500/20 hover:from-amber-500/30 hover:via-indigo-500/30 hover:to-purple-500/30 border border-amber-500/30 hover:border-amber-500/50 text-amber-300 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer group"
                 >
                   <span className="text-sm group-hover:scale-110 transition-transform">♟️</span>
-                  <span>Analyze Game (Beta)</span>
+                  <span>Analyze Game</span>
                 </button>
               </div>
             )}

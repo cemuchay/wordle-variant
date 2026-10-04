@@ -53,21 +53,28 @@ export function hasWordPrefix(prefix: string): boolean {
 
 import { safeLocalStorage } from '../storage';
 
+export interface WordMeaning {
+  partOfSpeech: string;
+  definition: string;
+}
+
 export interface DictionaryDefinition {
   word: string;
   partOfSpeech?: string;
   definition: string;
+  meanings?: WordMeaning[];
   phonetic?: string;
 }
 
 /**
  * Fetches the definition and pronunciation of a word using CORS-friendly Datamuse and Wiktionary endpoints.
  * Automatically caches definitions in safeLocalStorage using the game date so old words don't clutter storage.
+ * Handles words with multiple meanings across distinct parts of speech (noun, verb, adjective, etc.).
  */
 export async function fetchWordDefinition(word: string, date?: string): Promise<DictionaryDefinition> {
   const normalized = word.trim().toLowerCase();
   if (!normalized) {
-    return { word: '', definition: 'A valid English word.' };
+    return { word: '', definition: 'A valid English word.', meanings: [] };
   }
 
   // 1. Check local cache first (keyed by date so it auto-expires or can be purged daily)
@@ -88,17 +95,24 @@ export async function fetchWordDefinition(word: string, date?: string): Promise<
   const fallback: DictionaryDefinition = {
     word: word.toUpperCase(),
     definition: 'A valid English word.',
+    meanings: [{ partOfSpeech: 'WORD', definition: 'A valid English word.' }],
   };
 
-  // 2. Primary: Datamuse API (always has Access-Control-Allow-Origin: *, provides definitions, parts of speech, and IPA / pron)
+  const posMap: Record<string, string> = {
+    n: 'NOUN',
+    v: 'VERB',
+    adj: 'ADJECTIVE',
+    adv: 'ADVERB',
+    u: 'WORD',
+  };
+
+  // 2. Primary: Datamuse API (always has Access-Control-Allow-Origin: *, provides multiple definitions, parts of speech, and IPA / pron)
   try {
     const res = await fetch(`https://api.datamuse.com/words?sp=${normalized}&md=dp&ipa=1&max=1`);
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
         const item = data[0];
-        let partOfSpeech: string | undefined;
-        let definition: string | undefined;
         let phonetic: string | undefined;
 
         // Extract IPA / pronunciation tag
@@ -113,30 +127,36 @@ export async function fetchWordDefinition(word: string, date?: string): Promise<
           }
         }
 
-        // Extract definition
+        // Extract all definitions & parts of speech
+        const meanings: WordMeaning[] = [];
         if (Array.isArray(item.defs) && item.defs.length > 0) {
-          const rawDef: string = item.defs[0]; // e.g. "n\tA convex curve or surface." or "adj\tCurved or rounded outward."
-          const parts = rawDef.split('\t');
-          if (parts.length >= 2) {
-            const posMap: Record<string, string> = {
-              n: 'NOUN',
-              v: 'VERB',
-              adj: 'ADJECTIVE',
-              adv: 'ADVERB',
-              u: 'WORD',
-            };
-            partOfSpeech = posMap[parts[0].toLowerCase()] || parts[0].toUpperCase();
-            definition = parts[1];
-          } else {
-            definition = rawDef;
+          for (const rawDef of item.defs) {
+            if (typeof rawDef !== 'string') continue;
+            const parts = rawDef.split('\t');
+            if (parts.length >= 2) {
+              const pos = posMap[parts[0].toLowerCase()] || parts[0].toUpperCase();
+              const defText = parts[1].trim();
+              if (defText && !meanings.some((m) => m.definition.toLowerCase() === defText.toLowerCase())) {
+                meanings.push({
+                  partOfSpeech: pos,
+                  definition: defText,
+                });
+              }
+            } else if (rawDef.trim()) {
+              meanings.push({
+                partOfSpeech: 'WORD',
+                definition: rawDef.trim(),
+              });
+            }
           }
         }
 
-        if (definition) {
+        if (meanings.length > 0) {
           const result: DictionaryDefinition = {
             word: word.toUpperCase(),
-            partOfSpeech,
-            definition,
+            partOfSpeech: meanings[0].partOfSpeech,
+            definition: meanings[0].definition,
+            meanings,
             phonetic,
           };
           try {
@@ -156,14 +176,31 @@ export async function fetchWordDefinition(word: string, date?: string): Promise<
     if (res.ok) {
       const data = await res.json();
       if (data && data.en && Array.isArray(data.en) && data.en.length > 0) {
-        const firstEntry = data.en[0];
-        const partOfSpeech = firstEntry.partOfSpeech ? String(firstEntry.partOfSpeech).toUpperCase() : undefined;
-        if (Array.isArray(firstEntry.definitions) && firstEntry.definitions.length > 0) {
-          const cleanDef = firstEntry.definitions[0].definition.replace(/<[^>]*>?/gm, '').trim();
+        const meanings: WordMeaning[] = [];
+
+        for (const entry of data.en) {
+          const pos = entry.partOfSpeech ? String(entry.partOfSpeech).toUpperCase() : 'WORD';
+          if (Array.isArray(entry.definitions)) {
+            for (const d of entry.definitions) {
+              if (d && typeof d.definition === 'string') {
+                const cleanDef = d.definition.replace(/<[^>]*>?/gm, '').trim();
+                if (cleanDef && !meanings.some((m) => m.definition.toLowerCase() === cleanDef.toLowerCase())) {
+                  meanings.push({
+                    partOfSpeech: pos,
+                    definition: cleanDef,
+                  });
+                }
+              }
+            }
+          }
+        }
+
+        if (meanings.length > 0) {
           const result: DictionaryDefinition = {
             word: word.toUpperCase(),
-            partOfSpeech,
-            definition: cleanDef,
+            partOfSpeech: meanings[0].partOfSpeech,
+            definition: meanings[0].definition,
+            meanings,
           };
           try {
             safeLocalStorage.setItem(cacheKey, JSON.stringify(result));
