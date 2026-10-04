@@ -16,6 +16,76 @@ interface SubmissionTrayProps {
   disabled?: boolean;
 }
 
+interface StagedTileProps {
+  tile: ScrambleTile;
+  idx: number;
+  totalLength: number;
+  onUnstageTile: (tileId: string) => void;
+  onSwapTiles?: (fromIndex: number, toIndex: number) => void;
+}
+
+const StagedTile: React.FC<StagedTileProps> = memo(({
+  tile,
+  idx,
+  totalLength,
+  onUnstageTile,
+  onSwapTiles,
+}) => {
+  const palette = RAINBOW_TILE_PALETTES[tile.colorIndex % RAINBOW_TILE_PALETTES.length];
+
+  return (
+    <div className="relative group flex flex-col items-center shrink-0">
+      <button
+        onClick={() => onUnstageTile(tile.id)}
+        title="Tap to remove letter from rack"
+        className={`
+          w-9 h-10 sm:w-11 sm:h-12 md:w-12 md:h-13 rounded-lg sm:rounded-xl font-black text-lg sm:text-xl flex items-center justify-center
+          bg-gradient-to-br ${palette.bg} ${palette.text} ${palette.border}
+          border-b-2 sm:border-b-4 border-t border-x shadow-md select-none cursor-pointer
+          transition-transform duration-75 active:scale-90 hover:scale-105 will-change-transform
+        `}
+        style={{
+          boxShadow: `0 0 12px ${palette.glow}`,
+        }}
+      >
+        {tile.letter}
+      </button>
+
+      {/* Left / Right Quick Reorder Buttons */}
+      {totalLength > 1 && onSwapTiles && (
+        <div className="flex gap-1 mt-1 opacity-60 hover:opacity-100 transition-opacity">
+          {idx > 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onSwapTiles(idx, idx - 1);
+              }}
+              className="text-[8px] sm:text-[9px] px-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700"
+              title="Move left"
+            >
+              ◀
+            </button>
+          )}
+          {idx < totalLength - 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onSwapTiles(idx, idx + 1);
+              }}
+              className="text-[8px] sm:text-[9px] px-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700"
+              title="Move right"
+            >
+              ▶
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+});
+
+StagedTile.displayName = 'StagedTile';
+
 export const SubmissionTray: React.FC<SubmissionTrayProps> = memo(({
   stagedTiles,
   targetLengths,
@@ -31,11 +101,11 @@ export const SubmissionTray: React.FC<SubmissionTrayProps> = memo(({
   const currentWord = stagedTiles.map((t) => t.letter).join('');
 
   return (
-    <div className="w-full max-w-xl mx-auto my-2 sm:my-3 flex flex-col items-center gap-2 sm:gap-3 touch-pan-y">
+    <div className="w-full max-w-xl mx-auto my-1.5 sm:my-2.5 flex flex-col items-center gap-2 sm:gap-2.5 touch-pan-y">
       {/* Target Length Indicators */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 h-6">
         <span className="text-[11px] sm:text-xs font-semibold text-slate-400">Accepted Lengths:</span>
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 items-center">
           {targetLengths.map((len) => {
             const isMatch = currentWord.length === len;
             return (
@@ -57,66 +127,21 @@ export const SubmissionTray: React.FC<SubmissionTrayProps> = memo(({
         </div>
       </div>
 
-      {/* Staged Tiles Rainbow Tray with Reordering & Tap to Swap/Remove */}
-      <div className="w-full min-h-[58px] sm:min-h-[68px] p-2 sm:p-2.5 rounded-2xl bg-gradient-to-r from-slate-900/90 via-purple-950/40 to-slate-900/90 backdrop-blur-md border-2 border-indigo-500/30 flex items-center justify-center gap-1.5 sm:gap-2 shadow-inner overflow-x-auto">
-        {stagedTiles.map((tile, idx) => {
-          const palette = RAINBOW_TILE_PALETTES[tile.colorIndex % RAINBOW_TILE_PALETTES.length];
-          return (
-            <div
-              key={tile.id}
-              className="relative group flex flex-col items-center shrink-0"
-            >
-              <button
-                onClick={() => onUnstageTile(tile.id)}
-                title="Tap to remove letter from rack"
-                className={`
-                  w-9 h-10 sm:w-11 sm:h-12 md:w-12 md:h-13 rounded-lg sm:rounded-xl font-black text-lg sm:text-xl flex items-center justify-center
-                  bg-gradient-to-br ${palette.bg} ${palette.text} ${palette.border}
-                  border-b-2 sm:border-b-4 border-t border-x shadow-md select-none cursor-pointer
-                  transition-transform duration-75 active:scale-95 hover:scale-105
-                `}
-                style={{
-                  boxShadow: `0 0 14px ${palette.glow}`,
-                }}
-              >
-                {tile.letter}
-              </button>
-
-              {/* Left / Right Quick Reorder Buttons */}
-              {stagedTiles.length > 1 && onSwapTiles && (
-                <div className="flex gap-1 mt-1 opacity-60 hover:opacity-100 transition-opacity">
-                  {idx > 0 && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSwapTiles(idx, idx - 1);
-                      }}
-                      className="text-[8px] sm:text-[9px] px-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700"
-                      title="Move left"
-                    >
-                      ◀
-                    </button>
-                  )}
-                  {idx < stagedTiles.length - 1 && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSwapTiles(idx, idx + 1);
-                      }}
-                      className="text-[8px] sm:text-[9px] px-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700"
-                      title="Move right"
-                    >
-                      ▶
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
+      {/* Staged Tiles Rainbow Tray with STRICT Fixed Height (No layout jumps whether empty or full) */}
+      <div className="w-full h-[68px] sm:h-[76px] px-3 rounded-2xl bg-slate-900/95 border-2 border-indigo-500/30 flex items-center justify-center gap-1.5 sm:gap-2 shadow-inner overflow-x-auto">
+        {stagedTiles.map((tile, idx) => (
+          <StagedTile
+            key={tile.id}
+            tile={tile}
+            idx={idx}
+            totalLength={stagedTiles.length}
+            onUnstageTile={onUnstageTile}
+            onSwapTiles={onSwapTiles}
+          />
+        ))}
 
         {stagedTiles.length === 0 && (
-          <span className="text-xs sm:text-sm font-medium text-slate-500 tracking-wider">
+          <span className="text-xs sm:text-sm font-medium text-slate-500 tracking-wider select-none pointer-events-none">
             Select letters below or type on keyboard
           </span>
         )}

@@ -42,7 +42,6 @@ export const ScrambleLobby: React.FC<ScrambleLobbyProps> = ({
 
   const [mode, setMode] = useState<ScrambleGameMode>('timed');
   const [durationSeconds, setDurationSeconds] = useState<number>(90);
-  const [maxCapacity, setMaxCapacity] = useState<number>(30);
   const [useScrabbleDict] = useState<boolean>(true);
 
   // Load storage data
@@ -91,7 +90,7 @@ export const ScrambleLobby: React.FC<ScrambleLobbyProps> = ({
       mode,
       durationSeconds: mode === 'timed' ? durationSeconds : 0,
       wordsPerSpool,
-      maxCapacity,
+      maxCapacity: 0, // Auto-computed balanced capacity based on spool and word length
       useScrabbleDict,
       seed: Date.now().toString(),
     });
@@ -159,11 +158,10 @@ export const ScrambleLobby: React.FC<ScrambleLobbyProps> = ({
       <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-inner">
         <button
           onClick={() => setActiveTab('create')}
-          className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-            activeTab === 'create'
-              ? 'bg-gradient-to-r from-pink-500/20 via-amber-500/20 to-cyan-500/20 text-white border border-pink-500/40 shadow-sm'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
+          className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${activeTab === 'create'
+            ? 'bg-gradient-to-r from-pink-500/20 via-amber-500/20 to-cyan-500/20 text-white border border-pink-500/40 shadow-sm'
+            : 'text-slate-400 hover:text-slate-200'
+            }`}
         >
           <Sparkles className="w-3.5 h-3.5 text-pink-400" />
           <span>New Game</span>
@@ -171,11 +169,10 @@ export const ScrambleLobby: React.FC<ScrambleLobbyProps> = ({
 
         <button
           onClick={() => setActiveTab('pending')}
-          className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer relative ${
-            activeTab === 'pending'
-              ? 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-white border border-amber-500/40 shadow-sm'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
+          className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer relative ${activeTab === 'pending'
+            ? 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-white border border-amber-500/40 shadow-sm'
+            : 'text-slate-400 hover:text-slate-200'
+            }`}
         >
           <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
           <span>Pending Game</span>
@@ -186,11 +183,10 @@ export const ScrambleLobby: React.FC<ScrambleLobbyProps> = ({
 
         <button
           onClick={() => setActiveTab('history')}
-          className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-            activeTab === 'history'
-              ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-white border border-cyan-500/40 shadow-sm'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
+          className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${activeTab === 'history'
+            ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-white border border-cyan-500/40 shadow-sm'
+            : 'text-slate-400 hover:text-slate-200'
+            }`}
         >
           <History className="w-3.5 h-3.5 text-cyan-400" />
           <span>Game History ({historySessions.length})</span>
@@ -232,10 +228,9 @@ export const ScrambleLobby: React.FC<ScrambleLobbyProps> = ({
                           onClick={() => handleSelectPrimaryLength(len)}
                           className={`
                             py-2 rounded-xl font-black text-xs sm:text-sm transition-all duration-150 border cursor-pointer
-                            ${
-                              isSelected
-                                ? 'bg-gradient-to-r from-pink-500 to-rose-600 text-white border-pink-400 shadow-[0_0_12px_rgba(244,63,94,0.6)] scale-105'
-                                : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:border-slate-500 hover:text-white'
+                            ${isSelected
+                              ? 'bg-gradient-to-r from-pink-500 to-rose-600 text-white border-pink-400 shadow-[0_0_12px_rgba(244,63,94,0.6)] scale-105'
+                              : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:border-slate-500 hover:text-white'
                             }
                           `}
                         >
@@ -268,10 +263,9 @@ export const ScrambleLobby: React.FC<ScrambleLobbyProps> = ({
                           onClick={() => handleToggleAdditionalLength(len)}
                           className={`
                             py-2 rounded-xl font-black text-xs sm:text-sm transition-all duration-150 border cursor-pointer
-                            ${
-                              isPrimary
-                                ? 'bg-slate-900 text-slate-600 border-slate-800 opacity-40 cursor-not-allowed'
-                                : isSelected
+                            ${isPrimary
+                              ? 'bg-slate-900 text-slate-600 border-slate-800 opacity-40 cursor-not-allowed'
+                              : isSelected
                                 ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.5)] scale-105'
                                 : 'bg-slate-800/60 text-slate-400 border-slate-700 hover:border-slate-500 hover:text-white'
                             }
@@ -316,10 +310,9 @@ export const ScrambleLobby: React.FC<ScrambleLobbyProps> = ({
                     onClick={() => setMode('timed')}
                     className={`
                       p-3.5 rounded-2xl flex items-center gap-3 border transition-all text-left cursor-pointer
-                      ${
-                        mode === 'timed'
-                          ? 'bg-gradient-to-r from-cyan-950/70 to-blue-900/60 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)]'
-                          : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:text-slate-200'
+                      ${mode === 'timed'
+                        ? 'bg-gradient-to-r from-cyan-950/70 to-blue-900/60 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)]'
+                        : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:text-slate-200'
                       }
                     `}
                   >
@@ -334,10 +327,9 @@ export const ScrambleLobby: React.FC<ScrambleLobbyProps> = ({
                     onClick={() => setMode('untimed')}
                     className={`
                       p-3.5 rounded-2xl flex items-center gap-3 border transition-all text-left cursor-pointer
-                      ${
-                        mode === 'untimed'
-                          ? 'bg-gradient-to-r from-purple-950/70 to-indigo-900/60 border-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.3)]'
-                          : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:text-slate-200'
+                      ${mode === 'untimed'
+                        ? 'bg-gradient-to-r from-purple-950/70 to-indigo-900/60 border-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.3)]'
+                        : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:text-slate-200'
                       }
                     `}
                   >
@@ -364,10 +356,9 @@ export const ScrambleLobby: React.FC<ScrambleLobbyProps> = ({
                         onClick={() => setDurationSeconds(sec)}
                         className={`
                           py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer
-                          ${
-                            durationSeconds === sec
-                              ? 'bg-cyan-500 text-slate-950 border-cyan-300 font-black shadow-md'
-                              : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:border-slate-600'
+                          ${durationSeconds === sec
+                            ? 'bg-cyan-500 text-slate-950 border-cyan-300 font-black shadow-md'
+                            : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:border-slate-600'
                           }
                         `}
                       >
@@ -376,49 +367,11 @@ export const ScrambleLobby: React.FC<ScrambleLobbyProps> = ({
                     ))}
                   </div>
                 </div>
-              )}
-
-              {/* Grid Letter Capacity Cap */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] font-black">
-                      {mode === 'timed' ? '4' : '3'}
-                    </span>
-                    <span>Grid Letter Pool Cap</span>
-                  </h2>
-                  <span className="text-xs font-black text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-lg">
-                    {maxCapacity === 0 ? '✨ Auto (Balanced)' : `${maxCapacity} Max Tiles`}
-                  </span>
-                </div>
-                <div className="grid grid-cols-4 gap-2">
-                  {[0, 24, 30, 36].map((cap) => (
-                    <button
-                      key={cap}
-                      onClick={() => setMaxCapacity(cap)}
-                      className={`
-                        py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer
-                        ${
-                          maxCapacity === cap
-                            ? 'bg-emerald-500 text-slate-950 border-emerald-300 font-black shadow-md'
-                            : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:border-slate-600'
-                        }
-                      `}
-                    >
-                      {cap === 0 ? 'Auto ✨' : `${cap} Tiles`}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  {maxCapacity === 0
-                    ? 'Engine automatically sizes grid capacity based on selected word lengths and spooled words.'
-                    : 'Hard cap ensures letter tiles never overflow the grid matrix during refills.'}
-                </p>
               </div>
             </div>
 
             {/* Right Col: Setup Preview & Start Button */}
-            <div className="lg:col-span-5 flex flex-col space-y-4">
+            <div className="lg:col-span-5 flex flex-col space-y-4 pb-18 mb-6">
               <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4 flex-1">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800 pb-2">
                   Game Configuration Summary
@@ -440,9 +393,9 @@ export const ScrambleLobby: React.FC<ScrambleLobbyProps> = ({
                   </div>
 
                   <div className="flex items-center justify-between py-1.5 border-b border-slate-800/60">
-                    <span className="text-slate-400">Grid Cap:</span>
+                    <span className="text-slate-400">Grid Pool:</span>
                     <span className="font-bold text-emerald-300">
-                      Hard capped at {maxCapacity} tiles (no overflow)
+                      Auto-Balanced (Smart Capacity)
                     </span>
                   </div>
 

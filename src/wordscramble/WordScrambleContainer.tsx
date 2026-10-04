@@ -252,6 +252,43 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
     }
   }, [view, stagedTiles, validDictionary, wordListMap, state.status, state.config.selectedLengths, state.foundWords]);
 
+  // Stable Callbacks to prevent re-rendering memoized Board and Tray on 1s timer ticks
+  const handleStageTile = useCallback((tileId: string) => {
+    dispatch({ type: 'STAGE_TILE', tileId });
+  }, []);
+
+  const handleUnstageTile = useCallback((tileId: string) => {
+    dispatch({ type: 'UNSTAGE_TILE', tileId });
+  }, []);
+
+  const handleSwapStagedTiles = useCallback((fromIndex: number, toIndex: number) => {
+    dispatch({ type: 'SWAP_STAGED_TILES', fromIndex, toIndex });
+  }, []);
+
+  const handleBackspace = useCallback(() => {
+    dispatch({ type: 'UNSTAGE_LAST_TILE' });
+  }, []);
+
+  const handleClear = useCallback(() => {
+    dispatch({ type: 'CLEAR_STAGING' });
+  }, []);
+
+  const handleShuffle = useCallback(() => {
+    dispatch({ type: 'SHUFFLE_TILES' });
+  }, []);
+
+  const handleSubmit = useCallback(() => {
+    dispatch({
+      type: 'SUBMIT_WORD',
+      validDictionary,
+      wordListMap,
+    });
+  }, [validDictionary, wordListMap]);
+
+  const handleTogglePause = useCallback(() => {
+    dispatch({ type: state.status === 'playing' ? 'PAUSE_GAME' : 'RESUME_GAME' });
+  }, [state.status]);
+
   // Desktop Physical Keyboard Support
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -259,35 +296,30 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
 
       if (e.key === 'Enter') {
         e.preventDefault();
-        dispatch({
-          type: 'SUBMIT_WORD',
-          validDictionary,
-          wordListMap,
-        });
+        handleSubmit();
       } else if (e.key === 'Backspace') {
         e.preventDefault();
-        dispatch({ type: 'UNSTAGE_LAST_TILE' });
+        handleBackspace();
       } else if (e.key === 'Escape') {
         e.preventDefault();
-        dispatch({ type: 'CLEAR_STAGING' });
+        handleClear();
       } else if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
-        dispatch({ type: 'SHUFFLE_TILES' });
+        handleShuffle();
       } else if (/^[a-zA-Z]$/.test(e.key)) {
         const char = e.key.toUpperCase();
-        // Find first available tile on board matching letter
         const availableTile = state.tiles.find(
           (t) => t.status === 'available' && t.letter === char
         );
         if (availableTile) {
-          dispatch({ type: 'STAGE_TILE', tileId: availableTile.id });
+          handleStageTile(availableTile.id);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [view, state.status, state.tiles, validDictionary, wordListMap]);
+  }, [view, state.status, state.tiles, handleSubmit, handleBackspace, handleClear, handleShuffle, handleStageTile]);
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-slate-950 via-slate-900 to-indigo-950 text-slate-100 flex flex-col items-center pt-4 sm:pt-8 pb-20 px-3 sm:px-5 select-none overflow-y-auto overscroll-contain relative touch-pan-y">
@@ -339,18 +371,12 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
               <SubmissionTray
                 stagedTiles={stagedTiles}
                 targetLengths={state.config.selectedLengths}
-                onUnstageTile={(id) => dispatch({ type: 'UNSTAGE_TILE', tileId: id })}
-                onSwapTiles={(from, to) => dispatch({ type: 'SWAP_STAGED_TILES', fromIndex: from, toIndex: to })}
-                onBackspace={() => dispatch({ type: 'UNSTAGE_LAST_TILE' })}
-                onClear={() => dispatch({ type: 'CLEAR_STAGING' })}
-                onSubmit={() =>
-                  dispatch({
-                    type: 'SUBMIT_WORD',
-                    validDictionary,
-                    wordListMap,
-                  })
-                }
-                onShuffle={() => dispatch({ type: 'SHUFFLE_TILES' })}
+                onUnstageTile={handleUnstageTile}
+                onSwapTiles={handleSwapStagedTiles}
+                onBackspace={handleBackspace}
+                onClear={handleClear}
+                onSubmit={handleSubmit}
+                onShuffle={handleShuffle}
                 isValidLength={isValidLength}
                 disabled={state.status !== 'playing'}
               />
@@ -358,7 +384,7 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
               {/* Letter Pool Matrix BELOW Selected Words */}
               <ScrambleBoard
                 tiles={state.tiles}
-                onTileClick={(id) => dispatch({ type: 'STAGE_TILE', tileId: id })}
+                onTileClick={handleStageTile}
                 disabled={state.status !== 'playing'}
               />
             </section>
@@ -372,10 +398,7 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
                 mode={state.config.mode}
                 targetLengths={state.config.selectedLengths}
                 isPaused={state.status === 'paused'}
-                onTogglePause={() => {
-                  if (state.status === 'playing') dispatch({ type: 'PAUSE_GAME' });
-                  else if (state.status === 'paused') dispatch({ type: 'RESUME_GAME' });
-                }}
+                onTogglePause={handleTogglePause}
               />
 
               <FoundWordsList foundWords={state.foundWords} />
