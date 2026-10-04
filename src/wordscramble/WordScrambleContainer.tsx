@@ -10,21 +10,27 @@ import { SubmissionTray } from './components/SubmissionTray';
 import { FoundWordsList } from './components/FoundWordsList';
 import { ScrambleSummaryModal } from './components/ScrambleSummaryModal';
 import { ScrambleWordSplash, type ScrambleWordSplashData } from './components/ScrambleWordSplash';
-import { ArrowLeft, RefreshCw } from 'lucide-react';
+import { ScrambleTutorialModal } from './components/ScrambleTutorialModal';
+import { safeLocalStorage } from '../utils/storage';
+import { useApp } from '../context/AppContext';
+import { TOAST_DURATION } from '../constants/ui';
+import { ArrowLeft, RefreshCw, HelpCircle } from 'lucide-react';
 
 interface WordScrambleContainerProps {
   onBackToMenu?: () => void;
 }
 
+const TUTORIAL_STORAGE_KEY = 'wordscramble_tutorial_completed';
+
 export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
   onBackToMenu,
 }) => {
+  const { triggerToast } = useApp();
   const [state, dispatch] = useReducer(scrambleReducer, initialScrambleState);
   const [view, setView] = useState<'lobby' | 'game'>('lobby');
   const [validDictionary, setValidDictionary] = useState<Set<string>>(new Set());
   const [wordListMap, setWordListMap] = useState<Record<number, string[]>>({});
-  const [isLoadingWords, setIsLoadingWords] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showInGameTutorial, setShowInGameTutorial] = useState<boolean>(false);
 
   // Splash animation state when a correct word is accepted
   const [splashData, setSplashData] = useState<ScrambleWordSplashData | null>(null);
@@ -37,8 +43,6 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
     wordListMap: Record<number, string[]>;
     validDictionary: Set<string>;
   }> => {
-    setIsLoadingWords(true);
-    setErrorMessage(null);
     const newWordListMap: Record<number, string[]> = {};
     const combinedValid = new Set<string>();
 
@@ -77,20 +81,15 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
       setValidDictionary(combinedValid);
       return { wordListMap: newWordListMap, validDictionary: combinedValid };
     } catch (e: any) {
-      const msg = e?.message || 'Failed to initialize word dictionary';
       console.error('WordScramble dictionary load error:', e);
-      setErrorMessage(msg);
       throw e;
-    } finally {
-      setIsLoadingWords(false);
     }
   }, []);
 
   const handleStartGame = async (config: ScrambleConfig) => {
     try {
-      setErrorMessage(null);
       const { wordListMap: preparedMap } = await prepareDictionaries(config.selectedLengths);
-      
+
       const hasWords = config.selectedLengths.some((len) => (preparedMap[len] || []).length > 0);
       if (!hasWords) {
         throw new Error('No words available for selected lengths. Please try another selection.');
@@ -102,20 +101,20 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
       setView('game');
     } catch (err: any) {
       console.error('Error starting Word Scramble game:', err);
-      setErrorMessage(err?.message || 'Could not start game. Please try again.');
+      triggerToast(err?.message || 'Could not start game. Please try again.', TOAST_DURATION.DEFAULT);
     }
   };
 
   const handleResumeGame = async (savedState: any) => {
     try {
-      const { wordListMap: preparedMap } = await prepareDictionaries(savedState.config.selectedLengths);
+      await prepareDictionaries(savedState.config.selectedLengths);
       dispatch({ type: 'RESTORE_SAVED_GAME', state: savedState });
       prevFoundWordsLengthRef.current = (savedState.foundWords || []).length;
       setSplashData(null);
       setView('game');
     } catch (err: any) {
       console.error('Error resuming saved game:', err);
-      setErrorMessage(err?.message || 'Could not resume game.');
+      triggerToast(err?.message || 'Could not resume game.', TOAST_DURATION.DEFAULT);
     }
   };
 
@@ -123,43 +122,54 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
     setView('lobby');
   };
 
-  // Detect newly accepted words and trigger splash emoji banner
+  // Detect milestone word discoveries (5, 10, 15, 20, etc.) and trigger celebratory milestone splash
   useEffect(() => {
     if (view !== 'game') return;
 
-    if (state.foundWords.length > prevFoundWordsLengthRef.current) {
-      const latestWord = state.foundWords[0];
-      if (latestWord) {
-        setSplashData({
-          word: latestWord.word,
-          score: latestWord.score,
-          streak: state.streak,
-          length: latestWord.length,
-          timestamp: latestWord.timestamp || Date.now(),
-          isSecretSpoolBonus: latestWord.isSecretSpoolBonus,
-        });
+    const currentCount = state.foundWords.length;
+    const prevCount = prevFoundWordsLengthRef.current;
+
+    if (currentCount > prevCount && currentCount > 0) {
+      // Trigger splash ONLY on milestone multiples of 5 (e.g. 5, 10, 15, 20, 25, 30...)
+      if (currentCount % 5 === 0) {
+        const latestWord = state.foundWords[0];
+        if (latestWord) {
+          setSplashData({
+            milestoneCount: currentCount,
+            latestWord: latestWord.word,
+            totalScore: state.score,
+            streak: state.streak,
+            timeBonus: latestWord.timeBonus,
+            timestamp: latestWord.timestamp || Date.now(),
+          });
+        }
       }
     }
-    prevFoundWordsLengthRef.current = state.foundWords.length;
-  }, [state.foundWords, state.streak, view]);
+    prevFoundWordsLengthRef.current = currentCount;
+  }, [state.foundWords, state.score, state.streak, view]);
 
-  // Auto-dismiss splash animation quickly (instant celebratory impact)
+  // Auto-dismiss milestone splash animation
   useEffect(() => {
     if (!splashData) return;
     const timer = setTimeout(() => {
       setSplashData(null);
-    }, 1200);
+    }, 1800);
     return () => clearTimeout(timer);
   }, [splashData]);
 
-  // Timer Tick (only when active and playing)
+  // Dynamic Timer Tick according to progressive decay multiplier
   useEffect(() => {
     if (view !== 'game' || state.status !== 'playing' || state.config.mode === 'untimed') return;
+
+    // Base 1000ms divided by decay multiplier (e.g. 1.1x -> 909ms, 1.2x -> 833ms, 1.3x -> 769ms)
+    const decay = state.timeDecayMultiplier || 1.0;
+    const intervalMs = Math.max(400, Math.round(1000 / decay));
+
     const timer = setInterval(() => {
       dispatch({ type: 'TICK_TIMER' });
-    }, 1000);
+    }, intervalMs);
     return () => clearInterval(timer);
-  }, [view, state.status, state.config.mode]);
+  }, [view, state.status, state.config.mode, state.timeDecayMultiplier]);
 
   // Persist session to repository on Game Over and clean up active game
   useEffect(() => {
@@ -240,17 +250,19 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
 
     const formedWord = stagedTiles.map((t) => t.letter).join('').toUpperCase();
 
-    if (
-      validDictionary.has(formedWord) &&
-      !state.foundWords.some((f) => f.word === formedWord)
-    ) {
+    if (state.foundWords.some((f) => f.word === formedWord)) {
+      triggerToast(`"${formedWord}" already played!`, TOAST_DURATION.SHORT);
+      return;
+    }
+
+    if (validDictionary.has(formedWord)) {
       dispatch({
         type: 'SUBMIT_WORD',
         validDictionary,
         wordListMap,
       });
     }
-  }, [view, stagedTiles, validDictionary, wordListMap, state.status, state.config.selectedLengths, state.foundWords]);
+  }, [view, stagedTiles, validDictionary, wordListMap, state.status, state.config.selectedLengths, state.foundWords, triggerToast]);
 
   // Stable Callbacks to prevent re-rendering memoized Board and Tray on 1s timer ticks
   const handleStageTile = useCallback((tileId: string) => {
@@ -278,12 +290,46 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
   }, []);
 
   const handleSubmit = useCallback(() => {
+    if (stagedTiles.length === 0) return;
+    const formedWord = stagedTiles.map((t) => t.letter).join('').toUpperCase();
+
+    // Check if word has already been played
+    if (state.foundWords.some((entry) => entry.word === formedWord)) {
+      triggerToast(`"${formedWord}" already played!`, TOAST_DURATION.SHORT);
+      return;
+    }
+
+    // Check if length is acceptable
+    if (!state.config.selectedLengths.includes(formedWord.length)) {
+      triggerToast(
+        `Word must be ${state.config.selectedLengths.map((l) => `${l}L`).join(' or ')}`,
+        TOAST_DURATION.SHORT
+      );
+      dispatch({
+        type: 'SUBMIT_WORD',
+        validDictionary,
+        wordListMap,
+      });
+      return;
+    }
+
+    // Check if in dictionary
+    if (!validDictionary.has(formedWord)) {
+      triggerToast(`"${formedWord}" not in word list!`, TOAST_DURATION.SHORT);
+      dispatch({
+        type: 'SUBMIT_WORD',
+        validDictionary,
+        wordListMap,
+      });
+      return;
+    }
+
     dispatch({
       type: 'SUBMIT_WORD',
       validDictionary,
       wordListMap,
     });
-  }, [validDictionary, wordListMap]);
+  }, [stagedTiles, state.foundWords, state.config.selectedLengths, validDictionary, wordListMap, triggerToast]);
 
   const handleTogglePause = useCallback(() => {
     dispatch({ type: state.status === 'playing' ? 'PAUSE_GAME' : 'RESUME_GAME' });
@@ -292,6 +338,17 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
   // Desktop Physical Keyboard Support
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input, textarea or contenteditable element
+      const target = e.target as HTMLElement;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
       if (view !== 'game' || state.status !== 'playing') return;
 
       if (e.key === 'Enter') {
@@ -307,11 +364,13 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
         e.preventDefault();
         handleShuffle();
       } else if (/^[a-zA-Z]$/.test(e.key)) {
+        // Look for the first available tile matching this letter in the letter pool grid
         const char = e.key.toUpperCase();
         const availableTile = state.tiles.find(
-          (t) => t.status === 'available' && t.letter === char
+          (t) => t.status === 'available' && t.letter.toUpperCase() === char
         );
         if (availableTile) {
+          e.preventDefault();
           handleStageTile(availableTile.id);
         }
       }
@@ -353,15 +412,39 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
               </span>
             </div>
 
-            <button
-              onClick={() => handleStartGame(state.config)}
-              className="p-2 sm:p-2.5 rounded-xl bg-slate-900 border border-slate-700/80 hover:bg-slate-800 text-slate-300 transition-all flex items-center gap-1 text-xs font-bold cursor-pointer active:scale-95 shadow-md"
-              title="Restart with same configuration"
-            >
-              <RefreshCw className="w-4 h-4 text-cyan-400" />
-              <span className="hidden sm:inline">Restart</span>
-            </button>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                onClick={() => setShowInGameTutorial(true)}
+                className="p-2 sm:p-2.5 rounded-xl bg-slate-900 border border-slate-700/80 hover:bg-slate-800 text-cyan-400 transition-all flex items-center gap-1 text-xs font-bold cursor-pointer active:scale-95 shadow-md"
+                title="How to Play"
+              >
+                <HelpCircle className="w-4 h-4" />
+                <span className="hidden sm:inline">Guide</span>
+              </button>
+
+              <button
+                onClick={() => handleStartGame(state.config)}
+                className="p-2 sm:p-2.5 rounded-xl bg-slate-900 border border-slate-700/80 hover:bg-slate-800 text-slate-300 transition-all flex items-center gap-1 text-xs font-bold cursor-pointer active:scale-95 shadow-md"
+                title="Restart with same configuration"
+              >
+                <RefreshCw className="w-4 h-4 text-cyan-400" />
+                <span className="hidden sm:inline">Restart</span>
+              </button>
+            </div>
           </header>
+
+          {/* In-Game Tutorial Modal */}
+          <ScrambleTutorialModal
+            isOpen={showInGameTutorial}
+            onComplete={() => {
+              safeLocalStorage.setItem(TUTORIAL_STORAGE_KEY, 'true');
+              setShowInGameTutorial(false);
+            }}
+            onSkip={() => {
+              safeLocalStorage.setItem(TUTORIAL_STORAGE_KEY, 'true');
+              setShowInGameTutorial(false);
+            }}
+          />
 
           {/* Main Game Surface: Responsive Desktop 2-Column & Mobile 1-Column */}
           <main className="w-full max-w-4xl flex flex-col lg:flex-row items-start justify-center gap-4 flex-1">
@@ -399,6 +482,7 @@ export const WordScrambleContainer: React.FC<WordScrambleContainerProps> = ({
                 targetLengths={state.config.selectedLengths}
                 isPaused={state.status === 'paused'}
                 onTogglePause={handleTogglePause}
+                timeDecayMultiplier={state.timeDecayMultiplier}
               />
 
               <FoundWordsList foundWords={state.foundWords} />

@@ -102,3 +102,49 @@ export function calculateWordScore(
 
   return Math.round(baseLetterPoints * 10 * lengthMultiplier * (1 + streakBonus) * spoolMultiplier);
 }
+
+/**
+ * Calculate dynamic time bonus in seconds for a correctly submitted word in timed mode.
+ * Higher score value, longer words, and quick submissions award higher time bonuses (+2s to +8s).
+ */
+export function calculateTimeBonus(
+  wordLength: number,
+  score: number,
+  secondsSinceLastWord: number = 5,
+  isSpoolBonus: boolean = false
+): number {
+  // Base bonus by length: 3L = 2s, 4L = 3s, 5L = 4s, 6L = 5s, 7L+ = 6s
+  let bonus = Math.min(6, Math.max(2, wordLength - 1));
+
+  // Score magnitude bonus
+  if (score >= 400) bonus += 2;
+  else if (score >= 200) bonus += 1;
+
+  // Speed bonus: submitted within 3 seconds of last word/game start
+  if (secondsSinceLastWord <= 3) {
+    bonus += 1;
+  }
+
+  // Original spool bonus adds +1s extra
+  if (isSpoolBonus) {
+    bonus += 1;
+  }
+
+  return Math.min(10, bonus);
+}
+
+/**
+ * Calculate time decay multiplier based on total words found relative to game progress.
+ * After 10 words: +10% faster (1.1x)
+ * After 20 words: +20% faster (1.2x)
+ * After 30 words: +30% faster (1.3x)
+ * After 45 words: +50% faster (1.5x)
+ */
+export function calculateTimeDecayMultiplier(wordsFoundCount: number): number {
+  if (wordsFoundCount >= 45) return 1.5;
+  if (wordsFoundCount >= 30) return 1.3;
+  if (wordsFoundCount >= 20) return 1.2;
+  if (wordsFoundCount >= 10) return 1.1;
+  return 1.0;
+}
+

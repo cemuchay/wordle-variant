@@ -25,6 +25,7 @@ export interface FoundWordEntry {
   timestamp: number;
   tileIds: string[];
   isSecretSpoolBonus?: boolean;
+  timeBonus?: number; // Time in seconds added to the clock
 }
 
 export interface ScrambleGameState {
@@ -44,6 +45,8 @@ export interface ScrambleGameState {
   allPossibleWordsCount?: number;
   gameStartedAt?: number;
   gameEndedAt?: number;
+  timeDecayMultiplier: number; // e.g. 1.0 (normal), 1.1 (+10%), 1.2 (+20%), etc.
+  lastWordSubmittedAt?: number;
 }
 
 export interface ScrambleSessionStats {

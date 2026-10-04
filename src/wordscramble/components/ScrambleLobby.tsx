@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { ScrambleConfig, ScrambleGameMode, ScrambleSessionStats } from '../engine/types';
 import { LocalStorageScrambleRepository } from '../storage/ScrambleRepository';
+import { safeLocalStorage } from '../../utils/storage';
+import { ScrambleTutorialModal } from './ScrambleTutorialModal';
 import {
   Play,
   Sparkles,
@@ -14,6 +16,7 @@ import {
   Flame,
   ArrowLeft,
   CheckCircle2,
+  HelpCircle,
 } from 'lucide-react';
 
 interface ScrambleLobbyProps {
@@ -23,6 +26,15 @@ interface ScrambleLobbyProps {
 }
 
 const AVAILABLE_LENGTHS = [3, 4, 5, 6, 7, 8, 9, 10];
+const TUTORIAL_STORAGE_KEY = 'wordscramble_tutorial_completed';
+const CONFIG_STORAGE_KEY = 'wordscramble_last_config';
+
+interface SavedScrambleConfig {
+  primaryLength: number;
+  additionalLengths: number[];
+  mode: ScrambleGameMode;
+  durationSeconds: number;
+}
 
 export const ScrambleLobby: React.FC<ScrambleLobbyProps> = ({
   onStartNewGame,
@@ -33,16 +45,50 @@ export const ScrambleLobby: React.FC<ScrambleLobbyProps> = ({
   const [activeTab, setActiveTab] = useState<'create' | 'pending' | 'history'>('create');
   const [pendingGame, setPendingGame] = useState<any | null>(null);
   const [historySessions, setHistorySessions] = useState<ScrambleSessionStats[]>([]);
+  const [showTutorial, setShowTutorial] = useState<boolean>(() => {
+    return safeLocalStorage.getItem(TUTORIAL_STORAGE_KEY) !== 'true';
+  });
+
+  const handleTutorialComplete = () => {
+    safeLocalStorage.setItem(TUTORIAL_STORAGE_KEY, 'true');
+    setShowTutorial(false);
+  };
+
+  const handleOpenTutorial = () => {
+    setShowTutorial(true);
+  };
+
+  // Load saved config if it exists
+  const savedConfig = useMemo<SavedScrambleConfig | null>(() => {
+    try {
+      const raw = safeLocalStorage.getItem(CONFIG_STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {
+      // fallback
+    }
+    return null;
+  }, []);
 
   // Game configuration form state: 2-Row selector design
   // Row 1: Primary Target Length (strictly 1 length selected)
-  const [primaryLength, setPrimaryLength] = useState<number>(5);
+  const [primaryLength, setPrimaryLength] = useState<number>(savedConfig?.primaryLength ?? 5);
   // Row 2: Additional Accepted Lengths (optional, up to max 2 additional lengths)
-  const [additionalLengths, setAdditionalLengths] = useState<number[]>([]);
+  const [additionalLengths, setAdditionalLengths] = useState<number[]>(savedConfig?.additionalLengths ?? []);
 
-  const [mode, setMode] = useState<ScrambleGameMode>('timed');
-  const [durationSeconds, setDurationSeconds] = useState<number>(90);
+  const [mode, setMode] = useState<ScrambleGameMode>(savedConfig?.mode ?? 'timed');
+  const [durationSeconds, setDurationSeconds] = useState<number>(savedConfig?.durationSeconds ?? 90);
   const [useScrabbleDict] = useState<boolean>(true);
+
+  // Persist config selection whenever values change
+  useEffect(() => {
+    const toSave: SavedScrambleConfig = {
+      primaryLength,
+      additionalLengths,
+      mode,
+      durationSeconds,
+    };
+    safeLocalStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(toSave));
+  }, [primaryLength, additionalLengths, mode, durationSeconds]);
 
   // Load storage data
   const loadData = useCallback(async () => {
@@ -142,9 +188,18 @@ export const ScrambleLobby: React.FC<ScrambleLobbyProps> = ({
           </div>
         </div>
 
-        {/* Global Quick Stats */}
-        <div className="hidden sm:flex items-center gap-3">
-          <div className="px-3 py-1.5 rounded-2xl bg-slate-950/80 border border-indigo-500/30 flex items-center gap-2">
+        {/* Global Quick Stats & How to Play Button */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            onClick={handleOpenTutorial}
+            className="p-2 sm:px-3 sm:py-2 rounded-2xl bg-indigo-950/60 hover:bg-indigo-900/80 border border-indigo-500/40 text-cyan-300 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-md"
+            title="How to Play Tutorial"
+          >
+            <HelpCircle className="w-4 h-4 text-cyan-400" />
+            <span className="hidden sm:inline">How to Play</span>
+          </button>
+
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-950/80 border border-indigo-500/30">
             <Trophy className="w-4 h-4 text-amber-400" />
             <div className="text-right">
               <span className="text-[9px] uppercase font-bold text-slate-400 block leading-none">Best Score</span>
@@ -153,6 +208,13 @@ export const ScrambleLobby: React.FC<ScrambleLobbyProps> = ({
           </div>
         </div>
       </header>
+
+      {/* Tutorial Modal */}
+      <ScrambleTutorialModal
+        isOpen={showTutorial}
+        onComplete={handleTutorialComplete}
+        onSkip={handleTutorialComplete}
+      />
 
       {/* Navigation Tabs (Create Game / Pending Game / History) */}
       <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-inner">
@@ -367,7 +429,7 @@ export const ScrambleLobby: React.FC<ScrambleLobbyProps> = ({
                     ))}
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Right Col: Setup Preview & Start Button */}
@@ -582,7 +644,7 @@ export const ScrambleLobby: React.FC<ScrambleLobbyProps> = ({
             </div>
 
             {/* List of Game Sessions */}
-            <div className="space-y-2.5 max-h-[480px] overflow-y-auto pr-1">
+            <div className="space-y-2.5 max-h-[480px] overflow-y-auto pr-1 mb-12">
               {historySessions.map((item) => (
                 <div
                   key={item.id}

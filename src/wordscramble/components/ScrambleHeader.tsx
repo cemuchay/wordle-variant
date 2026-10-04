@@ -11,6 +11,7 @@ interface ScrambleHeaderProps {
   targetLengths?: number[];
   isPaused?: boolean;
   onTogglePause?: () => void;
+  timeDecayMultiplier?: number;
 }
 
 export const ScrambleHeader: React.FC<ScrambleHeaderProps> = ({
@@ -20,6 +21,7 @@ export const ScrambleHeader: React.FC<ScrambleHeaderProps> = ({
   mode,
   isPaused = false,
   onTogglePause,
+  timeDecayMultiplier = 1.0,
 }) => {
   const formatTime = (secs: number) => {
     const mins = Math.floor(secs / 60);
@@ -28,6 +30,7 @@ export const ScrambleHeader: React.FC<ScrambleHeaderProps> = ({
   };
 
   const isLowTime = mode === 'timed' && remainingSeconds <= 15;
+  const isDecayActive = mode === 'timed' && timeDecayMultiplier > 1.0;
 
   return (
     <div className="w-full max-w-xl mx-auto mb-2 sm:mb-3 flex items-center justify-between gap-2 p-2 sm:p-3 rounded-2xl bg-slate-900/90 border border-indigo-500/20 shadow-md">
@@ -44,17 +47,28 @@ export const ScrambleHeader: React.FC<ScrambleHeaderProps> = ({
         </div>
       </div>
 
-      {/* Streak Multiplier */}
-      {streak > 0 && (
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="flex items-center gap-1 px-2 sm:px-3 py-0.5 sm:py-1 rounded-lg sm:rounded-xl bg-gradient-to-r from-orange-500/30 to-rose-500/30 border border-orange-500/40"
-        >
-          <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-400 animate-bounce" />
-          <span className="text-[10px] sm:text-xs font-black text-orange-300">{streak}x Streak</span>
-        </motion.div>
-      )}
+      {/* Streak Multiplier & Time Decay Indicators */}
+      <div className="flex items-center gap-1.5">
+        {streak > 0 && (
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg sm:rounded-xl bg-gradient-to-r from-orange-500/30 to-rose-500/30 border border-orange-500/40"
+          >
+            <Flame className="w-3.5 h-3.5 text-orange-400" />
+            <span className="text-[10px] sm:text-xs font-black text-orange-300">{streak}x</span>
+          </motion.div>
+        )}
+
+        {isDecayActive && (
+          <div
+            className="flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-lg bg-rose-950/70 border border-rose-500/50 text-[9px] sm:text-[10px] font-black text-rose-300 tracking-tight"
+            title={`Time decay speed is ${timeDecayMultiplier.toFixed(1)}x faster due to high word clearing!`}
+          >
+            <span>⚡ {timeDecayMultiplier.toFixed(1)}x SPEED</span>
+          </div>
+        )}
+      </div>
 
       {/* Timer or Untimed Badge + Pause Button */}
       <div className="flex items-center gap-1.5 sm:gap-2">

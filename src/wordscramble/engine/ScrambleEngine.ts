@@ -1,5 +1,12 @@
 import type { ScrambleGameState, ScrambleConfig, ScrambleTile } from './types';
-import { spoolSecretWords, generateTilesFromWords, calculateWordScore, createRng } from './poolGenerator';
+import {
+  spoolSecretWords,
+  generateTilesFromWords,
+  calculateWordScore,
+  calculateTimeBonus,
+  calculateTimeDecayMultiplier,
+  createRng,
+} from './poolGenerator';
 
 export type ScrambleAction =
   | { type: 'START_GAME'; config: ScrambleConfig; wordListMap: Record<number, string[]> }
@@ -36,6 +43,7 @@ export const initialScrambleState: ScrambleGameState = {
   targetRefillThreshold: 5,
   maxCapacity: 30,
   secretSpoolWords: [],
+  timeDecayMultiplier: 1.0,
 };
 
 export function scrambleReducer(
@@ -53,13 +61,13 @@ export function scrambleReducer(
       );
       
       // Auto-calculate appropriate matrix capacity based on spooled words and game configuration
-      // Sum of letters in initial secret words + 2-3 butter helper tiles (e.g. 6 words * 5 letters = 30 + 3 = 33)
       const totalLettersInWords = secretWords.reduce((acc, w) => acc + w.length, 0);
       const bonusButterCount = Math.min(3, Math.max(1, Math.floor(secretWords.length / 2)));
       const autoComputedCapacity = totalLettersInWords + bonusButterCount;
       const targetCapacity = action.config.maxCapacity || Math.min(48, Math.max(20, autoComputedCapacity));
 
       const tiles = generateTilesFromWords(secretWords, 0, rng).slice(0, targetCapacity);
+      const now = Date.now();
 
       return {
         ...state,
@@ -79,7 +87,9 @@ export function scrambleReducer(
         targetRefillThreshold: 5,
         maxCapacity: targetCapacity,
         secretSpoolWords: secretWords,
-        gameStartedAt: Date.now(),
+        gameStartedAt: now,
+        lastWordSubmittedAt: now,
+        timeDecayMultiplier: 1.0,
         gameEndedAt: undefined,
       };
     }
@@ -218,6 +228,22 @@ export function scrambleReducer(
       const nextStreak = state.streak + 1;
       const wordScore = calculateWordScore(word, nextStreak, isSpoolBonus);
 
+      const now = Date.now();
+      const lastTime = state.lastWordSubmittedAt || state.gameStartedAt || now;
+      const secondsSinceLastWord = Math.max(0, Math.floor((now - lastTime) / 1000));
+
+      // Calculate time bonus for efficient gameplay in timed mode
+      const timeBonus = state.config.mode === 'timed'
+        ? calculateTimeBonus(word.length, wordScore, secondsSinceLastWord, isSpoolBonus)
+        : 0;
+
+      const updatedRemainingSeconds = state.config.mode === 'timed'
+        ? state.remainingSeconds + timeBonus
+        : state.remainingSeconds;
+
+      const nextFoundWordsCount = state.foundWords.length + 1;
+      const nextDecayMultiplier = calculateTimeDecayMultiplier(nextFoundWordsCount);
+
       const stagedSet = new Set(state.stagedTileIds);
       let updatedTiles = state.tiles.map((t) =>
         stagedSet.has(t.id) ? { ...t, status: 'consumed' as const } : t
@@ -227,9 +253,10 @@ export function scrambleReducer(
         word,
         length: word.length,
         score: wordScore,
-        timestamp: Date.now(),
+        timestamp: now,
         tileIds: [...state.stagedTileIds],
         isSecretSpoolBonus: isSpoolBonus,
+        timeBonus,
       };
 
       const wordsCleared = state.wordsClearedSinceRefill + 1;
@@ -286,8 +313,11 @@ export function scrambleReducer(
         score: state.score + wordScore,
         streak: nextStreak,
         highestStreak: Math.max(state.highestStreak, nextStreak),
+        remainingSeconds: updatedRemainingSeconds,
         wordsClearedSinceRefill: wordsCleared,
         secretSpoolWords: newSecretWords,
+        lastWordSubmittedAt: now,
+        timeDecayMultiplier: nextDecayMultiplier,
       };
     }
 

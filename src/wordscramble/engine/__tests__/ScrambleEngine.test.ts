@@ -345,4 +345,42 @@ describe('ScrambleEngine & Pool Generator', () => {
     expect(bonusScore).toBeGreaterThan(normalScore);
     expect(state.foundWords[0].score).toBe(bonusScore);
   });
+
+  it('awards dynamic time bonus and applies progressive time decay in timed mode', () => {
+    let state = scrambleReducer(initialScrambleState, {
+      type: 'START_GAME',
+      config: {
+        selectedLengths: [3],
+        mode: 'timed',
+        durationSeconds: 60,
+        wordsPerSpool: 1,
+        useScrabbleDict: true,
+        seed: 'seed_time_bonus',
+      },
+      wordListMap: { 3: ['CAT'] },
+    });
+
+    expect(state.remainingSeconds).toBe(60);
+    expect(state.timeDecayMultiplier).toBe(1.0);
+
+    const cTile = state.tiles.find((t) => t.letter === 'C')!;
+    const aTile = state.tiles.find((t) => t.letter === 'A')!;
+    const tTile = state.tiles.find((t) => t.letter === 'T')!;
+
+    state = scrambleReducer(state, { type: 'STAGE_TILE', tileId: cTile.id });
+    state = scrambleReducer(state, { type: 'STAGE_TILE', tileId: aTile.id });
+    state = scrambleReducer(state, { type: 'STAGE_TILE', tileId: tTile.id });
+
+    // Submit word in timed mode
+    state = scrambleReducer(state, {
+      type: 'SUBMIT_WORD',
+      validDictionary: mockDict,
+      wordListMap: { 3: ['CAT'] },
+    });
+
+    // Time bonus must be awarded to clock
+    expect(state.foundWords[0].timeBonus).toBeGreaterThan(0);
+    expect(state.remainingSeconds).toBeGreaterThan(60);
+  });
 });
+
