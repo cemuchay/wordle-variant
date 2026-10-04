@@ -223,4 +223,164 @@ describe('ScrambleEngine & Pool Generator', () => {
     const score2 = calculateWordScore('TRAIN', 4);
     expect(score2).toBeGreaterThan(score1);
   });
+
+  it('enforces hard grid letter capacity and prevents overflow on refills', () => {
+    let state = scrambleReducer(initialScrambleState, {
+      type: 'START_GAME',
+      config: {
+        selectedLengths: [3],
+        mode: 'timed',
+        durationSeconds: 90,
+        wordsPerSpool: 10,
+        maxCapacity: 24, // Hard cap 24
+        useScrabbleDict: true,
+        seed: 'seed_cap',
+      },
+      wordListMap: { 3: ['CAT', 'DOG', 'SUN', 'BAT', 'HAT', 'TAB', 'ACT'] },
+    });
+
+    // Initial tiles must not exceed maxCapacity (24)
+    expect(state.tiles.length).toBeLessThanOrEqual(24);
+    expect(state.maxCapacity).toBe(24);
+
+    // Consume 3 letters
+    const cTile = state.tiles.find((t) => t.letter === 'C') || state.tiles[0];
+    const aTile = state.tiles.find((t) => t.id !== cTile.id && t.letter === 'A') || state.tiles[1];
+    const tTile = state.tiles.find((t) => t.id !== cTile.id && t.id !== aTile.id && t.letter === 'T') || state.tiles[2];
+
+    state = scrambleReducer(state, { type: 'STAGE_TILE', tileId: cTile.id });
+    state = scrambleReducer(state, { type: 'STAGE_TILE', tileId: aTile.id });
+    state = scrambleReducer(state, { type: 'STAGE_TILE', tileId: tTile.id });
+
+    // Submit word to trigger tile replacement / refill
+    state = scrambleReducer(state, {
+      type: 'SUBMIT_WORD',
+      validDictionary: mockDict,
+      wordListMap: { 3: ['CAT', 'DOG', 'SUN', 'BAT', 'HAT', 'TAB', 'ACT'] },
+    });
+
+    // After word submission & refill, total grid tiles must strictly NEVER exceed hard cap (24)
+    expect(state.tiles.length).toBeLessThanOrEqual(24);
+  });
+
+  it('restores a saved game state correctly', () => {
+    const savedSnapshot = {
+      ...initialScrambleState,
+      status: 'playing' as const,
+      score: 1500,
+      streak: 3,
+      highestStreak: 3,
+      remainingSeconds: 45,
+      maxCapacity: 30,
+      tiles: [
+        { id: 'tile_1', letter: 'A', originalIndex: 0, status: 'available' as const, colorIndex: 0 },
+        { id: 'tile_2', letter: 'B', originalIndex: 1, status: 'available' as const, colorIndex: 1 },
+      ],
+    };
+
+    const state = scrambleReducer(initialScrambleState, {
+      type: 'RESTORE_SAVED_GAME',
+      state: savedSnapshot,
+    });
+
+    expect(state.score).toBe(1500);
+    expect(state.streak).toBe(3);
+    expect(state.remainingSeconds).toBe(45);
+    expect(state.status).toBe('playing');
+  });
+
+  it('auto-computes max tile capacity when not explicitly provided', () => {
+    const state = scrambleReducer(initialScrambleState, {
+      type: 'START_GAME',
+      config: {
+        selectedLengths: [4, 5],
+        mode: 'untimed',
+        durationSeconds: 0,
+        wordsPerSpool: 4,
+        useScrabbleDict: true,
+        seed: 'auto_cap_seed',
+      },
+      wordListMap: mockWordLists,
+    });
+
+    // Auto-computed capacity from 4 spooled words (4L & 5L combinations) + bonus butter tiles
+    expect(state.maxCapacity).toBeGreaterThanOrEqual(20);
+    expect(state.tiles.length).toBeLessThanOrEqual(state.maxCapacity);
+  });
+
+  it('awards bonus points and flags isSecretSpoolBonus for original secret spool words', () => {
+    let state = scrambleReducer(initialScrambleState, {
+      type: 'START_GAME',
+      config: {
+        selectedLengths: [3],
+        mode: 'untimed',
+        durationSeconds: 0,
+        wordsPerSpool: 1,
+        useScrabbleDict: true,
+        seed: 'spool_bonus_seed',
+      },
+      wordListMap: { 3: ['CAT'] },
+    });
+
+    const cTile = state.tiles.find((t) => t.letter === 'C')!;
+    const aTile = state.tiles.find((t) => t.letter === 'A')!;
+    const tTile = state.tiles.find((t) => t.letter === 'T')!;
+
+    state = scrambleReducer(state, { type: 'STAGE_TILE', tileId: cTile.id });
+    state = scrambleReducer(state, { type: 'STAGE_TILE', tileId: aTile.id });
+    state = scrambleReducer(state, { type: 'STAGE_TILE', tileId: tTile.id });
+
+    // Submit 'CAT' which is in secretSpoolWords
+    state = scrambleReducer(state, {
+      type: 'SUBMIT_WORD',
+      validDictionary: mockDict,
+      wordListMap: { 3: ['CAT'] },
+    });
+
+    expect(state.foundWords[0].word).toBe('CAT');
+    expect(state.foundWords[0].isSecretSpoolBonus).toBe(true);
+    // Spool bonus gives 1.5x points multiplier over regular word
+    const normalScore = calculateWordScore('CAT', 1, false);
+    const bonusScore = calculateWordScore('CAT', 1, true);
+    expect(bonusScore).toBeGreaterThan(normalScore);
+    expect(state.foundWords[0].score).toBe(bonusScore);
+  });
+
+  it('awards dynamic time bonus and applies progressive time decay in timed mode', () => {
+    let state = scrambleReducer(initialScrambleState, {
+      type: 'START_GAME',
+      config: {
+        selectedLengths: [3],
+        mode: 'timed',
+        durationSeconds: 60,
+        wordsPerSpool: 1,
+        useScrabbleDict: true,
+        seed: 'seed_time_bonus',
+      },
+      wordListMap: { 3: ['CAT'] },
+    });
+
+    expect(state.remainingSeconds).toBe(60);
+    expect(state.timeDecayMultiplier).toBe(1.0);
+
+    const cTile = state.tiles.find((t) => t.letter === 'C')!;
+    const aTile = state.tiles.find((t) => t.letter === 'A')!;
+    const tTile = state.tiles.find((t) => t.letter === 'T')!;
+
+    state = scrambleReducer(state, { type: 'STAGE_TILE', tileId: cTile.id });
+    state = scrambleReducer(state, { type: 'STAGE_TILE', tileId: aTile.id });
+    state = scrambleReducer(state, { type: 'STAGE_TILE', tileId: tTile.id });
+
+    // Submit word in timed mode
+    state = scrambleReducer(state, {
+      type: 'SUBMIT_WORD',
+      validDictionary: mockDict,
+      wordListMap: { 3: ['CAT'] },
+    });
+
+    // Time bonus must be awarded to clock
+    expect(state.foundWords[0].timeBonus).toBeGreaterThan(0);
+    expect(state.remainingSeconds).toBeGreaterThan(60);
+  });
 });
+

@@ -9,7 +9,7 @@ interface FoundWordsListProps {
 
 export const FoundWordsList: React.FC<FoundWordsListProps> = ({ foundWords }) => {
   return (
-    <div className="w-full max-w-xl mx-auto mt-2 sm:mt-3 p-2.5 sm:p-3.5 rounded-2xl bg-slate-900/60 backdrop-blur-md border border-white/10">
+    <div className="w-full max-w-xl mx-auto mt-2 sm:mt-3 p-2.5 sm:p-3.5 rounded-2xl bg-slate-900/60 backdrop-blur-md border border-white/10 mb-12">
       <div className="flex items-center justify-between mb-1.5 sm:mb-2">
         <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1 sm:gap-1.5">
           <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400" />

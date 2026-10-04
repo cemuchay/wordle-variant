@@ -33,7 +33,7 @@ export const LoadingView = ({ message = "Preparing Arena...", onCancel }: Loadin
                className="text-xs font-black uppercase tracking-widest text-[#E85151] flex items-center justify-center gap-1.5"
             >
                <Swords size={12} className="animate-pulse" />
-               WordUp Battles (beta)
+               WordUp Battles
             </motion.h3>
             <motion.p
                initial={{ y: 10, opacity: 0 }}

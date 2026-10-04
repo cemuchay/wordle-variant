@@ -1,8 +1,16 @@
 import type { ScrambleGameState, ScrambleConfig, ScrambleTile } from './types';
-import { spoolSecretWords, generateTilesFromWords, calculateWordScore, createRng } from './poolGenerator';
+import {
+  spoolSecretWords,
+  generateTilesFromWords,
+  calculateWordScore,
+  calculateTimeBonus,
+  calculateTimeDecayMultiplier,
+  createRng,
+} from './poolGenerator';
 
 export type ScrambleAction =
   | { type: 'START_GAME'; config: ScrambleConfig; wordListMap: Record<number, string[]> }
+  | { type: 'RESTORE_SAVED_GAME'; state: ScrambleGameState }
   | { type: 'STAGE_TILE'; tileId: string }
   | { type: 'UNSTAGE_TILE'; tileId: string }
   | { type: 'UNSTAGE_LAST_TILE' }
@@ -33,7 +41,9 @@ export const initialScrambleState: ScrambleGameState = {
   remainingSeconds: 90,
   wordsClearedSinceRefill: 0,
   targetRefillThreshold: 5,
+  maxCapacity: 30,
   secretSpoolWords: [],
+  timeDecayMultiplier: 1.0,
 };
 
 export function scrambleReducer(
@@ -49,11 +59,22 @@ export function scrambleReducer(
         action.config.wordsPerSpool,
         rng
       );
-      const tiles = generateTilesFromWords(secretWords, 0, rng);
+      
+      // Auto-calculate appropriate matrix capacity based on spooled words and game configuration
+      const totalLettersInWords = secretWords.reduce((acc, w) => acc + w.length, 0);
+      const bonusButterCount = Math.min(3, Math.max(1, Math.floor(secretWords.length / 2)));
+      const autoComputedCapacity = totalLettersInWords + bonusButterCount;
+      const targetCapacity = action.config.maxCapacity || Math.min(48, Math.max(20, autoComputedCapacity));
+
+      const tiles = generateTilesFromWords(secretWords, 0, rng).slice(0, targetCapacity);
+      const now = Date.now();
 
       return {
         ...state,
-        config: action.config,
+        config: {
+          ...action.config,
+          maxCapacity: targetCapacity,
+        },
         status: 'playing',
         tiles,
         stagedTileIds: [],
@@ -64,9 +85,19 @@ export function scrambleReducer(
         remainingSeconds: action.config.durationSeconds,
         wordsClearedSinceRefill: 0,
         targetRefillThreshold: 5,
+        maxCapacity: targetCapacity,
         secretSpoolWords: secretWords,
-        gameStartedAt: Date.now(),
+        gameStartedAt: now,
+        lastWordSubmittedAt: now,
+        timeDecayMultiplier: 1.0,
         gameEndedAt: undefined,
+      };
+    }
+
+    case 'RESTORE_SAVED_GAME': {
+      return {
+        ...action.state,
+        status: 'playing',
       };
     }
 
@@ -192,8 +223,26 @@ export function scrambleReducer(
         return state;
       }
 
+      // Check if this submitted word is one of the original secret spool words for bonus
+      const isSpoolBonus = state.secretSpoolWords.includes(word);
       const nextStreak = state.streak + 1;
-      const wordScore = calculateWordScore(word, nextStreak);
+      const wordScore = calculateWordScore(word, nextStreak, isSpoolBonus);
+
+      const now = Date.now();
+      const lastTime = state.lastWordSubmittedAt || state.gameStartedAt || now;
+      const secondsSinceLastWord = Math.max(0, Math.floor((now - lastTime) / 1000));
+
+      // Calculate time bonus for efficient gameplay in timed mode
+      const timeBonus = state.config.mode === 'timed'
+        ? calculateTimeBonus(word.length, wordScore, secondsSinceLastWord, isSpoolBonus)
+        : 0;
+
+      const updatedRemainingSeconds = state.config.mode === 'timed'
+        ? state.remainingSeconds + timeBonus
+        : state.remainingSeconds;
+
+      const nextFoundWordsCount = state.foundWords.length + 1;
+      const nextDecayMultiplier = calculateTimeDecayMultiplier(nextFoundWordsCount);
 
       const stagedSet = new Set(state.stagedTileIds);
       let updatedTiles = state.tiles.map((t) =>
@@ -204,27 +253,55 @@ export function scrambleReducer(
         word,
         length: word.length,
         score: wordScore,
-        timestamp: Date.now(),
+        timestamp: now,
         tileIds: [...state.stagedTileIds],
+        isSecretSpoolBonus: isSpoolBonus,
+        timeBonus,
       };
 
       const wordsCleared = state.wordsClearedSinceRefill + 1;
       let newSecretWords = state.secretSpoolWords;
+      const hardCap = state.maxCapacity || 30;
 
-      // In Timed Mode: if cleared threshold words or available tiles < 10, spool new words & refill
+      // In Timed Mode: refill ONLY when available tiles drop below threshold (< 10)
+      // Runs only once when tiles drop below the threshold, refilling consumed slots up to hardCap
       if (state.config.mode === 'timed') {
         const availableCount = updatedTiles.filter((t) => t.status === 'available').length;
-        if (wordsCleared >= state.targetRefillThreshold || availableCount < 10) {
+        const REFILL_THRESHOLD = 10;
+        
+        if (availableCount < REFILL_THRESHOLD) {
           const freshWords = spoolSecretWords(
             action.wordListMap,
             state.config.selectedLengths,
             state.config.wordsPerSpool
           );
           newSecretWords = [...newSecretWords, ...freshWords];
-          const newTiles = generateTilesFromWords(freshWords, updatedTiles.length);
-          // Keep unconsumed available tiles + append newly spooled tiles
-          const remainingAvailable = updatedTiles.filter((t) => t.status === 'available');
-          updatedTiles = [...remainingAvailable, ...newTiles];
+          
+          // Generate fresh tiles pool
+          const freshTiles = generateTilesFromWords(freshWords, updatedTiles.length);
+          let freshIdx = 0;
+
+          // 1. First replace consumed tile slots in place
+          const refilledTiles: ScrambleTile[] = [];
+          for (const tile of updatedTiles) {
+            if (tile.status === 'consumed' && freshIdx < freshTiles.length) {
+              const fresh = freshTiles[freshIdx++];
+              refilledTiles.push({
+                ...fresh,
+                colorIndex: tile.colorIndex, // Keep visual harmonious position
+              });
+            } else {
+              refilledTiles.push(tile);
+            }
+          }
+
+          // 2. If total tiles < hardCap and more fresh tiles exist, append up to hardCap
+          while (refilledTiles.length < hardCap && freshIdx < freshTiles.length) {
+            refilledTiles.push(freshTiles[freshIdx++]);
+          }
+
+          // Enforce absolute hard cap
+          updatedTiles = refilledTiles.slice(0, hardCap);
         }
       }
 
@@ -236,8 +313,11 @@ export function scrambleReducer(
         score: state.score + wordScore,
         streak: nextStreak,
         highestStreak: Math.max(state.highestStreak, nextStreak),
+        remainingSeconds: updatedRemainingSeconds,
         wordsClearedSinceRefill: wordsCleared,
         secretSpoolWords: newSecretWords,
+        lastWordSubmittedAt: now,
+        timeDecayMultiplier: nextDecayMultiplier,
       };
     }
 
