@@ -21,7 +21,8 @@ export const ScrambleConfigModal: React.FC<ScrambleConfigModalProps> = ({
   isLoading = false,
   errorMessage = null,
 }) => {
-  const [selectedLengths, setSelectedLengths] = useState<number[]>([5]);
+  const [primaryLength, setPrimaryLength] = useState<number>(5);
+  const [additionalLengths, setAdditionalLengths] = useState<number[]>([]);
   const [mode, setMode] = useState<ScrambleGameMode>('timed');
   const [durationSeconds, setDurationSeconds] = useState<number>(90);
   const [useScrabbleDict] = useState<boolean>(true);
@@ -29,14 +30,22 @@ export const ScrambleConfigModal: React.FC<ScrambleConfigModalProps> = ({
 
   if (!isOpen) return null;
 
-  const toggleLength = (len: number) => {
-    if (selectedLengths.includes(len)) {
-      if (selectedLengths.length > 1) {
-        setSelectedLengths(selectedLengths.filter((l) => l !== len));
-      }
+  const selectedLengths = Array.from(new Set([primaryLength, ...additionalLengths])).sort((a, b) => a - b);
+
+  const handleSelectPrimaryLength = (len: number) => {
+    setPrimaryLength(len);
+    setAdditionalLengths((prev) => prev.filter((l) => l !== len));
+  };
+
+  const handleToggleAdditionalLength = (len: number) => {
+    if (len === primaryLength) return;
+    if (additionalLengths.includes(len)) {
+      setAdditionalLengths((prev) => prev.filter((l) => l !== len));
     } else {
-      if (selectedLengths.length < 3) {
-        setSelectedLengths([...selectedLengths, len].sort((a, b) => a - b));
+      if (additionalLengths.length < 2) {
+        setAdditionalLengths((prev) => [...prev, len].sort((a, b) => a - b));
+      } else {
+        setAdditionalLengths((prev) => [prev[1], len].sort((a, b) => a - b));
       }
     }
   };
@@ -79,41 +88,89 @@ export const ScrambleConfigModal: React.FC<ScrambleConfigModalProps> = ({
 
         {step === 'configure' ? (
           <>
-            {/* 1. Target Lengths (Select 1 to 3) */}
-            <div className="mb-5">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">
-                Target Word Lengths (Select up to 3)
-              </label>
-              <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-                {AVAILABLE_LENGTHS.map((len) => {
-                  const isSelected = selectedLengths.includes(len);
-                  return (
-                    <button
-                      key={len}
-                      onClick={() => toggleLength(len)}
-                      className={`
-                        py-2 rounded-xl font-black text-sm transition-all duration-150 border
-                        ${
-                          isSelected
-                            ? 'bg-gradient-to-r from-pink-500 to-rose-600 text-white border-pink-400 shadow-[0_0_12px_rgba(244,63,94,0.6)] scale-105'
-                            : 'bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-500'
-                        }
-                      `}
-                    >
-                      {len}L
-                    </button>
-                  );
-                })}
+            {/* 1. Target Lengths (2-Row Design) */}
+            <div className="space-y-3 mb-5">
+              {/* Row 1: Primary Length */}
+              <div className="p-3 rounded-2xl bg-slate-950/60 border border-pink-500/30">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                    Primary Word Length (Pick 1)
+                  </span>
+                  <span className="text-[11px] font-black text-pink-400">
+                    {primaryLength}L Main
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
+                  {AVAILABLE_LENGTHS.map((len) => {
+                    const isSelected = primaryLength === len;
+                    return (
+                      <button
+                        key={len}
+                        onClick={() => handleSelectPrimaryLength(len)}
+                        className={`
+                          py-2 rounded-xl font-black text-xs sm:text-sm transition-all duration-150 border cursor-pointer
+                          ${
+                            isSelected
+                              ? 'bg-gradient-to-r from-pink-500 to-rose-600 text-white border-pink-400 shadow-[0_0_12px_rgba(244,63,94,0.6)] scale-105'
+                              : 'bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-500 hover:text-white'
+                          }
+                        `}
+                      >
+                        {len}L
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="text-[11px] text-slate-500 mt-1">
-                Selected:{' '}
-                <span className="text-amber-400 font-bold">
-                  {selectedLengths.map((l) => `${l}L`).join(', ')}
-                </span>{' '}
+
+              {/* Row 2: Additional Lengths */}
+              <div className="p-3 rounded-2xl bg-slate-950/40 border border-slate-800">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                    Additional Lengths (Optional, max 2)
+                  </span>
+                  <span className="text-[11px] font-bold text-cyan-400">
+                    {additionalLengths.length}/2 Selected
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
+                  {AVAILABLE_LENGTHS.map((len) => {
+                    const isPrimary = primaryLength === len;
+                    const isSelected = additionalLengths.includes(len);
+                    return (
+                      <button
+                        key={len}
+                        disabled={isPrimary}
+                        onClick={() => handleToggleAdditionalLength(len)}
+                        className={`
+                          py-2 rounded-xl font-black text-xs sm:text-sm transition-all duration-150 border cursor-pointer
+                          ${
+                            isPrimary
+                              ? 'bg-slate-900 text-slate-600 border-slate-800 opacity-40 cursor-not-allowed'
+                              : isSelected
+                              ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.5)] scale-105'
+                              : 'bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-500 hover:text-white'
+                          }
+                        `}
+                      >
+                        {len}L
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="text-[11px] text-slate-400 flex items-center justify-between px-1">
+                <span>
+                  Active:{' '}
+                  <span className="text-amber-400 font-bold">
+                    {selectedLengths.map((l) => `${l}L`).join(', ')}
+                  </span>
+                </span>
                 {isAutoSubmitEnabled ? (
-                  <span className="text-emerald-400">(⚡ Auto-submit enabled)</span>
+                  <span className="text-emerald-400 font-bold">⚡ Auto-submit enabled</span>
                 ) : (
-                  <span className="text-amber-300">(Manual SUBMIT button required)</span>
+                  <span className="text-amber-300 font-bold">Manual SUBMIT button</span>
                 )}
               </div>
             </div>

@@ -82,8 +82,13 @@ export function generateTilesFromWords(
 
 /**
  * Calculate score for a submitted word
+ * Applies +50% bonus if the submitted word matches one of the secret original spool words
  */
-export function calculateWordScore(word: string, streak: number = 1): number {
+export function calculateWordScore(
+  word: string,
+  streak: number = 1,
+  isSpoolBonus: boolean = false
+): number {
   const upper = word.toUpperCase();
   let baseLetterPoints = 0;
   for (const char of upper) {
@@ -93,6 +98,7 @@ export function calculateWordScore(word: string, streak: number = 1): number {
   // Length multiplier
   const lengthMultiplier = upper.length >= 7 ? 2.5 : upper.length >= 5 ? 1.8 : 1.2;
   const streakBonus = Math.min(streak * 0.15, 1.0); // up to +100% bonus for streak
+  const spoolMultiplier = isSpoolBonus ? 1.5 : 1.0; // +50% bonus for original secret spool word
 
-  return Math.round(baseLetterPoints * 10 * lengthMultiplier * (1 + streakBonus));
+  return Math.round(baseLetterPoints * 10 * lengthMultiplier * (1 + streakBonus) * spoolMultiplier);
 }

@@ -13,6 +13,7 @@ export interface ScrambleConfig {
   mode: ScrambleGameMode;
   durationSeconds: number; // e.g. 90
   wordsPerSpool: number; // e.g. 6 words (30 tiles for 5L)
+  maxCapacity?: number; // Hard cap on maximum letters in the grid (e.g. 30 tiles)
   useScrabbleDict: boolean;
   seed?: string;
 }
@@ -23,6 +24,7 @@ export interface FoundWordEntry {
   score: number;
   timestamp: number;
   tileIds: string[];
+  isSecretSpoolBonus?: boolean;
 }
 
 export interface ScrambleGameState {
@@ -37,6 +39,7 @@ export interface ScrambleGameState {
   remainingSeconds: number;
   wordsClearedSinceRefill: number;
   targetRefillThreshold: number;
+  maxCapacity: number;
   secretSpoolWords: string[];
   allPossibleWordsCount?: number;
   gameStartedAt?: number;
