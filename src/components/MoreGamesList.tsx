@@ -1,6 +1,6 @@
 
 interface MoreGamesListProps {
-    setMoreGameMode: React.Dispatch<React.SetStateAction<"wordup" | "select" | "wordgrid" | "wordscramble">>;
+    setMoreGameMode: React.Dispatch<React.SetStateAction<"wordup" | "select" | "wordgrid" | "upscramble" | "wordscramble">>;
     handleNavigation: (item: "wordup" | "play" | "challenges" | "leaderboard" | "chat" | "more") => void;
     wordupUnreadCount?: number;
     wordgridUnreadCount?: number;
@@ -20,9 +20,9 @@ const MoreGamesList = ({
         </div>
 
         <div className="space-y-4">
-            {/* Word Scramble Matrix game card */}
+            {/* UpScramble game card */}
             <button
-                onClick={() => setMoreGameMode("wordscramble")}
+                onClick={() => setMoreGameMode("upscramble")}
                 className="w-full flex items-center gap-4 p-4 bg-linear-to-br from-pink-500/15 via-amber-500/10 to-cyan-500/15 hover:from-pink-500/25 hover:to-cyan-500/25 border border-pink-500/30 rounded-2xl cursor-pointer text-left transition-all active:scale-98 group relative shadow-[0_0_20px_rgba(236,72,153,0.15)]"
             >
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-pink-500 via-amber-400 to-cyan-400 border border-pink-400/40 flex items-center justify-center shrink-0 text-2xl group-hover:scale-105 transition-transform shadow-md text-slate-950 font-black">
@@ -31,9 +31,11 @@ const MoreGamesList = ({
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                         <p className="text-xs font-black uppercase text-transparent bg-clip-text bg-gradient-to-r from-pink-300 via-amber-200 to-cyan-300 tracking-wide">
-                            Word Scramble Matrix
+                            UpScramble
                         </p>
-
+                        <span className="px-1.5 py-0.5 rounded-full bg-pink-500/20 text-pink-300 border border-pink-500/30 text-[9px] font-black uppercase tracking-wider">
+                            Web App
+                        </span>
                     </div>
                     <p className="text-[12px] text-slate-200 font-medium leading-normal mt-0.5">
                         Spool 3L-10L anagram letter matrices in Timed Rush or Untimed Puzzle mode!

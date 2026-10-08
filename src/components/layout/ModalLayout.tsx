@@ -117,7 +117,7 @@ export const ModalLayout: React.FC<ModalLayoutProps> = ({
             style={{
               paddingBottom: 'env(safe-area-inset-bottom, 0px)',
             }}
-            className="flex-1 flex flex-col min-h-0 h-full w-full overflow-hidden"
+            className="flex-1 flex flex-col min-h-0 h-full w-full overflow-hidden scrollbar-hide"
           >
             {children}
           </div>
