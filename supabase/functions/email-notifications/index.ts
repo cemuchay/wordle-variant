@@ -1133,6 +1133,53 @@ serve(async (req) => {
          );
       }
 
+      // ACTION: ADMIN CUSTOM BROADCAST
+      if (action === "admin-custom-broadcast") {
+         log(`Starting action admin-custom-broadcast for user ${body.username || "Player"} (${body.email})`);
+         const recipientEmail = body.email;
+         const username = body.username || "Player";
+         const userId = body.user_id || "admin-broadcast";
+         const title = body.title || "Announcement from Variant";
+         const messageText = body.message || "";
+         const targetUrl = body.url ? (body.url.startsWith("http") ? body.url : `${APP_URL}${body.url.startsWith("/") ? "" : "/"}${body.url}`) : APP_URL;
+
+         if (!recipientEmail) {
+            log(`Error: Missing email address for admin-custom-broadcast`);
+            return new Response(
+               JSON.stringify({ error: "Missing email address in payload" }),
+               {
+                  status: 400,
+                  headers: { ...corsHeaders, "Content-Type": "application/json" },
+               },
+            );
+         }
+
+         // Format paragraphs nicely
+         const formattedMessage = messageText
+            .split("\n\n")
+            .map((para: string) => `<p style="font-size: 15px; line-height: 1.6; color: #3f3f46; margin: 0 0 16px 0;">${para.replace(/\n/g, "<br/>")}</p>`)
+            .join("");
+
+         const content = `
+            <div style="margin: 8px 0 24px 0;">
+               ${formattedMessage}
+            </div>
+            <div style="margin: 28px 0 16px 0; text-align: center;">
+               <a href="${targetUrl}" class="btn-primary" style="display: inline-block; background-color: #18181b; color: #ffffff !important; font-size: 13px; font-weight: 700; text-decoration: none; padding: 12px 28px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.06em;">Open Variant</a>
+            </div>
+         `;
+
+         const html = getEmailHtml(username, userId, title, content);
+         const success = await sendEmailWithFallback(recipientEmail, title, html);
+
+         return new Response(
+            JSON.stringify({ success: !!success, action, emails_sent: success ? 1 : 0 }),
+            {
+               headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+         );
+      }
+
       return new Response(
          JSON.stringify({ error: `Unhandled action: ${action}` }),
          {

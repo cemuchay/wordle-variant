@@ -1043,7 +1043,7 @@ const AdminCustomNotificationBroadcaster = ({ triggerToast }: { triggerToast: (t
             return saved ? JSON.parse(saved).url || '/' : '/';
         } catch { return '/'; }
     });
-    const [deliveryMode, setDeliveryMode] = useState<'hybrid' | 'push_only' | 'email_only' | 'in_app_only'>(() => {
+    const [deliveryMode, setDeliveryMode] = useState<'hybrid' | 'push_only' | 'email_only' | 'in_app_only' | 'push_pure' | 'email_pure'>(() => {
         try {
             const saved = localStorage.getItem(ADMIN_BROADCAST_DRAFT_KEY);
             return saved ? JSON.parse(saved).deliveryMode || 'hybrid' : 'hybrid';
@@ -1216,8 +1216,10 @@ const AdminCustomNotificationBroadcaster = ({ triggerToast }: { triggerToast: (t
                                 className="w-full bg-black/40 border border-white/10 rounded-2xl p-3 text-xs focus:outline-none focus:border-correct/50 text-white font-semibold"
                             >
                                 <option value="hybrid" className="bg-gray-900">Hybrid (Smart Push / Email + In-App)</option>
-                                <option value="push_only" className="bg-gray-900">Push & In-App Only</option>
-                                <option value="email_only" className="bg-gray-900">Email & In-App Only</option>
+                                <option value="email_pure" className="bg-gray-900">📧 Email Only (No In-App, No Push)</option>
+                                <option value="push_pure" className="bg-gray-900">🔔 Push Only (No In-App, Push Subs Only)</option>
+                                <option value="push_only" className="bg-gray-900">Push & In-App</option>
+                                <option value="email_only" className="bg-gray-900">Email & In-App</option>
                                 <option value="in_app_only" className="bg-gray-900">In-App Notification Only</option>
                             </select>
                         </div>
@@ -1293,8 +1295,13 @@ const AdminCustomNotificationBroadcaster = ({ triggerToast }: { triggerToast: (t
                     </h4>
 
                     {/* Preview 1: In-App Toast */}
-                    <div className="space-y-2">
-                        <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block">1. In-App Alert Preview</span>
+                    <div className={`space-y-2 transition-opacity ${['email_pure', 'push_pure'].includes(deliveryMode) ? 'opacity-30' : 'opacity-100'}`}>
+                        <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block">1. In-App Notification</span>
+                            {['email_pure', 'push_pure'].includes(deliveryMode) && (
+                                <span className="text-[8px] font-black uppercase tracking-wider text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded">Disabled in this mode</span>
+                            )}
+                        </div>
                         <div className="bg-gray-900 border border-correct/30 rounded-2xl p-4 shadow-xl flex items-start gap-3">
                             <div className="bg-correct/20 p-2 rounded-xl text-correct shrink-0">
                                 <Bell size={16} />
@@ -1311,8 +1318,13 @@ const AdminCustomNotificationBroadcaster = ({ triggerToast }: { triggerToast: (t
                     </div>
 
                     {/* Preview 2: Browser Push */}
-                    <div className="space-y-2">
-                        <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block">2. Web Push Notification Banner</span>
+                    <div className={`space-y-2 transition-opacity ${['email_only', 'email_pure', 'in_app_only'].includes(deliveryMode) ? 'opacity-30' : 'opacity-100'}`}>
+                        <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block">2. Web Push Notification Banner</span>
+                            {['email_only', 'email_pure', 'in_app_only'].includes(deliveryMode) && (
+                                <span className="text-[8px] font-black uppercase tracking-wider text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded">Disabled in this mode</span>
+                            )}
+                        </div>
                         <div className="bg-black/80 border border-white/15 rounded-2xl p-4 shadow-xl flex items-start gap-3 font-sans">
                             <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white font-black text-xs flex items-center justify-center shrink-0">
                                 V
@@ -1329,8 +1341,13 @@ const AdminCustomNotificationBroadcaster = ({ triggerToast }: { triggerToast: (t
                     </div>
 
                     {/* Preview 3: Dark Mode Email */}
-                    <div className="space-y-2">
-                        <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block">3. Dark Mode Email Template</span>
+                    <div className={`space-y-2 transition-opacity ${['push_only', 'push_pure', 'in_app_only'].includes(deliveryMode) ? 'opacity-30' : 'opacity-100'}`}>
+                        <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block">3. Dark Mode Email Template</span>
+                            {['push_only', 'push_pure', 'in_app_only'].includes(deliveryMode) && (
+                                <span className="text-[8px] font-black uppercase tracking-wider text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded">Disabled in this mode</span>
+                            )}
+                        </div>
                         <div className="bg-[#030712] border border-[#1f2937] rounded-2xl p-5 text-gray-200 font-sans space-y-3">
                             <div className="w-full h-1 bg-gradient-to-r from-indigo-500 to-indigo-700 rounded-full" />
                             <h5 className="text-sm font-black text-white uppercase">{title || 'Sample Title'}</h5>
