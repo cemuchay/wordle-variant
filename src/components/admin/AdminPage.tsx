@@ -3,18 +3,26 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
     ArrowUpDown,
     Bell,
+    Bold,
     BookOpen,
     Check,
     ChevronLeft,
     ChevronRight,
+    Code,
     Copy,
     Edit2,
     EyeOff,
     FileCode,
     Flag,
+    Heading,
     Home,
     Image,
+    Italic,
+    Link,
+    List,
     LogOut,
+    Minus,
+    Quote,
     RefreshCw,
     Search,
     Sparkles,
@@ -1064,6 +1072,87 @@ const AdminCustomNotificationBroadcaster = ({ triggerToast }: { triggerToast: (t
     const [draftSaved, setDraftSaved] = useState(false);
     const [sending, setSending] = useState(false);
     const [sendResult, setSendResult] = useState<BroadcastResult | null>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    const isEmailMode = ['email_only', 'email_pure', 'hybrid'].includes(deliveryMode);
+
+    const insertFormat = (prefix: string, suffix: string = '', defaultText: string = '') => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const selected = message.substring(start, end) || defaultText;
+        const replacement = `${prefix}${selected}${suffix}`;
+        const newMessage = message.substring(0, start) + replacement + message.substring(end);
+
+        setMessage(newMessage);
+        setTimeout(() => {
+            textarea.focus();
+            textarea.setSelectionRange(start + prefix.length, start + prefix.length + selected.length);
+        }, 0);
+    };
+
+    // Render formatted markdown inside the email preview
+    const renderEmailContentPreview = (raw: string) => {
+        if (!raw.trim()) {
+            return <p className="text-xs text-gray-500 italic">No message content entered yet...</p>;
+        }
+
+        const blocks = raw.split(/\n\n+/);
+        return blocks.map((block, idx) => {
+            const trimmed = block.trim();
+            if (!trimmed) return null;
+
+            if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
+                return <hr key={idx} className="border-t border-white/15 my-3" />;
+            }
+            if (trimmed.startsWith('### ')) {
+                return <h5 key={idx} className="text-xs font-black text-white uppercase tracking-wider mt-3 mb-1">{trimmed.slice(4)}</h5>;
+            }
+            if (trimmed.startsWith('## ')) {
+                return <h4 key={idx} className="text-sm font-black text-white uppercase tracking-wider mt-3 mb-1">{trimmed.slice(3)}</h4>;
+            }
+            if (trimmed.startsWith('# ')) {
+                return <h3 key={idx} className="text-base font-black text-white uppercase tracking-tight mt-4 mb-1">{trimmed.slice(2)}</h3>;
+            }
+            if (trimmed.startsWith('> ')) {
+                return (
+                    <blockquote key={idx} className="border-l-2 border-indigo-500 pl-3 py-1 my-2 text-xs italic text-indigo-200/90 bg-indigo-500/10 rounded-r-lg">
+                        {trimmed.slice(2)}
+                    </blockquote>
+                );
+            }
+            if (trimmed.split('\n').every(l => l.trim().startsWith('- ') || l.trim().startsWith('* '))) {
+                return (
+                    <ul key={idx} className="list-disc pl-4 space-y-1 my-2 text-xs text-gray-300">
+                        {trimmed.split('\n').map((line, liIdx) => (
+                            <li key={liIdx}>{line.replace(/^[-*]\s+/, '')}</li>
+                        ))}
+                    </ul>
+                );
+            }
+
+            // Paragraph with bold, italic, code inline formatting
+            const parts = trimmed.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
+            return (
+                <p key={idx} className="text-xs text-gray-300 leading-relaxed my-1.5 whitespace-pre-wrap">
+                    {parts.map((p, pIdx) => {
+                        if (p.startsWith('**') && p.endsWith('**')) {
+                            return <strong key={pIdx} className="text-white font-bold">{p.slice(2, -2)}</strong>;
+                        }
+                        if (p.startsWith('*') && p.endsWith('*')) {
+                            return <em key={pIdx} className="text-indigo-200 italic">{p.slice(1, -1)}</em>;
+                        }
+                        if (p.startsWith('`') && p.endsWith('`')) {
+                            return <code key={pIdx} className="bg-white/10 text-indigo-300 px-1 py-0.5 rounded text-[11px] font-mono">{p.slice(1, -1)}</code>;
+                        }
+                        return p;
+                    })}
+                </p>
+            );
+        });
+    };
 
     // Debounced LocalStorage Draft Save Effect (500ms)
     useEffect(() => {
@@ -1186,13 +1275,95 @@ const AdminCustomNotificationBroadcaster = ({ triggerToast }: { triggerToast: (t
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Message Content</label>
+                        <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Message Content</label>
+                            {isEmailMode && (
+                                <span className="text-[9px] font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
+                                    Markdown Supported for Email
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Formatting Toolbar */}
+                        {isEmailMode && (
+                            <div className="flex flex-wrap items-center gap-1 p-1.5 bg-black/50 border border-white/10 rounded-xl text-gray-400">
+                                <button
+                                    type="button"
+                                    onClick={() => insertFormat('**', '**', 'bold text')}
+                                    className="p-1.5 hover:bg-white/10 hover:text-white rounded-lg transition-colors cursor-pointer text-xs"
+                                    title="Bold (**text**)"
+                                >
+                                    <Bold size={13} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => insertFormat('*', '*', 'italic text')}
+                                    className="p-1.5 hover:bg-white/10 hover:text-white rounded-lg transition-colors cursor-pointer text-xs"
+                                    title="Italic (*text*)"
+                                >
+                                    <Italic size={13} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => insertFormat('### ', '', 'Heading Text')}
+                                    className="p-1.5 hover:bg-white/10 hover:text-white rounded-lg transition-colors cursor-pointer text-xs"
+                                    title="Heading (### Text)"
+                                >
+                                    <Heading size={13} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => insertFormat('- ', '', 'List item')}
+                                    className="p-1.5 hover:bg-white/10 hover:text-white rounded-lg transition-colors cursor-pointer text-xs"
+                                    title="Bullet List (- Item)"
+                                >
+                                    <List size={13} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => insertFormat('> ', '', 'Quoted callout')}
+                                    className="p-1.5 hover:bg-white/10 hover:text-white rounded-lg transition-colors cursor-pointer text-xs"
+                                    title="Callout Quote (> Text)"
+                                >
+                                    <Quote size={13} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => insertFormat('`', '`', 'code snippet')}
+                                    className="p-1.5 hover:bg-white/10 hover:text-white rounded-lg transition-colors cursor-pointer text-xs"
+                                    title="Code (`code`)"
+                                >
+                                    <Code size={13} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => insertFormat('\n\n---\n\n', '', '')}
+                                    className="p-1.5 hover:bg-white/10 hover:text-white rounded-lg transition-colors cursor-pointer text-xs"
+                                    title="Horizontal Line (---)"
+                                >
+                                    <Minus size={13} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => insertFormat('[', '](https://wordle-variant.xyz)', 'Link title')}
+                                    className="p-1.5 hover:bg-white/10 hover:text-white rounded-lg transition-colors cursor-pointer text-xs"
+                                    title="Link ([title](url))"
+                                >
+                                    <Link size={13} />
+                                </button>
+                                <div className="ml-auto text-[9px] text-gray-500 font-mono pr-1.5">
+                                    Double-enter for new paragraph
+                                </div>
+                            </div>
+                        )}
+
                         <textarea
-                            rows={4}
-                            placeholder="Type the message body to deliver to players..."
+                            ref={textareaRef}
+                            rows={isEmailMode ? 6 : 4}
+                            placeholder={isEmailMode ? "Type formatted message... (supports **bold**, *italic*, ### headings, - lists, & links)" : "Type the message body to deliver to players..."}
                             value={message}
                             onChange={e => setMessage(e.target.value)}
-                            className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-xs focus:outline-none focus:border-correct/50 text-white placeholder-gray-600 font-medium resize-none"
+                            className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-xs focus:outline-none focus:border-correct/50 text-white placeholder-gray-600 font-medium resize-y font-sans leading-relaxed"
                         />
                     </div>
 
@@ -1340,23 +1511,51 @@ const AdminCustomNotificationBroadcaster = ({ triggerToast }: { triggerToast: (t
                         </div>
                     </div>
 
-                    {/* Preview 3: Dark Mode Email */}
+                    {/* Preview 3: Editorial Email Preview */}
                     <div className={`space-y-2 transition-opacity ${['push_only', 'push_pure', 'in_app_only'].includes(deliveryMode) ? 'opacity-30' : 'opacity-100'}`}>
                         <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block">3. Dark Mode Email Template</span>
+                            <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block">3. Editorial Email Template Preview</span>
                             {['push_only', 'push_pure', 'in_app_only'].includes(deliveryMode) && (
                                 <span className="text-[8px] font-black uppercase tracking-wider text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded">Disabled in this mode</span>
                             )}
                         </div>
-                        <div className="bg-[#030712] border border-[#1f2937] rounded-2xl p-5 text-gray-200 font-sans space-y-3">
-                            <div className="w-full h-1 bg-gradient-to-r from-indigo-500 to-indigo-700 rounded-full" />
-                            <h5 className="text-sm font-black text-white uppercase">{title || 'Sample Title'}</h5>
-                            <p className="text-xs text-gray-400 leading-relaxed">{message || 'Sample email message body text.'}</p>
+                        <div className="bg-[#030712] border border-[#1f2937] rounded-2xl p-5 text-gray-200 font-sans space-y-3.5 shadow-2xl">
+                            {/* Masthead */}
+                            <div className="border-b border-white/10 pb-2 text-center">
+                                <span className="text-[10px] font-black tracking-widest text-white uppercase block font-serif">THE VARIANT</span>
+                                <span className="text-[8px] font-bold tracking-widest text-gray-500 uppercase block">Daily Word Puzzle & Gazette</span>
+                            </div>
+
+                            <div>
+                                <h5 className="text-sm font-black text-white font-serif tracking-tight leading-snug">
+                                    {title || 'Sample Broadcast Title'}
+                                </h5>
+                                <p className="text-[10px] text-gray-400 font-medium mt-1">
+                                    {(() => {
+                                        const h = new Date().getHours();
+                                        if (h >= 5 && h < 12) return 'Good morning';
+                                        if (h >= 12 && h < 17) return 'Good afternoon';
+                                        if (h >= 17 && h < 22) return 'Good evening';
+                                        return 'Hello';
+                                    })()}, <strong className="text-white">Player</strong> —
+                                </p>
+                            </div>
+
+                            {/* Rendered Body with Markdown & Layout */}
+                            <div className="border-t border-b border-white/5 py-2.5 my-2">
+                                {renderEmailContentPreview(message)}
+                            </div>
+
+                            {/* Call to action button */}
                             <div className="pt-2 text-center">
-                                <span className="inline-block bg-gradient-to-r from-indigo-500 to-indigo-700 text-white text-[10px] font-extrabold uppercase tracking-wider px-4 py-2 rounded-xl">
+                                <span className="inline-block bg-white text-black text-[10px] font-black uppercase tracking-wider px-5 py-2.5 rounded-lg shadow-md">
                                     Open Variant
                                 </span>
                             </div>
+
+                            <p className="text-[8px] text-gray-600 text-center pt-1">
+                                Sent from wordle-variant.xyz · Unsubscribe anytime
+                            </p>
                         </div>
                     </div>
                 </div>
