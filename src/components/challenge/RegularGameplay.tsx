@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { AlertTriangle, Lightbulb, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Lightbulb, RefreshCw, Eye, X } from 'lucide-react';
 import { memo, useEffect, useRef, useState, useCallback } from 'react';
 import { ANIMATION_DURATION } from '../../constants/ui';
 import { ANIMATION } from '../../constants/game';
@@ -54,6 +54,7 @@ export const RegularGameplay = memo(function RegularGameplay({
 
     const wasGameOverOnMount = useRef(isGameOver);
     const [hideKeyboard, setHideKeyboard] = useState(wasGameOverOnMount.current);
+    const [showSentenceModal, setShowSentenceModal] = useState(false);
     // const [debugInfo, setDebugInfo] = useState({
     //     siblingHeights: 0,
     //     containerGap: 0,
@@ -304,9 +305,9 @@ export const RegularGameplay = memo(function RegularGameplay({
                         )}
                     </div>
                 )}
-                {sentenceGames && (
-                    <div className="bg-indigo-950/30 border border-indigo-500/25 p-3 rounded-xl max-w-md w-full shrink-0 flex flex-wrap gap-x-2.5 gap-y-1.5 items-center justify-center text-center">
-                        {sentenceGames.map((g, idx) => {
+                {sentenceGames && (() => {
+                    const renderSentenceContent = () => (
+                        sentenceGames.map((g, idx) => {
                             const prog = participation?.marathon_progress?.find((p: any) => p.game_index === idx);
                             const isCompleted = prog?.status === 'completed' || (idx < (gameIndex ?? 0));
                             const isActive = idx === gameIndex;
@@ -330,9 +331,65 @@ export const RegularGameplay = memo(function RegularGameplay({
                                     </span>
                                 );
                             }
-                        })}
-                    </div>
-                )}
+                        })
+                    );
+
+                    if (sentenceGames.length > 6) {
+                        return (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSentenceModal(true)}
+                                    className="bg-indigo-950/40 hover:bg-indigo-900/50 border border-indigo-500/30 text-indigo-300 text-xs font-bold px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shrink-0 shadow-sm cursor-pointer active:scale-95"
+                                >
+                                    <Eye className="w-3.5 h-3.5 text-indigo-400" />
+                                    Show Sentence ({sentenceGames.length} words)
+                                </button>
+
+                                {showSentenceModal && (
+                                    <div
+                                        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+                                        onClick={() => setShowSentenceModal(false)}
+                                    >
+                                        <div
+                                            className="bg-[#121420] border border-indigo-500/30 p-4 rounded-2xl max-w-sm w-full shadow-2xl relative flex flex-col items-center gap-3 animate-in zoom-in-95 duration-200"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <div className="w-full flex items-center justify-between border-b border-white/10 pb-2">
+                                                <span className="text-xs font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
+                                                    <Eye className="w-3.5 h-3.5 text-indigo-400" />
+                                                    Sentence Progress
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowSentenceModal(false)}
+                                                    className="text-white/50 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+                                                    aria-label="Close"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            </div>
+
+                                            <div className="bg-indigo-950/40 border border-indigo-500/20 p-3 rounded-xl w-full flex flex-wrap gap-x-2.5 gap-y-2 items-center justify-center text-center max-h-60 overflow-y-auto">
+                                                {renderSentenceContent()}
+                                            </div>
+
+                                            <p className="text-[10px] text-white/40 text-center">
+                                                Click outside or press ✕ to return to your game
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        );
+                    }
+
+                    return (
+                        <div className="bg-indigo-950/30 border border-indigo-500/25 p-3 rounded-xl max-w-md w-full shrink-0 flex flex-wrap gap-x-2.5 gap-y-1.5 items-center justify-center text-center">
+                            {renderSentenceContent()}
+                        </div>
+                    );
+                })()}
 
                 <div className={`relative grid-wrapper-parent ${maxAttempts > 6 ? 'py-2 px-4 sm:py-4 sm:px-6' : ''}`}>
                     <NewGrid
