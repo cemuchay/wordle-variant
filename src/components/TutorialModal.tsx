@@ -365,6 +365,10 @@ export const TutorialModal = ({ onComplete, onSkip }: TutorialModalProps) => {
               <div className="bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2">
                 <p className="text-[10px] text-gray-400">Word length changes daily — <span className="text-white">4 to 7 letters</span>.</p>
               </div>
+              <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-lg px-3 py-2">
+                <p className="text-[10px] text-cyan-300 font-bold uppercase tracking-wider">❄️ STREAK FREEZE</p>
+                <p className="text-[10px] text-gray-400">Miss 1 day? Streak freezes automatically. Miss 2+ days and it resets.</p>
+              </div>
             </div>
 
             <button

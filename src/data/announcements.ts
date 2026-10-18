@@ -9,6 +9,19 @@ export interface Announcement {
 
 export const ANNOUNCEMENTS: Announcement[] = [
    {
+      id: "streak-freeze-protection",
+      title: "New: Streak Freeze Protection ❄️",
+      date: "2026-10-18",
+      type: "feature",
+      lifespanDays: 14,
+      content: `
+             <h3>Missed a Day? Your Streak is Safe!</h3>
+             <p>Life happens! If you miss <strong>just 1 daily game</strong>, your streak is automatically frozen and preserved until you play again next.</p>
+             <p>No score is awarded, but your streak won't break unless you miss <strong>more than 1 consecutive day</strong>. This feature is also retroactively applied from <strong>September 1st, 2026</strong>!</p>
+             <p> Happy gaming <p/>
+          `,
+   },
+   {
       id: "nearly-got-it-bonus",
       title: "Scoring Update: Nearly Got It Bonus (+84 pts)",
       date: "2026-08-18",

@@ -28,13 +28,33 @@ const corsHeaders = {
       "authorization, x-client-info, apikey, content-type, x-internal-secret",
 };
 
+// Helper to produce an accurate, pleasant time-based greeting or fallback
+const getTimeBasedGreeting = (customGreeting?: string): string => {
+   if (customGreeting && customGreeting.trim()) {
+      return customGreeting.trim();
+   }
+   // Use UTC hour offset check (or standard universal greeting)
+   const currentHour = new Date().getUTCHours();
+   // Roughly accounts for morning / afternoon / evening across UTC to UTC+3/WAT
+   if (currentHour >= 4 && currentHour < 12) {
+      return "Good morning";
+   } else if (currentHour >= 12 && currentHour < 17) {
+      return "Good afternoon";
+   } else if (currentHour >= 17 && currentHour < 22) {
+      return "Good evening";
+   }
+   return "Hello";
+};
+
 // Clean, professional editorial light mode HTML email template wrapper (WSJ / NYT style)
 const getEmailHtml = (
    username: string,
    userId: string,
    title: string,
    contentHtml: string,
+   customGreeting?: string,
 ) => {
+   const greetingWord = getTimeBasedGreeting(customGreeting);
    const unsubscribeUrl = `${APP_URL}/unsubscribe?user_id=${userId}`;
    return `
     <!DOCTYPE html>
@@ -172,7 +192,7 @@ const getEmailHtml = (
               <div class="masthead-subtitle">DAILY WORD PUZZLE & GAZETTE</div>
             </div>
             <h1>${title}</h1>
-            <p class="greeting">Good morning, <strong>${formatUsername(username)}</strong> —</p>
+            <p class="greeting">${greetingWord}, <strong>${formatUsername(username)}</strong> —</p>
             ${contentHtml}
             <div class="footer">
               <p class="footer-text">
@@ -1127,6 +1147,106 @@ serve(async (req) => {
 
          return new Response(
             JSON.stringify({ success: true, action, emails_sent: sentCount }),
+            {
+               headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+         );
+      }
+
+      // ACTION: ADMIN CUSTOM BROADCAST
+      if (action === "admin-custom-broadcast") {
+         log(`Starting action admin-custom-broadcast for user ${body.username || "Player"} (${body.email})`);
+         const recipientEmail = body.email;
+         const username = body.username || "Player";
+         const userId = body.user_id || "admin-broadcast";
+         const title = body.title || "Announcement from Variant";
+         const messageText = body.message || "";
+         const targetUrl = body.url ? (body.url.startsWith("http") ? body.url : `${APP_URL}${body.url.startsWith("/") ? "" : "/"}${body.url}`) : APP_URL;
+
+         if (!recipientEmail) {
+            log(`Error: Missing email address for admin-custom-broadcast`);
+            return new Response(
+               JSON.stringify({ error: "Missing email address in payload" }),
+               {
+                  status: 400,
+                  headers: { ...corsHeaders, "Content-Type": "application/json" },
+               },
+            );
+         }
+
+         // Format markdown & paragraphs into clean email HTML
+         const formatMarkdownToEmailHtml = (rawText: string) => {
+            const blocks = rawText.split(/\n\n+/);
+            return blocks.map(block => {
+               const trimmed = block.trim();
+               if (!trimmed) return "";
+
+               // Horizontal Rule / Divider
+               if (trimmed === "---" || trimmed === "***" || trimmed === "___") {
+                  return `<hr style="border: 0; border-top: 1px solid #e4e4e7; margin: 24px 0;" />`;
+               }
+
+               // Headers
+               if (trimmed.startsWith("### ")) {
+                  return `<h3 style="font-family: 'Newsreader', Georgia, serif; font-size: 18px; font-weight: 700; color: #18181b; margin: 20px 0 10px 0;">${trimmed.slice(4)}</h3>`;
+               }
+               if (trimmed.startsWith("## ")) {
+                  return `<h2 style="font-family: 'Newsreader', Georgia, serif; font-size: 20px; font-weight: 800; color: #18181b; margin: 24px 0 12px 0;">${trimmed.slice(3)}</h2>`;
+               }
+               if (trimmed.startsWith("# ")) {
+                  return `<h1 style="font-family: 'Newsreader', Georgia, serif; font-size: 22px; font-weight: 800; color: #18181b; margin: 28px 0 14px 0;">${trimmed.slice(2)}</h1>`;
+               }
+
+               // Unordered Lists
+               if (trimmed.split("\n").every(line => line.trim().startsWith("- ") || line.trim().startsWith("* "))) {
+                  const items = trimmed.split("\n").map(line => {
+                     const itemText = line.replace(/^[-*]\s+/, "");
+                     const formatted = itemText
+                        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+                        .replace(/\*(.*?)\*/g, "<em>$1</em>")
+                        .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" style="color: #4f46e5; text-decoration: underline; font-weight: 600;">$1</a>');
+                     return `<li style="margin-bottom: 6px; color: #3f3f46; font-size: 15px; line-height: 1.6;">${formatted}</li>`;
+                  }).join("");
+                  return `<ul style="padding-left: 20px; margin: 12px 0 16px 0;">${items}</ul>`;
+               }
+
+               // Callout / Blockquote
+               if (trimmed.startsWith("> ")) {
+                  const quoteText = trimmed.replace(/^>\s*/gm, "")
+                     .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+                     .replace(/\*(.*?)\*/g, "<em>$1</em>");
+                  return `<div style="border-left: 3px solid #6366f1; background-color: #f8fafc; padding: 12px 16px; margin: 16px 0; border-radius: 4px; font-style: italic; color: #475569;">${quoteText.replace(/\n/g, "<br/>")}</div>`;
+               }
+
+               // Standard paragraph with bold, italic, code & link support
+               let parsed = trimmed
+                  .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+                  .replace(/__(.*?)__/g, "<strong>$1</strong>")
+                  .replace(/\*(.*?)\*/g, "<em>$1</em>")
+                  .replace(/_(.*?)_/g, "<em>$1</em>")
+                  .replace(/`([^`]+)`/g, '<code style="background: #f1f5f9; color: #6366f1; padding: 2px 5px; border-radius: 4px; font-family: monospace; font-size: 13px;">$1</code>')
+                  .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" style="color: #4f46e5; text-decoration: underline; font-weight: 600;">$1</a>');
+
+               return `<p style="font-size: 15px; line-height: 1.6; color: #3f3f46; margin: 0 0 16px 0;">${parsed.replace(/\n/g, "<br/>")}</p>`;
+            }).filter(Boolean).join("");
+         };
+
+         const formattedMessage = formatMarkdownToEmailHtml(messageText);
+
+         const content = `
+            <div style="margin: 8px 0 24px 0;">
+               ${formattedMessage}
+            </div>
+            <div style="margin: 28px 0 16px 0; text-align: center;">
+               <a href="${targetUrl}" class="btn-primary" style="display: inline-block; background-color: #18181b; color: #ffffff !important; font-size: 13px; font-weight: 700; text-decoration: none; padding: 12px 28px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.06em;">Open Variant</a>
+            </div>
+         `;
+
+         const html = getEmailHtml(username, userId, title, content);
+         const success = await sendEmailWithFallback(recipientEmail, title, html);
+
+         return new Response(
+            JSON.stringify({ success: !!success, action, emails_sent: success ? 1 : 0 }),
             {
                headers: { ...corsHeaders, "Content-Type": "application/json" },
             },

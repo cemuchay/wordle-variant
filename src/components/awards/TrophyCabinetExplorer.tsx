@@ -281,7 +281,7 @@ export const TrophyCabinetExplorer = ({
    const filteredBottom = libraryBooks.filter(b => b.shelfRow === 'bottom')
 
    return (
-      <div className="fixed inset-0 z-50 flex flex-col select-none overflow-hidden bg-[#060403] text-white">
+      <div className="fixed inset-0 z-[200] flex flex-col select-none overflow-hidden bg-[#060403] text-white">
          {/* Atmospheric Library Ambient Background */}
          <div
             className="absolute inset-0 pointer-events-none"

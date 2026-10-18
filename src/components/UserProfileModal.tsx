@@ -758,11 +758,17 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                     onSelectUser={(newId) => setViewedUserId(newId)}
                 />
             )}
-            {isCabinetOpen && profile && (
+            {isCabinetOpen && (
                 <TrophyCabinetExplorer
-                    stats={{ dailyWins: stats.dailyWins, weeklyWins: stats.weeklyWins, monthlyWins: stats.monthlyWins }}
+                    stats={{
+                        dailyWins: stats.dailyWins,
+                        weeklyWins: stats.weeklyWins,
+                        monthlyWins: stats.monthlyWins,
+                        currentStreak: stats.currentStreak,
+                        maxStreak: stats.maxStreak,
+                    }}
                     awards={awards}
-                    username={profile.username}
+                    username={profile?.username || 'Player'}
                     onClose={() => setIsCabinetOpen(false)}
                 />
             )}

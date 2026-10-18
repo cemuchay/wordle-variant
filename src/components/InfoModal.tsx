@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Lightbulb, GraduationCap, Zap } from 'lucide-react';
+import { Lightbulb, GraduationCap, Zap, Flame } from 'lucide-react';
 import { TutorialModal } from './TutorialModal';
 import { ModalLayout } from './layout/ModalLayout';
 
@@ -113,6 +113,21 @@ export const InfoModal: React.FC<Props> = ({ isOpen, onClose, inline = false }) 
               <p className="font-bold text-white mb-1 uppercase tracking-wide">Scrub Mode</p>
               <p className="text-gray-400 leading-relaxed">
                 Stuck? A hint unlocks after your <span className="text-white font-bold">2nd attempt</span>. Using it marks your result with shame. <span className="text-red-500 font-bold">Locked on the last guess or when only 1 letter remains!</span>
+              </p>
+            </div>
+          </div>
+
+          {/* Streak Freeze Info */}
+          <div className="flex gap-4">
+            <div className="bg-cyan-500/20 p-2 h-fit rounded-lg text-cyan-400 shrink-0">
+              <Flame size={20} />
+            </div>
+            <div>
+              <p className="font-bold text-white mb-1 uppercase tracking-wide flex items-center gap-1.5">
+                Streak Freeze <span className="text-xs text-cyan-400 font-normal">❄️</span>
+              </p>
+              <p className="text-gray-400 leading-relaxed">
+                Miss just <span className="text-white font-bold">1 game</span>? Your streak freezes automatically until you play next. Miss <span className="text-red-400 font-bold">2+ days in a row</span> and your streak resets.
               </p>
             </div>
           </div>
