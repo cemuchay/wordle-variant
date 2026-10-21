@@ -154,6 +154,7 @@ export const useGameEngine = (
    }, [date, user, triggerToast]);
 
    const { refresh, updateOptimistically } = useWordleStats(user, false, date);
+   const isSyncInFlightRef = useRef(false);
 
    const { performSync, loadFromCloud, retrySync } = usePersistence({
       user,
@@ -161,6 +162,7 @@ export const useGameEngine = (
       dispatch,
       config,
       triggerToast,
+      isSyncInFlightRef,
    });
 
    const actionsProps = useActions({
@@ -232,12 +234,39 @@ export const useGameEngine = (
       const saved = safeLocalStorage.getItem(`wordle-${date}`);
 
       const hydrate = async () => {
+         // GUARD: If a sync is currently in flight or local state has already concluded for today,
+         // do not let visibility-change or background rehydration overwrite recent progress.
+         if (isSyncInFlightRef.current || (state.isGameOver && state.status !== "playing")) {
+            return;
+         }
+
          const currentConfig = config!;
          const cloudPayload = user ? await loadFromCloud() : null;
 
-         if (saved) {
+         // Read primary saved storage or fallback to backup if missing/corrupt
+         let savedData = saved;
+         if (!savedData) {
+            savedData = safeLocalStorage.getItem(`wordle-${date}-backup`);
+         }
+
+         if (savedData) {
             try {
-               const payload = JSON.parse(saved);
+               let payload = JSON.parse(savedData);
+               const backupRaw = safeLocalStorage.getItem(`wordle-${date}-backup`);
+               if (backupRaw) {
+                  try {
+                     const backupParsed = JSON.parse(backupRaw);
+                     if (
+                        Array.isArray(backupParsed?.guesses) &&
+                        Array.isArray(payload?.guesses) &&
+                        backupParsed.guesses.length > payload.guesses.length
+                     ) {
+                        payload = backupParsed;
+                     }
+                  } catch {
+                     /* empty block */
+                  }
+               }
 
                // Deobfuscate target word for local in-memory gameplay state
                if (payload.config && payload.config.word) {
@@ -291,6 +320,17 @@ export const useGameEngine = (
                } else {
                   // Both local and cloud states exist: check coherence and harmonize
                   if (user && cloudPayload) {
+                     const isLocalFinished = payload.status === "won" || payload.status === "lost";
+                     const isCloudFinished = cloudPayload.status === "won" || cloudPayload.status === "lost";
+
+                     // TERMINAL STATE PROTECTION:
+                     // Never downgrade a completed local game to an unfinished or shorter cloud state.
+                     if (isLocalFinished && !isCloudFinished) {
+                        dispatch({ type: "LOAD_STATE", payload });
+                        performSync(payload);
+                        return;
+                     }
+
                      const isCoherent = areGuessesCoherent(
                         payload.guesses,
                         cloudPayload.guesses,

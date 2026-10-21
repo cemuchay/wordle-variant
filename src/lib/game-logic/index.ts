@@ -334,23 +334,27 @@ export const getHint = (word: string, guesses: GuessResult[][]) => {
 
    let chosenIndex: number;
 
-   if (roll < 0.33 && undiscoveredIndices.length > 0) {
-      // 1. 33% chance: Random undiscovered letter (pure random exploration among undiscovered letters)
+   if (roll < 0.1 && undiscoveredIndices.length > 0) {
+      // 1. 10% chance: Random undiscovered letter (pure random exploration among undiscovered letters)
       chosenIndex =
          undiscoveredIndices[
             Math.floor(Math.random() * undiscoveredIndices.length)
          ];
-   } else if (roll < 0.66) {
-      // 2. 33% chance: Standard reveal (prioritize undiscovered indices first, fallback to remaining indices)
+   } else if (roll < 0.4) {
+      // 2. 30% chance: Standard reveal (prioritize undiscovered indices first, fallback to remaining indices)
       const candidateIndices =
-         undiscoveredIndices.length > 0 ? undiscoveredIndices : remainingIndices;
+         undiscoveredIndices.length > 0
+            ? undiscoveredIndices
+            : remainingIndices;
       chosenIndex =
          candidateIndices[Math.floor(Math.random() * candidateIndices.length)];
    } else {
-      // 3. 33% chance: Optimal reveal with highest impact in narrowing down remaining possibilities
+      // 3. 50% chance: Optimal reveal with highest impact in narrowing down remaining possibilities
       // Evaluate impact using distinguishing letter partition efficiency and vowel/consonant distribution
       const candidateIndices =
-         undiscoveredIndices.length > 0 ? undiscoveredIndices : remainingIndices;
+         undiscoveredIndices.length > 0
+            ? undiscoveredIndices
+            : remainingIndices;
 
       const scoredIndices = candidateIndices.map((idx) => {
          const letter = targetWord[idx];
@@ -363,13 +367,18 @@ export const getHint = (word: string, guesses: GuessResult[][]) => {
          }
 
          // High frequency English distinguishing letter weights
-         if (["E", "A", "R", "I", "O", "T", "N", "S", "L", "C"].includes(letter)) {
+         if (
+            ["E", "A", "R", "I", "O", "T", "N", "S", "L", "C"].includes(letter)
+         ) {
             score += 10;
          }
 
          // Positional index weighting (first letter and vowels at index 1 or 2 give high clue value)
          if (idx === 0) score += 6;
-         if ((idx === 1 || idx === 2) && ["A", "E", "I", "O", "U"].includes(letter)) {
+         if (
+            (idx === 1 || idx === 2) &&
+            ["A", "E", "I", "O", "U"].includes(letter)
+         ) {
             score += 5;
          }
 
@@ -378,7 +387,9 @@ export const getHint = (word: string, guesses: GuessResult[][]) => {
 
       scoredIndices.sort((a, b) => b.score - a.score);
       const topScore = scoredIndices[0].score;
-      const topCandidates = scoredIndices.filter((item) => item.score === topScore);
+      const topCandidates = scoredIndices.filter(
+         (item) => item.score === topScore,
+      );
       chosenIndex =
          topCandidates[Math.floor(Math.random() * topCandidates.length)].idx;
    }
@@ -467,7 +478,7 @@ export const syncWithRetry = async (
          return { success: true, score: score || 0 };
       } catch (err) {
          if (i === retries - 1) throw err;
-          await new Promise((resolve) => setTimeout(resolve, RETRY.SYNC_DELAY));
+         await new Promise((resolve) => setTimeout(resolve, RETRY.SYNC_DELAY));
       }
    }
    return { success: false, score: 0 };
