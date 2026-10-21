@@ -14,12 +14,14 @@ interface UsePersistenceProps {
    dispatch: React.Dispatch<any>;
    config: any;
    triggerToast: (msg: string, duration?: number) => void;
+   isSyncInFlightRef?: React.MutableRefObject<boolean>;
 }
 
-export const usePersistence = ({ user, date, dispatch, config, triggerToast }: UsePersistenceProps) => {
+export const usePersistence = ({ user, date, dispatch, config, triggerToast, isSyncInFlightRef }: UsePersistenceProps) => {
    const performSync = useCallback(
       async (gamePayload: { status: string; guesses?: any[]; usedHint?: boolean; hintRecord?: any }) => {
          if (!user || !date) return false;
+         if (isSyncInFlightRef) isSyncInFlightRef.current = true;
          dispatch({ type: "SET_SYNC_STATUS", status: "syncing" });
 
          // Lightweight pre-sync check: only push if local is ahead of cloud
@@ -171,9 +173,16 @@ export const usePersistence = ({ user, date, dispatch, config, triggerToast }: U
                saveGameWithBackup(date, current);
             }
             return false;
+         } finally {
+            if (isSyncInFlightRef) {
+               // Grace period of 1500ms to allow mobile Safari visibility / focus settle
+               setTimeout(() => {
+                  if (isSyncInFlightRef) isSyncInFlightRef.current = false;
+               }, 1500);
+            }
          }
       },
-      [user, date, dispatch],
+      [user, date, dispatch, isSyncInFlightRef],
    );
 
    const loadFromCloud = useCallback(async () => {
