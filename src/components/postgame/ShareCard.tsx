@@ -1,9 +1,9 @@
-import { useState, useMemo } from "react";
-import { Share2, Check, Copy, Sparkles, Clock, Loader2, Flame } from "lucide-react";
-import type { GuessResult } from "../../types/game";
-import { generateShareText } from "../../lib/share";
-import { useApp } from "../../context/AppContext";
+import { Check, Clock, Copy, Loader2, Share2 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { TOAST_DURATION } from "../../constants/ui";
+import { useApp } from "../../context/AppContext";
+import { generateShareText } from "../../lib/share";
+import type { GuessResult } from "../../types/game";
 import CountDown from "../common/CountDown";
 
 interface ShareCardProps {
