@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { BookOpen, Sparkles, Volume2, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { fetchWordDefinition, type DictionaryDefinition } from "../../utils/wordgrid/dictionary";
@@ -38,13 +38,18 @@ export const WordTriviaCard: React.FC<WordTriviaCardProps> = ({
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState(0);
+  const [prevWord, setPrevWord] = useState(word);
+
+  if (prevWord !== word) {
+    setPrevWord(word);
+    setLoading(true);
+    setCurrentIndex(0);
+    setDirection(0);
+  }
 
   useEffect(() => {
     if (!word) return;
     let isMounted = true;
-    setLoading(true);
-    setCurrentIndex(0);
-    setDirection(0);
 
     const loadDetails = async () => {
       try {
@@ -76,10 +81,14 @@ export const WordTriviaCard: React.FC<WordTriviaCardProps> = ({
     }
   };
 
-  const meanings = definitionData?.meanings || (definitionData?.definition ? [{
-    partOfSpeech: definitionData.partOfSpeech || 'WORD',
-    definition: definitionData.definition,
-  }] : []);
+  // Limit to top 10 most relevant definitions
+  const meanings = useMemo(() => {
+    const raw = definitionData?.meanings || (definitionData?.definition ? [{
+      partOfSpeech: definitionData.partOfSpeech || 'WORD',
+      definition: definitionData.definition,
+    }] : []);
+    return raw.slice(0, 10);
+  }, [definitionData]);
 
   const total = meanings.length;
   const currentMeaning = meanings[currentIndex] || meanings[0];
@@ -144,7 +153,7 @@ export const WordTriviaCard: React.FC<WordTriviaCardProps> = ({
       </div>
 
       {/* Carousel Definition Content */}
-      <div className="min-h-[48px] flex flex-col justify-center relative overflow-hidden">
+      <div className="min-h-12 flex flex-col justify-center relative overflow-hidden">
         {loading ? (
           <div className="flex items-center gap-1.5 text-xs text-gray-500 py-1">
             <Loader2 size={12} className="animate-spin text-indigo-400" />
@@ -190,7 +199,7 @@ export const WordTriviaCard: React.FC<WordTriviaCardProps> = ({
                 }}
                 className={`h-1.5 rounded-full transition-all duration-200 cursor-pointer ${
                   idx === currentIndex
-                    ? "w-4 bg-gradient-to-r from-pink-500 to-cyan-400"
+                    ? "w-4 bg-linear-to-r from-pink-500 to-cyan-400"
                     : "w-1.5 bg-slate-700 hover:bg-slate-500"
                 }`}
                 title={`Meaning ${idx + 1}`}

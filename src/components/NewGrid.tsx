@@ -425,8 +425,17 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
         const navItems: React.ReactNode[] = [];
 
         if (!isGameOver && canShowHint && onHint) {
-          const isLocked = isHintLocked ?? (guesses.length < 2);
+          const isTooEarly = guesses.length < 2;
+          const isLocked = isHintLocked ?? isTooEarly;
           const isUnavailable = isLocked || !!usedHint;
+
+          const getHintTooltip = () => {
+            if (usedHint) return "Hint Used";
+            if (isTooEarly) return "Unlock hint by guessing 2+ words";
+            if (isLocked) return "Hint Unavailable: Only one letter remains or max attempts reached";
+            return "Get Hint";
+          };
+
           navItems.push(
             <button
               key="btn-hint"
@@ -436,7 +445,7 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
                 ? 'bg-black/80 text-gray-500 border border-gray-800 opacity-50 cursor-not-allowed pointer-events-none'
                 : 'bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30 border border-yellow-500/40 cursor-pointer active:scale-95 animate-pulse'
                 }`}
-              title={usedHint ? "Hint Used" : isLocked ? "Unlock hint by guessing 2+ words" : "Get Hint"}
+              title={getHintTooltip()}
             >
               <Lightbulb size={12} className={isUnavailable ? "text-gray-600" : "text-yellow-400 fill-yellow-400/20"} />
               <span className="truncate">{usedHint ? "hint used" : isLocked ? "hint 🔒" : "get hint"}</span>

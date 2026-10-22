@@ -16,6 +16,7 @@ import {
   clearArchiveDraft,
   getAllValidArchiveDates,
   getYesterdayArchiveDate,
+  getPendingArchiveDraftDate,
 } from '../../utils/archiveDb';
 import { saveGuestFreePlayState, getGuestFreePlayState, getTodayDateString } from '../../utils/guestFreePlay';
 import { useApp } from '../../context/AppContext';
@@ -44,12 +45,31 @@ const formatDateDDMMYYYY = (isoDateStr: string): string => {
 };
 
 /**
- * Returns the earliest valid archive date that has NOT yet been completed.
+ * Returns a starting archive date:
+ * 1. If user has a pending/in-progress game draft, prioritize it.
+ * 2. Otherwise, pick a random unplayed date from the entire archive.
+ * 3. Fallback to a random archive date or yesterday if all are solved.
  */
-const getEarliestUnplayedArchiveDate = (completed: Set<string>): string => {
-  const allValid = getAllValidArchiveDates(); // Chronological from earliest (2026-05-18) to yesterday
-  const unplayed = allValid.find((d) => !completed.has(d));
-  return unplayed || allValid[0] || getYesterdayArchiveDate();
+const getInitialArchiveDate = (completed: Set<string>): string => {
+  const pendingDate = getPendingArchiveDraftDate();
+  if (pendingDate && !completed.has(pendingDate)) {
+    return pendingDate;
+  }
+
+  const allValid = getAllValidArchiveDates();
+  const unplayed = allValid.filter((d) => !completed.has(d));
+
+  if (unplayed.length > 0) {
+    const randomIndex = Math.floor(Math.random() * unplayed.length);
+    return unplayed[randomIndex];
+  }
+
+  // All completed: pick random archive date
+  if (allValid.length > 0) {
+    return allValid[Math.floor(Math.random() * allValid.length)];
+  }
+
+  return getYesterdayArchiveDate();
 };
 
 export const FreePlayModal = ({
@@ -87,15 +107,15 @@ export const FreePlayModal = ({
   const [autoAdvanceTimer, setAutoAdvanceTimer] = useState<number | null>(null);
   const [isTimerPaused, setIsTimerPaused] = useState(false);
 
-  // Load completed archive dates & default to earliest unplayed date
+  // Load completed archive dates & default to pending draft or random unplayed date
   const refreshCompletedDates = useCallback(async () => {
     try {
       const dates = await getCompletedArchiveDates();
       const setCompleted = new Set(dates);
       setCompletedDates(setCompleted);
       if (initialMode === 'archive') {
-        const earliest = getEarliestUnplayedArchiveDate(setCompleted);
-        setSelectedDate(earliest);
+        const initialDate = getInitialArchiveDate(setCompleted);
+        setSelectedDate(initialDate);
       }
     } catch (err) {
       console.error('[FreePlayModal] Error loading completed dates:', err);
@@ -230,16 +250,16 @@ export const FreePlayModal = ({
     }
   }, [isOpen, loadPuzzle]);
 
-  // Load next unplayed puzzle
+  // Load next unplayed puzzle (advances to the next most recent unplayed date)
   const handleNextUnplayedPuzzle = useCallback(() => {
     setAutoAdvanceTimer(null);
     setIsTimerPaused(false);
 
     const allValid = getAllValidArchiveDates();
-    const unplayed = allValid.filter((d) => !completedDates.has(d) && d !== selectedDate);
+    const unplayed = [...allValid].reverse().filter((d) => !completedDates.has(d) && d !== selectedDate);
 
     if (unplayed.length > 0) {
-      const nextDate = unplayed[0]; // Earliest remaining unplayed date
+      const nextDate = unplayed[0]; // Most recent remaining unplayed date
       setSelectedDate(nextDate);
       triggerToast(`Loading next archive puzzle: ${formatDateDDMMYYYY(nextDate)}`);
     } else {
@@ -341,9 +361,14 @@ export const FreePlayModal = ({
       const calcScore = won ? Math.max(100, 1000 - (newGuesses.length - 1) * 150) : 0;
       setScore(calcScore);
 
-      // Start 15-second auto-advance timer
-      setAutoAdvanceTimer(15);
-      setIsTimerPaused(false);
+      // Start 15-second auto-advance timer only for archive mode
+      if (mode === 'archive') {
+        setAutoAdvanceTimer(15);
+        setIsTimerPaused(false);
+      } else {
+        setAutoAdvanceTimer(null);
+        setIsTimerPaused(false);
+      }
 
       if (mode === 'archive') {
         // Save completed archive to IndexedDB and clear draft
@@ -517,37 +542,39 @@ export const FreePlayModal = ({
                     )}
                   </div>
 
-                  {/* Auto-Advance Prompt */}
-                  <div className="pt-2.5 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-2">
-                    <span className="text-xs font-bold text-gray-300 flex items-center gap-2">
-                      {autoAdvanceTimer !== null && !isTimerPaused ? (
-                        <>
-                          <span className="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-ping" />
-                          <span>Next puzzle in <strong className="text-white font-mono text-sm">{autoAdvanceTimer}s</strong>...</span>
-                        </>
-                      ) : (
-                        <span>Play next unplayed puzzle?</span>
-                      )}
-                    </span>
+                  {/* Auto-Advance Prompt (Archive mode only) */}
+                  {mode === 'archive' && (
+                    <div className="pt-2.5 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-2">
+                      <span className="text-xs font-bold text-gray-300 flex items-center gap-2">
+                        {autoAdvanceTimer !== null && !isTimerPaused ? (
+                          <>
+                            <span className="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-ping" />
+                            <span>Next puzzle in <strong className="text-white font-mono text-sm">{autoAdvanceTimer}s</strong>...</span>
+                          </>
+                        ) : (
+                          <span>Play next unplayed puzzle?</span>
+                        )}
+                      </span>
 
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                      <button
-                        onClick={handleNextUnplayedPuzzle}
-                        className="flex-1 sm:flex-initial px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
-                      >
-                        <Play size={14} /> Play Next
-                      </button>
-                      {autoAdvanceTimer !== null && !isTimerPaused && (
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
                         <button
-                          onClick={() => setIsTimerPaused(true)}
-                          className="px-3 py-2 bg-white/10 hover:bg-white/20 text-gray-300 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1"
-                          title="Pause auto-advance timer"
+                          onClick={handleNextUnplayedPuzzle}
+                          className="flex-1 sm:flex-initial px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
                         >
-                          <Pause size={14} /> Pause
+                          <Play size={14} /> Play Next
                         </button>
-                      )}
+                        {autoAdvanceTimer !== null && !isTimerPaused && (
+                          <button
+                            onClick={() => setIsTimerPaused(true)}
+                            className="px-3 py-2 bg-white/10 hover:bg-white/20 text-gray-300 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1"
+                            title="Pause auto-advance timer"
+                          >
+                            <Pause size={14} /> Pause
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </motion.div>
               )}
 
@@ -565,6 +592,9 @@ export const FreePlayModal = ({
                 onDelete={handleDelete}
                 onEnter={handleEnter}
                 gameplayType={mode}
+                targetWord={targetWord}
+                date={selectedDate}
+                onClose={onClose}
               />
             </>
           )}

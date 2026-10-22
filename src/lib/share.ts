@@ -98,12 +98,13 @@ export const generateShareText = ({
       const yyyy = parsedDate.getFullYear();
       localDate = `${dd}/${mm}/${yyyy}`;
    }
+   const effectiveWordLength = wordLength || guesses[0]?.length || 5;
 
    if (!isAuthenticated) {
       localDate += "**";
    }
    
-   const header = `Variant - ${localDate}\n${attemptsText}/${maxAttempts} (${wordLength}L) • Score: ${skillScore} pts${hintMarker}`;
+   const header = `Variant - ${localDate}\n${attemptsText}/${maxAttempts} (${effectiveWordLength}L) • Score: ${skillScore} pts${hintMarker}`;
 
    const grid = guesses
       .map((row) => {

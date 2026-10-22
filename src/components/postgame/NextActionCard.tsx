@@ -1,4 +1,4 @@
-import { Calendar, Gamepad2, Swords, Sparkles, ChevronRight } from "lucide-react";
+import { Calendar, Gamepad2, Swords, Sparkles, ChevronRight, Home } from "lucide-react";
 import { MarathonBanner } from "../common/MarathonBanner";
 
 interface NextActionCardProps {
@@ -6,6 +6,8 @@ interface NextActionCardProps {
   onOpenGuestGame: () => void;
   onNavigateWordUp: () => void;
   onNavigateChallenges: () => void;
+  isGuestGame?: boolean;
+  onReturnHome?: () => void;
   activeDailyMarathons?: any[];
   isMarathonLoading?: boolean;
   isMarathonError?: boolean;
@@ -18,6 +20,8 @@ export const NextActionCard: React.FC<NextActionCardProps> = ({
   onOpenGuestGame,
   onNavigateWordUp,
   onNavigateChallenges,
+  isGuestGame = false,
+  onReturnHome,
   activeDailyMarathons = [],
   isMarathonLoading = false,
   isMarathonError = false,
@@ -98,22 +102,40 @@ export const NextActionCard: React.FC<NextActionCardProps> = ({
           </div>
         </button>
 
-        {/* Practice / Guest Mode */}
-        <button
-          onClick={onOpenGuestGame}
-          className="p-3.5 bg-linear-to-br from-emerald-950/70 via-slate-900 to-slate-950 border border-emerald-500/30 hover:border-emerald-400 rounded-2xl flex items-center gap-3 transition-all duration-300 shadow-lg group cursor-pointer active:scale-98 text-left"
-        >
-          <div className="p-2.5 bg-emerald-500/20 rounded-xl border border-emerald-500/40 text-emerald-400 group-hover:scale-110 transition-transform shrink-0">
-            <Gamepad2 size={18} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <span className="text-[8px] font-black uppercase tracking-wider text-emerald-400">Casual Mode</span>
-            <h5 className="text-xs font-black uppercase tracking-wide text-white group-hover:text-emerald-300 transition-colors truncate">
-              Guest Game
-            </h5>
-            <p className="text-[10px] text-gray-400 leading-tight truncate">Practice without stats</p>
-          </div>
-        </button>
+        {/* Practice / Guest Mode OR Return to Home */}
+        {isGuestGame ? (
+          <button
+            onClick={onReturnHome}
+            className="p-3.5 bg-linear-to-br from-indigo-950/70 via-slate-900 to-slate-950 border border-indigo-500/30 hover:border-indigo-400 rounded-2xl flex items-center gap-3 transition-all duration-300 shadow-lg group cursor-pointer active:scale-98 text-left"
+          >
+            <div className="p-2.5 bg-indigo-500/20 rounded-xl border border-indigo-500/40 text-indigo-400 group-hover:scale-110 transition-transform shrink-0">
+              <Home size={18} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-[8px] font-black uppercase tracking-wider text-indigo-400">Exit Mode</span>
+              <h5 className="text-xs font-black uppercase tracking-wide text-white group-hover:text-indigo-300 transition-colors truncate">
+                Return to Home
+              </h5>
+              <p className="text-[10px] text-gray-400 leading-tight truncate">Back to main menu</p>
+            </div>
+          </button>
+        ) : (
+          <button
+            onClick={onOpenGuestGame}
+            className="p-3.5 bg-linear-to-br from-emerald-950/70 via-slate-900 to-slate-950 border border-emerald-500/30 hover:border-emerald-400 rounded-2xl flex items-center gap-3 transition-all duration-300 shadow-lg group cursor-pointer active:scale-98 text-left"
+          >
+            <div className="p-2.5 bg-emerald-500/20 rounded-xl border border-emerald-500/40 text-emerald-400 group-hover:scale-110 transition-transform shrink-0">
+              <Gamepad2 size={18} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-[8px] font-black uppercase tracking-wider text-emerald-400">Casual Mode</span>
+              <h5 className="text-xs font-black uppercase tracking-wide text-white group-hover:text-emerald-300 transition-colors truncate">
+                Guest Game
+              </h5>
+              <p className="text-[10px] text-gray-400 leading-tight truncate">Practice without stats</p>
+            </div>
+          </button>
+        )}
       </div>
     </div>
   );

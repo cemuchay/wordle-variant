@@ -1,9 +1,9 @@
-import { useState, useMemo } from "react";
-import { Share2, Check, Copy, Sparkles, Clock, Loader2, Flame } from "lucide-react";
-import type { GuessResult } from "../../types/game";
-import { generateShareText } from "../../lib/share";
-import { useApp } from "../../context/AppContext";
+import { Check, Clock, Copy, Loader2, Share2 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { TOAST_DURATION } from "../../constants/ui";
+import { useApp } from "../../context/AppContext";
+import { generateShareText } from "../../lib/share";
+import type { GuessResult } from "../../types/game";
 import CountDown from "../common/CountDown";
 
 interface ShareCardProps {
@@ -16,6 +16,7 @@ interface ShareCardProps {
   wordLength: number;
   hintRecord?: { index: number; letter: string; row?: number } | null;
   isAuthenticated?: boolean;
+  showGrid?: boolean,
 }
 
 export const ShareCard: React.FC<ShareCardProps> = ({
@@ -28,6 +29,7 @@ export const ShareCard: React.FC<ShareCardProps> = ({
   wordLength,
   hintRecord,
   isAuthenticated = false,
+  showGrid = true,
 }) => {
   const { triggerToast } = useApp();
   const [copied, setCopied] = useState(false);
@@ -71,6 +73,7 @@ export const ShareCard: React.FC<ShareCardProps> = ({
         triggerToast("Result shared successfully!", TOAST_DURATION.DEFAULT);
         setIsSharing(false);
         return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
         if (err.name === "AbortError") {
           setIsSharing(false);
@@ -107,12 +110,10 @@ export const ShareCard: React.FC<ShareCardProps> = ({
       {/* Top Banner & Countdown */}
       <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-2.5">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/30 text-emerald-400 shrink-0">
-            <Sparkles size={18} />
-          </div>
+
           <div className="text-left">
             <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400">
-              {won ? "Victory Card" : "Game Over"}
+              {won ? "" : "Game Over"}
             </span>
             <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-white">
               {won ? `Solved in ${guesses.length}/${maxAttempts} Tries!` : "Better Luck Tomorrow!"}
@@ -129,12 +130,10 @@ export const ShareCard: React.FC<ShareCardProps> = ({
       {/* Roast / Game Message Callout */}
       {gameMessage && (
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-2.5 flex items-start gap-2 text-left">
-          <div className="p-1 rounded-lg bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
-            <Flame size={14} className="fill-amber-400/20" />
-          </div>
+
           <div className="min-w-0 flex-1">
             <span className="text-[8px] font-black uppercase tracking-widest text-amber-400 block mb-0.5">
-              The Verdict
+              Roast
             </span>
             <p className="text-xs text-amber-100/90 font-medium italic leading-relaxed">
               "{gameMessage}"
@@ -144,20 +143,21 @@ export const ShareCard: React.FC<ShareCardProps> = ({
       )}
 
       {/* Center Emoji Grid Preview */}
-      <div className="flex flex-col items-center justify-center py-1">
-        <div className="flex flex-col gap-1 p-2 rounded-xl bg-black/40 border border-white/5 shadow-inner">
-          {emojiRows.map((row, rIdx) => (
-            <div key={rIdx} className="flex gap-1">
-              {row.map((cell, cIdx) => (
-                <div
-                  key={cIdx}
-                  className={`w-4 h-4 sm:w-5 sm:h-5 rounded-sm border ${cell.bg} flex items-center justify-center text-[9px] shadow-xs`}
-                />
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
+      {showGrid ?
+        <div className="flex flex-col items-center justify-center py-1">
+          <div className="flex flex-col gap-1 p-2 rounded-xl bg-black/40 border border-white/5 shadow-inner">
+            {emojiRows.map((row, rIdx) => (
+              <div key={rIdx} className="flex gap-1">
+                {row.map((cell, cIdx) => (
+                  <div
+                    key={cIdx}
+                    className={`w-4 h-4 sm:w-5 sm:h-5 rounded-sm border ${cell.bg} flex items-center justify-center text-[9px] shadow-xs`}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div> : null}
 
       {/* Prominent High-Visibility CTA Button */}
       <button

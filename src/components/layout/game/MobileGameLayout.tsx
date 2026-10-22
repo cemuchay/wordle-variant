@@ -40,6 +40,7 @@ interface MobileGameLayoutProps {
   onToggleBoardCollapse: () => void;
   onNavigate?: (item: 'play' | 'chat' | 'leaderboard' | 'challenges' | 'wordup') => void;
   onOpenFreePlay?: (mode: 'guest' | 'archive') => void;
+  onClose?: () => void;
   activeDailyMarathons?: any[];
   isMarathonLoading?: boolean;
   isMarathonError?: boolean;
@@ -84,6 +85,7 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({
   onToggleBoardCollapse,
   onNavigate,
   onOpenFreePlay,
+  onClose,
   activeDailyMarathons,
   isMarathonLoading,
   isMarathonError,
@@ -198,6 +200,8 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({
               isMarathonError={isMarathonError}
               setSelectedChallengeId={setSelectedChallengeId}
               setIsChallengeOpen={setIsChallengeOpen}
+              gameplayType={gameplayType}
+              onClose={onClose}
             />
           </div>
         </div>
