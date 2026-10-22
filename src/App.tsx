@@ -1236,7 +1236,12 @@ function MainApp() {
                     onHint={actions.handleHint}
                     usedHint={state.usedHint}
                     canShowHint={!preferences.disableHints}
-                    isHintLocked={state.guesses.length < 2}
+                    isHintLocked={
+                      (stableGuessesCount < 2 ||
+                        stableGuessesCount >= (config?.maxAttempts ?? MAX_ATTEMPTS) - 1 ||
+                        stableIsHintDisabled) &&
+                      !state.usedHint
+                    }
                     gameMessage={state.gameMessage}
                     targetWord={config?.word || ""}
                     onNavigate={handleNavigation}

@@ -19,6 +19,8 @@ interface PostGameHubProps {
   hintRecord?: { index: number; letter: string; row?: number } | null;
   onNavigate: (item: "play" | "chat" | "leaderboard" | "challenges" | "wordup") => void;
   onOpenFreePlay?: (mode: "guest" | "archive") => void;
+  gameplayType?: 'regular' | 'challenge' | 'archive' | 'guest';
+  onClose?: () => void;
   activeDailyMarathons?: any[];
   isMarathonLoading?: boolean;
   isMarathonError?: boolean;
@@ -37,6 +39,8 @@ export const PostGameHub: React.FC<PostGameHubProps> = ({
   hintRecord,
   onNavigate,
   onOpenFreePlay,
+  gameplayType = 'regular',
+  onClose,
   activeDailyMarathons = [],
   isMarathonLoading = false,
   isMarathonError = false,
@@ -44,6 +48,16 @@ export const PostGameHub: React.FC<PostGameHubProps> = ({
   setIsChallengeOpen,
 }) => {
   const { stats, profile } = useApp();
+  const isGuestMode = gameplayType === 'guest';
+  const effectiveWordLength = word ? word.length : (guesses[0]?.length || 5);
+
+  const handleReturnHome = () => {
+    if (onClose) {
+      onClose();
+    } else {
+      onNavigate('play');
+    }
+  };
 
   return (
     <motion.div
@@ -53,7 +67,7 @@ export const PostGameHub: React.FC<PostGameHubProps> = ({
       className="w-full mx-auto flex flex-col space-y-3 pb-0 md:pb-2 pt-1 px-1 text-white"
     >
       {/* Row 1: Share Victory Card & Word Trivia Side by Side on Desktop */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-stretch">
+      <div className={`grid gap-3 items-stretch ${isGuestMode ? 'grid-cols-1 max-w-xl mx-auto w-full' : 'grid-cols-1 md:grid-cols-2'}`}>
         <ShareCard
           date={date}
           guesses={guesses}
@@ -61,18 +75,21 @@ export const PostGameHub: React.FC<PostGameHubProps> = ({
           won={isWon}
           usedHint={usedHint}
           gameMessage={gameMessage}
-          wordLength={word.length}
+          wordLength={effectiveWordLength}
           hintRecord={hintRecord}
-          isAuthenticated={!!profile}
+          isAuthenticated={isGuestMode ? false : !!profile}
+          showGrid={false}
         />
 
-        <WordTriviaCard
-          word={word}
-          isWon={isWon}
-          attemptsCount={guesses.length}
-          maxAttempts={maxAttempts}
-          date={date}
-        />
+        {!isGuestMode && (
+          <WordTriviaCard
+            word={word}
+            isWon={isWon}
+            attemptsCount={guesses.length}
+            maxAttempts={maxAttempts}
+            date={date}
+          />
+        )}
       </div>
 
       {/* Row 2: Secondary Game Loops & Launchpads */}
@@ -81,6 +98,8 @@ export const PostGameHub: React.FC<PostGameHubProps> = ({
         onOpenGuestGame={() => onOpenFreePlay?.("guest")}
         onNavigateWordUp={() => onNavigate("wordup")}
         onNavigateChallenges={() => onNavigate("challenges")}
+        isGuestGame={isGuestMode}
+        onReturnHome={handleReturnHome}
         activeDailyMarathons={activeDailyMarathons}
         isMarathonLoading={isMarathonLoading}
         isMarathonError={isMarathonError}
@@ -88,18 +107,20 @@ export const PostGameHub: React.FC<PostGameHubProps> = ({
         setIsChallengeOpen={setIsChallengeOpen}
       />
 
-      {/* Row 3: Streak Milestones & Leaderboard Snapshot */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
-        <StreakMilestoneCard
-          stats={stats}
-          guesses={guesses}
-          isWon={isWon}
-        />
+      {/* Row 3: Streak Milestones & Leaderboard Snapshot (Hidden in guest mode) */}
+      {!isGuestMode && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
+          <StreakMilestoneCard
+            stats={stats}
+            guesses={guesses}
+            isWon={isWon}
+          />
 
-        <MiniLeaderboardSnapshot
-          onOpenLeaderboard={() => onNavigate("leaderboard")}
-        />
-      </div>
+          <MiniLeaderboardSnapshot
+            onOpenLeaderboard={() => onNavigate("leaderboard")}
+          />
+        </div>
+      )}
     </motion.div>
   );
 };
