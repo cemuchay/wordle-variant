@@ -103,6 +103,41 @@ export function getAllValidArchiveDates(): string[] {
 
 const ARCHIVE_DRAFT_PREFIX = 'wordle_archive_draft_';
 
+/**
+ * Finds the most recently saved pending/in-progress archive draft date, if any.
+ */
+export function getPendingArchiveDraftDate(): string | null {
+  try {
+    let latestDraftDate: string | null = null;
+    let latestTimestamp = 0;
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(ARCHIVE_DRAFT_PREFIX)) {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed.guesses) && parsed.guesses.length > 0 && parsed.date) {
+              const time = parsed.savedAt ? new Date(parsed.savedAt).getTime() : 0;
+              if (time >= latestTimestamp) {
+                latestTimestamp = time;
+                latestDraftDate = parsed.date;
+              }
+            }
+          } catch {
+            /* ignore invalid json */
+          }
+        }
+      }
+    }
+    return latestDraftDate;
+  } catch (err) {
+    console.warn('[archiveDb] getPendingArchiveDraftDate error:', err);
+    return null;
+  }
+}
+
 export function getArchiveDraft(date: string): string[] | null {
   try {
     const raw = localStorage.getItem(`${ARCHIVE_DRAFT_PREFIX}${date}`);

@@ -30,6 +30,8 @@ interface GameAreaProps {
     usedHint?: boolean;
     canShowHint?: boolean;
     isHintLocked?: boolean;
+    date?: string | null;
+    onClose?: () => void;
     gameMessage?: string;
     targetWord?: string;
     onNavigate?: (item: "play" | "chat" | "leaderboard" | "challenges" | "wordup") => void;
@@ -66,6 +68,8 @@ export const GameArea = ({
     isHintLocked,
     gameMessage,
     targetWord = '',
+    date: explicitDate,
+    onClose,
     onNavigate,
     onOpenFreePlay,
     activeDailyMarathons = [],
@@ -74,7 +78,8 @@ export const GameArea = ({
     setSelectedChallengeId,
     setIsChallengeOpen,
 }: GameAreaProps) => {
-    const { preferences, date } = useApp();
+    const { preferences, date: contextDate } = useApp();
+    const effectiveDate = explicitDate || contextDate || new Date().toISOString().split('T')[0];
     const { isDesktop } = useIsResponsive();
     const [gridDimensions, setGridDimensions] = useState({ maxWidth: 320, maxHeight: 400 });
     const containerRef = useRef<HTMLDivElement>(null);
@@ -216,7 +221,8 @@ export const GameArea = ({
         isBoardCollapsed,
         gridDimensions,
         showHelp,
-        date: date || new Date().toISOString().split('T')[0],
+        date: effectiveDate,
+        onClose,
         onChar,
         onDelete,
         onClearRow,

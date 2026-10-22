@@ -40,6 +40,7 @@ interface DesktopGameLayoutProps {
   onToggleBoardCollapse: () => void;
   onNavigate?: (item: 'play' | 'chat' | 'leaderboard' | 'challenges' | 'wordup') => void;
   onOpenFreePlay?: (mode: 'guest' | 'archive') => void;
+  onClose?: () => void;
   activeDailyMarathons?: any[];
   isMarathonLoading?: boolean;
   isMarathonError?: boolean;
@@ -84,6 +85,7 @@ export const DesktopGameLayout: React.FC<DesktopGameLayoutProps> = ({
   onToggleBoardCollapse,
   onNavigate,
   onOpenFreePlay,
+  onClose,
   activeDailyMarathons,
   isMarathonLoading,
   isMarathonError,
@@ -223,6 +225,8 @@ export const DesktopGameLayout: React.FC<DesktopGameLayoutProps> = ({
               isMarathonError={isMarathonError}
               setSelectedChallengeId={setSelectedChallengeId}
               setIsChallengeOpen={setIsChallengeOpen}
+              gameplayType={gameplayType}
+              onClose={onClose}
             />
           </div>
         </div>
