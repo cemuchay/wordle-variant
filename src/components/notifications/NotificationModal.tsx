@@ -337,34 +337,24 @@ export const NotificationModal = memo(() => {
         const unread = notifications.filter(n => !n.is_read).map(n => n.id);
         return new Set(unread);
     });
-    const [hasAutoMarked, setHasAutoMarked] = useState(false);
 
-    // Synchronize session unread tracking when modal opens
+    // Synchronize session unread tracking when modal opens, deferring backend markAllAsRead
     useEffect(() => {
-        if (isNotificationsOpen) {
-            const unread = notifications.filter(n => !n.is_read).map(n => n.id);
-            if (unread.length > 0) {
-                setSessionNewIds(new Set(unread));
-                markAllAsRead();
-            }
-            setHasAutoMarked(true);
-        } else {
+        if (!isNotificationsOpen) {
             setSessionNewIds(new Set());
-            setHasAutoMarked(false);
+            return;
         }
-    }, [isNotificationsOpen]); // Only run on modal open / close
 
-    // Fallback if notifications finished loading after modal was already open
-    useEffect(() => {
-        if (isNotificationsOpen && !isLoading && notifications.length > 0 && !hasAutoMarked) {
-            const unread = notifications.filter(n => !n.is_read).map(n => n.id);
-            if (unread.length > 0) {
-                setSessionNewIds(new Set(unread));
+        const unread = notifications.filter(n => !n.is_read).map(n => n.id);
+        if (unread.length > 0) {
+            setSessionNewIds(new Set(unread));
+            // Defer markAllAsRead so opening animation & UI paints with zero frame drops
+            const timer = setTimeout(() => {
                 markAllAsRead();
-            }
-            setHasAutoMarked(true);
+            }, 300);
+            return () => clearTimeout(timer);
         }
-    }, [isNotificationsOpen, isLoading, notifications, hasAutoMarked, markAllAsRead]);
+    }, [isNotificationsOpen, notifications.length === 0]); // Re-check if initial load was empty
 
     const handleNotificationClick = useCallback((n: AppNotification) => {
         if (!n.is_read) {
