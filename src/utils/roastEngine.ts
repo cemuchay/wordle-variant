@@ -311,15 +311,19 @@ export function generateRoast(
 
       // SCENARIO B: Hint Usage (Mild vs. Brutal Paths)
       if (usedHint) {
-         const hintRow = hintRecord?.row ?? Math.max(1, attempts - 2);
-         const knownBeforeHint = getKnownLettersCountUpTo(guesses, hintRow);
+         // hintRecord.row can be 1-based (row: 1) or 0-based (guesses.length)
+         // Normalize: if hintRecord.row is 0, it means before guess 1 (row 1).
+         // If hintRecord.row is > 0, it represents the row after which hint was taken.
+         const rawRow = hintRecord?.row ?? Math.max(1, attempts - 2);
+         const displayRow = rawRow <= 0 ? 1 : rawRow;
+         const knownBeforeHint = getKnownLettersCountUpTo(guesses, rawRow);
 
-         // Brutal path: Hint taken early (row 1 or 2) OR when 3+ letters were already revealed on the board!
-         const isBrutalHint = hintRow <= 2 || knownBeforeHint >= 3;
+         // Brutal path: Hint taken early (on or before row 2) OR when 3+ letters were already revealed on the board!
+         const isBrutalHint = displayRow <= 2 || knownBeforeHint >= 3;
 
          if (isBrutalHint) {
             const brutalHintRoasts = [
-               `You asked for a hint on row ${hintRow + 1}? Omo, at least pretend to struggle first. 😭`,
+               `You asked for a hint on row ${displayRow}? Omo, at least pretend to struggle first. 😭`,
                `You barely warmed up and already called for backup. Is everything okay at home?`,
                `A hint this early? You came to play varian twith absolutely no intention of doing variant.`,
                `You saw the puzzle and immediately started looking for the oga. 😂`,
@@ -327,7 +331,7 @@ export function generateRoast(
                `You used a hint with ${knownBeforeHint} letters already revealed? My guy, what exactly are we doing here?`,
                `Omo, you didn't even give your brain a chance to load. Straight to the hint button.`,
                `You asked for help so early, even the answer is wondering what it did to deserve this.`,
-               `Row ${hintRow + 1} and you're already calling for reinforcements. This is not a group project, abeg.`,
+               `Row ${displayRow} and you're already calling for reinforcements. This is not a group project, abeg.`,
                `You treat the hint button like it's part of the tutorial. Nobody told you to press everything you see!`,
                `You didn't come to solve the puzzle. You came to supervise the hint system.`,
                `Ah ah! At least greet the puzzle before asking it for assistance.`,
