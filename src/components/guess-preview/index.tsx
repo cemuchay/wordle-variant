@@ -548,7 +548,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
     const isLost = gameData.guesses.length >= MAX_ATTEMPTS;
     const isEntryCompleted = entry?.status === "won" || entry?.status === "lost" || entry?.status === "completed" || entry?.status === "timed_out";
     return isWon || isLost || isEntryCompleted;
-  }, [gameData?.guesses, entry?.status]);
+  }, [gameData, entry]);
 
   const isOwnEntry = profile?.id === entry.user_id || (!profile && !!entry.guest_id);
   const username = entry.username || entry.profiles?.username || "Player";
@@ -686,7 +686,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
           >
             <span>←</span>
             <span className="hidden sm:inline font-mono">#{initialIndex}</span>
-            <span className="max-w-[80px] truncate">{prevEntry ? formatUsername(prevEntry.username) : "Prev"}</span>
+            <span className="max-w-20 truncate">{prevEntry ? formatUsername(prevEntry.username) : "Prev"}</span>
           </button>
 
           <div className="flex items-center gap-1 text-[11px] font-black text-amber-400 font-mono">
@@ -703,7 +703,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
               }`}
             title={nextEntry ? `Next: ${formatUsername(nextEntry.username)}` : "No next player"}
           >
-            <span className="max-w-[80px] truncate">{nextEntry ? formatUsername(nextEntry.username) : "Next"}</span>
+            <span className="max-w-20 truncate">{nextEntry ? formatUsername(nextEntry.username) : "Next"}</span>
             <span className="hidden sm:inline font-mono">#{initialIndex + 2}</span>
             <span>→</span>
           </button>

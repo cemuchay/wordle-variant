@@ -101,6 +101,7 @@ export const SocialStatsModal: React.FC<Props> = ({
     status?: "won" | "lost" | "playing";
     attempts?: number | "X";
     wordLength?: number;
+    hintRecord?: { letter: string; index: number; row?: number } | null;
   } | null>(null);
 
   const { date: currentDate, triggerToast } = useApp();
@@ -579,13 +580,12 @@ export const SocialStatsModal: React.FC<Props> = ({
         {/* Modal Top Header */}
         <div className="flex items-center justify-between mb-3 shrink-0 px-1 relative">
           <div className="flex items-center gap-2">
-            <Trophy size={18} className="text-amber-400" />
-            <h2 className="text-lg font-black uppercase tracking-tight text-gray-100">
+            <h2 className="text-lg text-center font-black uppercase tracking-tight text-gray-100">
               {activeTab === "leaderboard"
                 ? supportsFeed && viewMode === "newsfeed"
                   ? "Live Activity Feed"
                   : supportsFeed && viewMode === "feed"
-                    ? "Social Feed & Leaderboard"
+                    ? "Leaderboard"
                     : "Leaderboard"
                 : "Your Stats"}
             </h2>
@@ -954,6 +954,7 @@ export const SocialStatsModal: React.FC<Props> = ({
             status={activeCommentDrawer.status}
             attempts={activeCommentDrawer.attempts}
             wordLength={activeCommentDrawer.wordLength}
+            hintRecord={activeCommentDrawer.hintRecord}
           />
         )}
       </div>

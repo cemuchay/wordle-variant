@@ -471,7 +471,7 @@ export const UnifiedLobby = ({
                      )}
 
                      {/* Featured Topics */}
-                     {featuredCategories.length > 0 && (
+                     {/* {featuredCategories.length > 0 && (
                         <div className="space-y-2">
                            <p className="text-[12px] font-black uppercase tracking-wider text-[#E85151]">Featured Topics</p>
                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
@@ -499,7 +499,7 @@ export const UnifiedLobby = ({
                               })}
                            </div>
                         </div>
-                     )}
+                     )} */}
 
                      {/* Activity Feed */}
                      <ActivityFeed

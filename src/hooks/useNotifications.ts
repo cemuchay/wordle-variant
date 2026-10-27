@@ -104,8 +104,19 @@ export const useNotifications = (userId: string | undefined, options: { enableRe
                 .eq('id', id);
             if (error) throw error;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
+        onMutate: async (id: string) => {
+            if (!userId) return;
+            await queryClient.cancelQueries({ queryKey: ['notifications', userId] });
+            const previous = queryClient.getQueryData<AppNotification[]>(['notifications', userId]);
+            queryClient.setQueryData<AppNotification[]>(['notifications', userId], (old = []) =>
+                old.map(n => (n.id === id ? { ...n, is_read: true } : n))
+            );
+            return { previous };
+        },
+        onError: (_err, _id, context) => {
+            if (userId && context?.previous) {
+                queryClient.setQueryData(['notifications', userId], context.previous);
+            }
         }
     });
 
@@ -117,8 +128,19 @@ export const useNotifications = (userId: string | undefined, options: { enableRe
                 .eq('id', id);
             if (error) throw error;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
+        onMutate: async (id: string) => {
+            if (!userId) return;
+            await queryClient.cancelQueries({ queryKey: ['notifications', userId] });
+            const previous = queryClient.getQueryData<AppNotification[]>(['notifications', userId]);
+            queryClient.setQueryData<AppNotification[]>(['notifications', userId], (old = []) =>
+                old.map(n => (n.id === id ? { ...n, is_read: false } : n))
+            );
+            return { previous };
+        },
+        onError: (_err, _id, context) => {
+            if (userId && context?.previous) {
+                queryClient.setQueryData(['notifications', userId], context.previous);
+            }
         }
     });
 
@@ -132,8 +154,19 @@ export const useNotifications = (userId: string | undefined, options: { enableRe
                 .eq('is_read', false);
             if (error) throw error;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
+        onMutate: async () => {
+            if (!userId) return;
+            await queryClient.cancelQueries({ queryKey: ['notifications', userId] });
+            const previous = queryClient.getQueryData<AppNotification[]>(['notifications', userId]);
+            queryClient.setQueryData<AppNotification[]>(['notifications', userId], (old = []) =>
+                old.map(n => ({ ...n, is_read: true }))
+            );
+            return { previous };
+        },
+        onError: (_err, _vars, context) => {
+            if (userId && context?.previous) {
+                queryClient.setQueryData(['notifications', userId], context.previous);
+            }
         }
     });
 
@@ -145,8 +178,19 @@ export const useNotifications = (userId: string | undefined, options: { enableRe
                 .eq('id', id);
             if (error) throw error;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
+        onMutate: async (id: string) => {
+            if (!userId) return;
+            await queryClient.cancelQueries({ queryKey: ['notifications', userId] });
+            const previous = queryClient.getQueryData<AppNotification[]>(['notifications', userId]);
+            queryClient.setQueryData<AppNotification[]>(['notifications', userId], (old = []) =>
+                old.filter(n => n.id !== id)
+            );
+            return { previous };
+        },
+        onError: (_err, _id, context) => {
+            if (userId && context?.previous) {
+                queryClient.setQueryData(['notifications', userId], context.previous);
+            }
         }
     });
 

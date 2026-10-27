@@ -1,15 +1,36 @@
-import { memo } from 'react';
+import { memo, useEffect } from 'react';
 import { Bell } from 'lucide-react';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useApp } from '../../context/AppContext';
+
+// Preload the NotificationModal component bundle
+const preloadNotificationModal = () => {
+    import('./NotificationModal');
+};
 
 export const NotificationBell = memo(() => {
     const { profile, setIsNotificationsOpen } = useApp();
     const { unreadCount } = useNotifications(profile?.id, { enableRealtime: false });
 
+    // Preload when idle so opening is instant
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            if ('requestIdleCallback' in window) {
+                const handle = (window as any).requestIdleCallback(preloadNotificationModal, { timeout: 3000 });
+                return () => (window as any).cancelIdleCallback?.(handle);
+            } else {
+                const timer = setTimeout(preloadNotificationModal, 1500);
+                return () => clearTimeout(timer);
+            }
+        }
+    }, []);
+
     return (
         <button
             onClick={() => setIsNotificationsOpen(true)}
+            onMouseEnter={preloadNotificationModal}
+            onTouchStart={preloadNotificationModal}
+            onFocus={preloadNotificationModal}
             className="relative p-2 hover:bg-white/5 rounded-xl transition-all group"
             aria-label="Notifications"
         >

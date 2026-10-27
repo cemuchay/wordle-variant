@@ -1,14 +1,15 @@
-import React, { memo, useState, useEffect, useCallback, useRef } from 'react';
-import type { GuessResult } from '../types/game';
-import { HelpCircle, X, Calendar, Sparkles, ChevronRight, Share2, Check, Loader2, Lightbulb, Maximize2, Minimize2, RotateCcw } from 'lucide-react';
-import { ANIMATION_DURATION } from '../constants/ui';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { Check, ChevronRight, HelpCircle, Lightbulb, Loader2, Maximize2, Minimize2, RotateCcw, Share2, X } from 'lucide-react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { LAYOUT } from '../constants/game';
-import returnAnimationTime from '../utils/returnAnimationTime';
-import { useIsResponsive } from '../hooks/useResponsive';
-import { useAppStore } from '../store/useAppStore';
+import { ANIMATION_DURATION } from '../constants/ui';
 import { useApp } from '../context/AppContext';
-import { StreakCounter } from './StreakCounter';
+import { useIsResponsive } from '../hooks/useResponsive';
 import { generateShareText } from '../lib/share';
+import { useAppStore } from '../store/useAppStore';
+import type { GuessResult } from '../types/game';
+import returnAnimationTime from '../utils/returnAnimationTime';
+import { StreakCounter } from './StreakCounter';
 
 interface CellProps {
   letter: string;
@@ -112,6 +113,7 @@ interface NewGridProps {
   onToggleRules?: () => void;
   showRules?: boolean;
   onOpenArchive?: () => void;
+  onOpenGuestGame?: () => void;
   onOpenDailyEvent?: () => void;
   onHint?: () => void;
   usedHint?: boolean;
@@ -144,6 +146,7 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
   onToggleRules,
   showRules,
   onOpenArchive,
+  onOpenGuestGame,
   onOpenDailyEvent,
   onHint,
   usedHint,
@@ -466,7 +469,7 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
               disabled={!currentGuess || currentGuess.length === 0}
               className={`shrink-0 w-full px-2 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg transition-all flex items-center justify-center gap-1 shadow-xs cursor-pointer active:scale-95 ${!currentGuess || currentGuess.length === 0
                 ? 'bg-white/5 text-gray-500 border border-white/5 opacity-40 cursor-not-allowed pointer-events-none'
-                : 'bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 hover:text-rose-200 border border-rose-500/30'
+                : 'bg-rose-500/15 hover:bg-rose-500/25 text-white'
                 }`}
               title="Clear current typed guess row"
             >
@@ -548,10 +551,9 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
                 window.dispatchEvent(new CustomEvent('open-free-play', { detail: { mode: 'archive' } }));
               }
             }}
-            className="shrink-0 w-full px-2 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-indigo-200 border border-indigo-500/25 transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 shadow-xs"
+            className="shrink-0 w-full px-2 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-white border border-indigo-500/25 transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 shadow-xs"
             title="Variant Archive"
           >
-            <Calendar size={12} className="text-indigo-400 shrink-0" />
             <span className="truncate">archive</span>
             <ChevronRight size={13} className="opacity-80 shrink-0" />
           </button>
@@ -567,14 +569,33 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
                 window.dispatchEvent(new CustomEvent('open-challenges'));
               }
             }}
-            className="shrink-0 w-full px-2 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 hover:text-emerald-200 border border-emerald-500/25 transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 shadow-xs"
+            className="shrink-0 w-full px-2 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-white border border-emerald-500/25 transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 shadow-xs"
             title="Daily Event / Bot Event"
           >
-            <Sparkles size={12} className="text-emerald-400 shrink-0" />
             <span className="truncate">daily event</span>
             <ChevronRight size={13} className="opacity-80 shrink-0" />
           </button>
         );
+
+        navItems.push(
+          <button
+            key="btn-archive"
+            onClick={() => {
+              if (onOpenGuestGame) {
+                onOpenGuestGame();
+              } else {
+                window.dispatchEvent(new CustomEvent('open-free-play', { detail: { mode: 'guest' } }));
+              }
+            }}
+            className="shrink-0 w-full px-2 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg bg-pink-500/10 hover:bg-pink-500/20 text-white border border-pink-500/25 transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 shadow-xs"
+            title="guest game"
+
+          >
+            <span className="truncate">guest game</span>
+            <ChevronRight size={13} className="opacity-80 shrink-0" />
+          </button>
+        );
+
 
         // Group into slides of 3 items each
         const itemsPerSlide = 3;
