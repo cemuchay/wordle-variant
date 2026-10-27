@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { MessageCircle, Eye, User, X } from "lucide-react";
 import { ProtectedAvatar } from "../chat/ProtectedAvatar";
 import { ReigningBadge } from "../common/ReigningBadge";
@@ -49,27 +49,28 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
   const [topComment, setTopComment] = useState<{ content: string; author_username?: string } | null>(null);
   const [commentsCount, setCommentsCount] = useState(0);
   const [isCommentDrawerOpen, setIsCommentDrawerOpen] = useState(false);
-  const [playerGuesses, setPlayerGuesses] = useState<any[]>((entry as any).guesses || []);
-  const [hintRecord, setHintRecord] = useState<{ letter: string; index: number; row?: number } | null>(
-    (entry as any).hint_record || null
-  );
+  const [fetchedGuesses, setFetchedGuesses] = useState<any[] | null>(null);
+  const [fetchedHintRecord, setFetchedHintRecord] = useState<{ letter: string; index: number; row?: number } | null | undefined>(undefined);
+  const [fetchedGameMessage, setFetchedGameMessage] = useState<string | null | undefined>(undefined);
 
-  useEffect(() => {
-    if ((entry as any).guesses && (entry as any).guesses.length > 0) {
-      setPlayerGuesses((entry as any).guesses);
-    }
-    if ((entry as any).hint_record) {
-      setHintRecord((entry as any).hint_record);
-    }
-  }, [entry]);
+  const playerGuesses = useMemo(() => {
+    return fetchedGuesses ?? (entry as any).guesses ?? [];
+  }, [fetchedGuesses, entry]);
+
+  const hintRecord = useMemo(() => {
+    return fetchedHintRecord !== undefined ? fetchedHintRecord : ((entry as any).hint_record || null);
+  }, [fetchedHintRecord, entry]);
+
+  const gameMessage = useMemo(() => {
+    return fetchedGameMessage !== undefined ? fetchedGameMessage : ((entry as any).game_message || null);
+  }, [fetchedGameMessage, entry]);
 
   const targetUserId = entry.user_id;
   const attempts = entry.status === "lost" ? "X" : entry.attempts;
   const isFirst = rank === 1;
   const isPlaying = entry.status === "playing";
 
-  // Load reactions & top comment
-  const loadSocialData = async () => {
+  const loadSocialData = useCallback(async () => {
     if (!targetUserId || !gameDate) return;
 
     try {
@@ -112,7 +113,6 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
 
       if (cmRes.data && cmRes.data.length > 0) {
         const first = cmRes.data[0];
-        // Fetch author profile
         const { data: p } = await supabase
           .from("profiles")
           .select("username")
@@ -126,7 +126,6 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
         setTopComment(null);
       }
 
-      // Fetch count
       const { count } = await supabase
         .from("guess_comments")
         .select("id", { count: "exact", head: true })
@@ -135,29 +134,31 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
 
       if (count !== null) setCommentsCount(count);
 
-      // Fetch actual guesses and hint_record if allowed
       if (canViewGuesses) {
         const { data: scoreData } = await supabase
           .from("scores")
-          .select("guesses, hint_record, hints_used")
+          .select("guesses, hint_record, hints_used, game_message")
           .eq("user_id", targetUserId)
           .eq("game_date", gameDate)
           .maybeSingle();
 
         if (scoreData?.guesses && Array.isArray(scoreData.guesses) && scoreData.guesses.length > 0) {
-          setPlayerGuesses(scoreData.guesses);
+          setFetchedGuesses(scoreData.guesses);
         }
         if (scoreData?.hint_record !== undefined) {
-          setHintRecord(scoreData.hint_record);
+          setFetchedHintRecord(scoreData.hint_record);
+        }
+        if (scoreData?.game_message) {
+          setFetchedGameMessage(scoreData.game_message);
         }
       }
     } catch (err) {
       console.error("Error loading feed card social data:", err);
     }
-  };
+  }, [targetUserId, gameDate, canViewGuesses]);
 
   useEffect(() => {
-    loadSocialData();
+    void loadSocialData();
 
     if (!targetUserId || !gameDate) return;
 
@@ -166,43 +167,59 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "guess_reactions", filter: `target_user_id=eq.${targetUserId}` },
-        () => loadSocialData()
+        () => {
+          void loadSocialData();
+        }
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "guess_comments", filter: `target_user_id=eq.${targetUserId}` },
-        () => loadSocialData()
+        () => {
+          void loadSocialData();
+        }
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetUserId, gameDate]);
+  }, [targetUserId, gameDate, loadSocialData]);
 
-  // Handle 1-tap reaction
+  // Handle 1-tap reaction (enforces exactly 1 reaction per user)
   const handleToggleReaction = async (emoji: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!currentUser || !targetUserId || !gameDate) return;
 
-    const existingIndex = reactions.findIndex(
+    const existingReaction = reactions.find(
       (r) => r.user_id === currentUser.id && r.reaction === emoji
     );
 
-    if (existingIndex >= 0) {
-      // Optimistic remove
-      setReactions((prev) => prev.filter((_, idx) => idx !== existingIndex));
+    if (existingReaction) {
+      // Toggle off current reaction
+      setReactions((prev) =>
+        prev.filter((r) => !(r.user_id === currentUser.id && r.reaction === emoji))
+      );
       await supabase
         .from("guess_reactions")
         .delete()
         .eq("target_user_id", targetUserId)
         .eq("user_id", currentUser.id)
-        .eq("game_date", gameDate)
-        .eq("reaction", emoji);
+        .eq("game_date", gameDate);
     } else {
-      // Optimistic add
-      setReactions((prev) => [...prev, { reaction: emoji, user_id: currentUser.id }]);
+      // Replace any existing reaction for this user with the new emoji
+      setReactions((prev) => [
+        ...prev.filter((r) => r.user_id !== currentUser.id),
+        { reaction: emoji, user_id: currentUser.id },
+      ]);
+
+      // Remove any prior reaction in DB for this user on this card, then insert new one
+      await supabase
+        .from("guess_reactions")
+        .delete()
+        .eq("target_user_id", targetUserId)
+        .eq("user_id", currentUser.id)
+        .eq("game_date", gameDate);
+
       await supabase.from("guess_reactions").insert({
         target_user_id: targetUserId,
         user_id: currentUser.id,
@@ -326,7 +343,7 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
               </span>
               {isFirst && !isPlaying && (
                 <span
-                  className="absolute -top-[1.925rem] left-[2.5rem] sm:left-[2.35rem] sm:-top-[1.925rem] text-2xl sm:text-2xl select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] filter brightness-110 font-bold"
+                  className="absolute top-[-1.925rem] left-10 sm:left-[2.35rem] sm:top-[-1.925rem] text-2xl sm:text-2xl select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] filter brightness-110 font-bold"
                   role="img"
                   aria-label="crown"
                 >
@@ -335,7 +352,7 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
               )}
               {/* Rank Movement Indicator / NEW Tag */}
               {movement?.isNew ? (
-                <span className="text-[8px] font-black uppercase tracking-tight bg-gradient-to-r from-amber-400 to-orange-500 text-black px-1 rounded-sm shadow-xs mt-0.5 animate-in fade-in">
+                <span className="text-[8px] font-black uppercase tracking-tight bg-linear-to-r from-amber-400 to-orange-500 text-black px-1 rounded-sm shadow-xs mt-0.5 animate-in fade-in">
                   NEW
                 </span>
               ) : movement?.delta !== undefined && movement.delta !== 0 ? (
@@ -364,7 +381,7 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
             <div>
               <div className="flex items-center gap-1.5">
                 <span
-                  className={`text-xs sm:text-sm font-black tracking-tight truncate max-w-[130px] sm:max-w-[180px] ${isPlaying
+                  className={`text-xs sm:text-sm font-black tracking-tight truncate max-w-32.5 sm:max-w-45 ${isPlaying
                     ? "text-cyan-200"
                     : isFirst
                       ? "text-yellow-200"
@@ -507,6 +524,26 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
           </div>
         )}
 
+        {/* Fallback Roast Preview Bubble - shown when no comment exists yet */}
+        {canViewGuesses && !topComment && gameMessage && (
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenPreview(entry, true);
+            }}
+            className="mt-2.5 bg-linear-to-r from-amber-500/10 via-purple-500/10 to-transparent border border-amber-500/20 hover:border-amber-500/40 rounded-xl px-3 py-1.5 flex items-center gap-2 text-xs text-amber-200/90 transition-all cursor-pointer group"
+            title="Click to view full roast and game analysis"
+          >
+            <span className="text-xs shrink-0 select-none">🔥</span>
+            <p className="text-[11px] truncate flex-1 font-medium leading-relaxed">
+              <span className="font-bold text-amber-400 mr-1.5 uppercase text-[9px] tracking-wider">
+                Roast:
+              </span>
+              <span className="italic opacity-90">"{gameMessage}"</span>
+            </p>
+          </div>
+        )}
+
         {/* Action Buttons - Only show for completed games */}
         {!isPlaying && (
           <div className="mt-3 pt-2.5 border-t border-white/5 grid grid-cols-2 gap-2">
@@ -558,7 +595,7 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
             e.stopPropagation();
             setShowReactionsViewer(false);
           }}
-          className="fixed inset-0 bg-black/80 z-[250] flex items-center justify-center p-4 animate-in fade-in duration-150 cursor-default"
+          className="fixed inset-0 bg-black/80 z-250 flex items-center justify-center p-4 animate-in fade-in duration-150 cursor-default"
         >
           <div
             onClick={(e) => e.stopPropagation()}
