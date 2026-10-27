@@ -18,6 +18,7 @@ interface FeedCommentDrawerProps {
   status?: "won" | "lost" | "playing";
   attempts?: number | "X";
   wordLength?: number;
+  hintRecord?: { letter: string; index: number; row?: number } | null;
   onCommentAdded?: () => void;
 }
 
@@ -58,6 +59,7 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
   status = "won",
   attempts = 6,
   wordLength = 5,
+  hintRecord: initialHintRecord = null,
   onCommentAdded,
 }) => {
   const { user: currentUser } = useAuth();
@@ -71,6 +73,15 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
   const [taggedRow, setTaggedRow] = useState<number | null>(null);
   const [replyTo, setReplyTo] = useState<CommentItem | null>(null);
   const [fetchedGuesses, setFetchedGuesses] = useState<any[]>(rawGuesses);
+  const [activeHintRecord, setActiveHintRecord] = useState<{ letter: string; index: number; row?: number } | null>(
+    initialHintRecord
+  );
+
+  useEffect(() => {
+    if (initialHintRecord) {
+      setActiveHintRecord(initialHintRecord);
+    }
+  }, [initialHintRecord]);
   
   // Hold-to-react & Reaction Picker state
   const [activeReactionPickerCommentId, setActiveReactionPickerCommentId] = useState<string | null>(null);
@@ -141,7 +152,7 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
         promises.push(
           supabase
             .from("scores")
-            .select("guesses")
+            .select("guesses, hint_record")
             .eq("user_id", targetUserId)
             .eq("game_date", gameDate)
             .maybeSingle()
@@ -152,6 +163,9 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
 
       if (scoreRes?.data?.guesses && Array.isArray(scoreRes.data.guesses)) {
         setFetchedGuesses(scoreRes.data.guesses);
+      }
+      if (scoreRes?.data?.hint_record) {
+        setActiveHintRecord(scoreRes.data.hint_record);
       }
 
       const data = commentsRes.data;
@@ -887,16 +901,27 @@ export const FeedCommentDrawer: React.FC<FeedCommentDrawerProps> = ({
                     <div className="flex gap-1">
                       {row.map((cell: any, cIdx: number) => {
                         const status = cell.status;
+                        const hintStartRow = activeHintRecord?.row !== undefined ? activeHintRecord.row - 1 : null;
+                        const isHintedCell =
+                          activeHintRecord !== null &&
+                          cIdx === activeHintRecord.index &&
+                          (hintStartRow === null || rIdx > hintStartRow);
+
                         const bgClass =
                           status === "correct"
                             ? "bg-emerald-500 text-white"
                             : status === "present"
                               ? "bg-amber-400 text-black"
                               : "bg-gray-700 text-white";
+
+                        const borderClass = isHintedCell
+                          ? "border border-yellow-500/80 ring-1 ring-yellow-400/50 shadow-[0_0_8px_rgba(234,179,8,0.35)]"
+                          : "border border-transparent";
+
                         return (
                           <span
                             key={cIdx}
-                            className={`w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-xs shadow-xs ${bgClass} flex items-center justify-center font-black uppercase text-[9px] sm:text-[10px] select-none transition-all ${
+                            className={`w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-xs shadow-xs ${bgClass} ${borderClass} flex items-center justify-center font-black uppercase text-[9px] sm:text-[10px] select-none transition-all ${
                               hideGridWords ? "blur-[2px] opacity-40 select-none text-transparent" : ""
                             }`}
                           >

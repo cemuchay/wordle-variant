@@ -101,6 +101,7 @@ export const SocialStatsModal: React.FC<Props> = ({
     status?: "won" | "lost" | "playing";
     attempts?: number | "X";
     wordLength?: number;
+    hintRecord?: { letter: string; index: number; row?: number } | null;
   } | null>(null);
 
   const { date: currentDate, triggerToast } = useApp();
@@ -954,6 +955,7 @@ export const SocialStatsModal: React.FC<Props> = ({
             status={activeCommentDrawer.status}
             attempts={activeCommentDrawer.attempts}
             wordLength={activeCommentDrawer.wordLength}
+            hintRecord={activeCommentDrawer.hintRecord}
           />
         )}
       </div>

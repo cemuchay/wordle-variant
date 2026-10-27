@@ -50,10 +50,16 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
   const [commentsCount, setCommentsCount] = useState(0);
   const [isCommentDrawerOpen, setIsCommentDrawerOpen] = useState(false);
   const [playerGuesses, setPlayerGuesses] = useState<any[]>((entry as any).guesses || []);
+  const [hintRecord, setHintRecord] = useState<{ letter: string; index: number; row?: number } | null>(
+    (entry as any).hint_record || null
+  );
 
   useEffect(() => {
     if ((entry as any).guesses && (entry as any).guesses.length > 0) {
       setPlayerGuesses((entry as any).guesses);
+    }
+    if ((entry as any).hint_record) {
+      setHintRecord((entry as any).hint_record);
     }
   }, [entry]);
 
@@ -129,17 +135,20 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
 
       if (count !== null) setCommentsCount(count);
 
-      // Fetch actual guesses if allowed and not already populated
-      if (canViewGuesses && (!playerGuesses || playerGuesses.length === 0)) {
+      // Fetch actual guesses and hint_record if allowed
+      if (canViewGuesses) {
         const { data: scoreData } = await supabase
           .from("scores")
-          .select("guesses")
+          .select("guesses, hint_record, hints_used")
           .eq("user_id", targetUserId)
           .eq("game_date", gameDate)
           .maybeSingle();
 
         if (scoreData?.guesses && Array.isArray(scoreData.guesses) && scoreData.guesses.length > 0) {
           setPlayerGuesses(scoreData.guesses);
+        }
+        if (scoreData?.hint_record !== undefined) {
+          setHintRecord(scoreData.hint_record);
         }
       }
     } catch (err) {
@@ -213,6 +222,8 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
         ? Math.max(entry.attempts, entry.status === "playing" ? 1 : 0)
         : rawGuesses.length || (entry.status === "playing" ? 1 : 4);
 
+    const hintStartRow = hintRecord?.row !== undefined ? hintRecord.row - 1 : null;
+
     if (!canViewGuesses) {
       // Masked spoiler preview (squares with blurred mystery colors)
       return Array.from({ length: Math.min(guessCount, 6) }).map((_, rIdx) => (
@@ -232,16 +243,26 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
         <div key={rIdx} className="flex gap-1 justify-center">
           {row.map((cell: any, cIdx: number) => {
             const status = cell.status;
+            const isHintedCell =
+              hintRecord !== null &&
+              cIdx === hintRecord.index &&
+              (hintStartRow === null || rIdx > hintStartRow);
+
             const bgClass =
               status === "correct"
                 ? "bg-emerald-500 text-white"
                 : status === "present"
                   ? "bg-amber-400 text-black"
                   : "bg-gray-700 text-white";
+
+            const borderClass = isHintedCell
+              ? "ring-2 ring-yellow-400 border border-yellow-300 shadow-[0_0_10px_rgba(250,204,21,0.6)]"
+              : "border border-transparent";
+
             return (
               <span
                 key={cIdx}
-                className={`w-4 h-4 sm:w-5 sm:h-5 rounded-xs shadow-xs ${bgClass} flex items-center justify-center font-black uppercase text-[9px] sm:text-[10px] select-none transition-all ${hideGridWords ? "blur-[2px] opacity-40 select-none text-transparent" : ""
+                className={`w-4 h-4 sm:w-5 sm:h-5 rounded-xs shadow-xs ${bgClass} ${borderClass} flex items-center justify-center font-black uppercase text-[9px] sm:text-[10px] select-none transition-all ${hideGridWords ? "blur-[2px] opacity-40 select-none text-transparent" : ""
                   }`}
               >
                 {!hideGridWords ? cell.letter || "" : ""}
@@ -271,7 +292,7 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
         </div>
       );
     });
-  }, [entry, canViewGuesses, playerGuesses, hideGridWords]);
+  }, [entry, canViewGuesses, playerGuesses, hideGridWords, hintRecord]);
 
   return (
     <>

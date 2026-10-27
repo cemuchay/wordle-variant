@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Award, ArrowLeft, Home, Loader2 } from "lucide-react";
@@ -182,12 +183,12 @@ export const GameOverView = ({
             >
                Play Again
             </button>
-            <button
+            {/* <button
                onClick={() => setView("playbot")}
                className="bg-white/10 hover:bg-white/15 text-white font-black uppercase py-4 px-2 rounded-xl flex items-center justify-center gap-2 tracking-widest shadow-lg cursor-pointer hover:scale-102 active:scale-98 transition-all border border-white/10"
             >
                <span>Play vs Bot</span>
-            </button>
+            </button> */}
          </div>
          <div className="grid grid-cols-2 gap-3">
             <button

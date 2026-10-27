@@ -212,6 +212,16 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
   const highlightedRowIndex = activity.payload?.highlighted_row_index ?? null;
   const wordLen = activity.metadata?.word_length || 5;
 
+  const activityHintRecord = useMemo(() => {
+    return activity.payload?.hint_record || (activity.activity_type === 'hint_used' && activity.payload?.position !== undefined ? {
+      letter: activity.payload.letter || '',
+      index: activity.payload.position - 1,
+      row: activity.payload.row,
+    } : null);
+  }, [activity]);
+
+  const hintStartRow = activityHintRecord?.row !== undefined ? activityHintRecord.row - 1 : null;
+
   // Header badges & titles
   const activityHeader = useMemo(() => {
     switch (activity.activity_type) {
@@ -441,10 +451,19 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
                               ? 'bg-amber-400 text-black'
                               : 'bg-gray-700 text-white';
 
+                        const isHintedCell =
+                          activityHintRecord !== null &&
+                          cIdx === activityHintRecord.index &&
+                          (hintStartRow === null || rIdx > hintStartRow);
+
+                        const borderClass = isHintedCell
+                          ? 'border border-yellow-500/80 ring-1 ring-yellow-400/50 shadow-[0_0_8px_rgba(234,179,8,0.35)]'
+                          : 'border border-transparent';
+
                         return (
                           <span
                             key={cIdx}
-                            className={`w-6 h-6 sm:w-7 sm:h-7 rounded-sm shadow-xs ${bgClass} flex items-center justify-center font-black uppercase text-[10px] sm:text-xs select-none transition-all ${hideGridWords
+                            className={`w-6 h-6 sm:w-7 sm:h-7 rounded-sm shadow-xs ${bgClass} ${borderClass} flex items-center justify-center font-black uppercase text-[10px] sm:text-xs select-none transition-all ${hideGridWords
                               ? 'blur-[2px] opacity-40 select-none text-transparent'
                               : ''
                               } ${isTargetRow ? 'font-black' : ''}`}
@@ -545,10 +564,19 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
                           ? 'bg-amber-400 text-black'
                           : 'bg-gray-700 text-white';
 
+                    const isHintedCell =
+                      activityHintRecord !== null &&
+                      cIdx === activityHintRecord.index &&
+                      (hintStartRow === null || rIdx > hintStartRow);
+
+                    const borderClass = isHintedCell
+                      ? 'border border-yellow-500/80 ring-1 ring-yellow-400/50 shadow-[0_0_8px_rgba(234,179,8,0.35)]'
+                      : 'border border-transparent';
+
                     return (
                       <span
                         key={cIdx}
-                        className={`w-5 h-5 sm:w-6 sm:h-6 rounded-xs shadow-xs ${bgClass} flex items-center justify-center font-black uppercase text-[9px] sm:text-[10px] select-none transition-all ${hideGridWords
+                        className={`w-5 h-5 sm:w-6 sm:h-6 rounded-xs shadow-xs ${bgClass} ${borderClass} flex items-center justify-center font-black uppercase text-[9px] sm:text-[10px] select-none transition-all ${hideGridWords
                           ? 'blur-[2px] opacity-40 select-none text-transparent'
                           : ''
                           }`}
@@ -635,6 +663,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
           status={activity.payload?.status || 'playing'}
           attempts={activity.payload?.guess_number || (guessIdx + 1)}
           wordLength={wordLen}
+          hintRecord={activityHintRecord}
           onCommentAdded={() => setCommentsCount((c) => c + 1)}
         />
       )}
