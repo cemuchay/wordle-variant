@@ -182,9 +182,9 @@ export const StreakMilestoneCard: React.FC<StreakMilestoneCardProps> = ({
       <div className="flex items-center justify-between border-b border-white/5 pb-2">
         <div className="flex items-center gap-1.5">
           <div className={`p-1 ${milestone.theme.badgeBg} rounded-lg border ${milestone.theme.badgeBorder} ${milestone.theme.text}`}>
-            <Flame size={14} />
+
           </div>
-          <span className={`text-[9px] font-black uppercase tracking-widest ${milestone.theme.text}`}>
+          <span className={`text-[12px] font-black uppercase tracking-widest ${milestone.theme.text} text-white`}>
             Streak & Milestones
           </span>
         </div>
@@ -201,7 +201,7 @@ export const StreakMilestoneCard: React.FC<StreakMilestoneCardProps> = ({
             <Flame size={13} className={milestone.theme.flameColor} />
             {currentStreak}d Streak
           </span>
-          <span className="text-[9px] font-bold text-gray-400">
+          <span className="text-[9px] font-bold text-white">
             {milestone.remaining > 0 ? `${milestone.remaining}d to ${milestone.target}d Goal (${milestone.percent}%)` : "Goal Reached!"}
           </span>
         </div>

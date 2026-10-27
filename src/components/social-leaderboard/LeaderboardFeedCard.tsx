@@ -536,10 +536,7 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
           >
             <span className="text-xs shrink-0 select-none">🔥</span>
             <p className="text-[11px] truncate flex-1 font-medium leading-relaxed">
-              <span className="font-bold text-amber-400 mr-1.5 uppercase text-[9px] tracking-wider">
-                Roast:
-              </span>
-              <span className="italic opacity-90">"{gameMessage}"</span>
+              <span className="italic opacity-90 text-[9px]">"{gameMessage}"</span>
             </p>
           </div>
         )}
