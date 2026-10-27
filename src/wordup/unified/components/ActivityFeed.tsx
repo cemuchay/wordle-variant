@@ -1,4 +1,5 @@
-import { Radio, Shield, RefreshCw } from "lucide-react";
+import { Radio, RefreshCw } from "lucide-react";
+// import { Radio, Shield, RefreshCw } from "lucide-react";
 import type { ActivityFeedObj } from "@/wordup/shared/types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -109,21 +110,21 @@ const ActivityFeed = ({ isLoadingHistory, buildActivityFeed, CATEGORIES, CATEGOR
                             );
                         }
 
-                        if (item.type === "rank_milestone") {
-                            return (
-                                <div key={item.id} className="flex items-center gap-2.5 bg-[#E85151]/10 border border-[#E85151]/25 rounded-xl p-2.5">
-                                    <Shield size={16} className="text-[#E85151]" />
-                                    <div>
-                                        <p className="text-[12px] text-white font-bold leading-tight">
-                                            Rank Update: <span className="text-[#E85151]">{item.rankName}</span>
-                                        </p>
-                                        <p className="text-[12px] text-white/70 font-extrabold uppercase mt-0.5">
-                                            Currently holding {item.rating} rating ELO
-                                        </p>
-                                    </div>
-                                </div>
-                            );
-                        }
+                        // if (item.type === "rank_milestone") {
+                        //     return (
+                        //         <div key={item.id} className="flex items-center gap-2.5 bg-[#E85151]/10 border border-[#E85151]/25 rounded-xl p-2.5">
+                        //             <Shield size={16} className="text-[#E85151]" />
+                        //             <div>
+                        //                 <p className="text-[12px] text-white font-bold leading-tight">
+                        //                     Rank Update: <span className="text-[#E85151]">{item.rankName}</span>
+                        //                 </p>
+                        //                 <p className="text-[12px] text-white/70 font-extrabold uppercase mt-0.5">
+                        //                     Currently holding {item.rating} rating ELO
+                        //                 </p>
+                        //             </div>
+                        //         </div>
+                        //     );
+                        // }
 
                         return null;
                     })

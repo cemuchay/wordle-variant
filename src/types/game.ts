@@ -42,6 +42,9 @@ export interface LeaderboardEntry {
    days_active: number;
    user_id?: string;
    guesses?: any[];
+   hints_used?: boolean | number;
+   hint_record?: { letter: string; index: number; row?: number } | null;
+   game_message?: string | null;
 }
 
 export type SyncStatus = "idle" | "syncing" | "synced" | "error";

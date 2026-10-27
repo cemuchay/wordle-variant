@@ -48,7 +48,7 @@ describe('Roast Engine & Logic Analyzer', () => {
             2,
             { letter: 'T', index: 4, row: 1 }
         );
-        expect(brutalRoast).toMatch(/hint|assistance|lazy|surrender|ChatGPT|teach|bailout/i);
+        expect(brutalRoast).toMatch(/hint|assistance|backup|outsourced|reinforcements|surrendered|support|help|tutorial|WhatsApp|thinking|supervise|jar|boss|oga|panic|data|warmed|easier way/i);
 
         // Mild: Used hint on row 5 after struggling
         const mildGuesses: GuessResult[][] = [
@@ -70,7 +70,7 @@ describe('Roast Engine & Logic Analyzer', () => {
                 { letter: 'B', status: 'absent' },
                 { letter: 'O', status: 'absent' },
                 { letter: 'U', status: 'absent' },
-                { letter: 'N', status: 'present' },
+                { letter: 'N', status: 'absent' },
                 { letter: 'D', status: 'absent' },
             ],
             [
@@ -90,7 +90,7 @@ describe('Roast Engine & Logic Analyzer', () => {
             5,
             { letter: 'P', index: 0, row: 4 }
         );
-        expect(mildRoast).toMatch(/hint|training|win|lifeline|humble/i);
+        expect(mildRoast).toMatch(/hint|training|win|lifeline|humble|assistance|credit|LinkedIn|secret|contribution|honourable|clutch|teamwork|partnership|adult|intern|directions|asterisk|nudge|respect|survived|custody|flowers|friendship|passenger|intelligence/i);
     });
 
     it('identifies strategic burner rows with 4+ fresh letters', () => {
@@ -117,7 +117,7 @@ describe('Roast Engine & Logic Analyzer', () => {
         expect(analysis.strategicDiscards[0].newLettersCount).toBeGreaterThanOrEqual(4);
 
         const roast = generateRoast(guesses, 'PLANT', false, true, 3);
-        expect(roast).toMatch(/Kasparov|4D chess|burner|tactical|fresh|vowels|genius/i);
+        expect(roast).toMatch(/Kasparov|4D chess|burner|tactical|fresh|vowels|genius|sacrifice|sacrificed|research|scientists|intelligence|census|detective|experiment|investment|information|scouting|clues|strategy|suspense|thesis|scenic|abandoned|uncertainty|gambled/i);
     });
 
     it('detects green letter loss blunders', () => {

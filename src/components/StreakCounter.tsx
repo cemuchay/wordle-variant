@@ -78,10 +78,9 @@ export const StreakCounter: React.FC<StreakCounterProps> = ({
     return (
       <button
         onClick={handleClick}
-        className={`shrink-0 px-2.5 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-amber-200 border border-amber-500/25 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs ${className}`}
+        className={`shrink-0 px-1.5 sm:px-2.5 py-1 text-[11px] sm:text-xs font-bold tracking-wide rounded-lg bg-amber-500 text-white border border-amber-500/25 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs ${className}`}
         title={`Current streak: ${currentStreak} days (Max: ${maxStreak})`}
       >
-        <Flame size={13} className="text-amber-400 fill-amber-400/20 shrink-0 animate-pulse" />
         <span>Streak {currentStreak} {currentStreak === 1 ? 'day' : 'days'}</span>
       </button>
     );

@@ -1054,6 +1054,7 @@ function MainApp() {
       window.removeEventListener("open-free-play", handleOpenFreePlay);
       window.removeEventListener("open-challenges", handleOpenChallenges);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDailyMarathons]);
 
 
