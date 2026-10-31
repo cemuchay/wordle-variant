@@ -1,4 +1,4 @@
-import { Gamepad2, LogIn } from 'lucide-react';
+import { Gamepad2, LogIn, Swords, Grid3X3, Trophy, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface WelcomeScreenProps {
@@ -8,8 +8,8 @@ interface WelcomeScreenProps {
 
 export const WelcomeScreen = ({ onPlayAsGuest, onSignIn }: WelcomeScreenProps) => {
   return (
-    <div className="fixed inset-0 bg-dark flex flex-col">
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-8 max-w-md mx-auto w-full">
+    <div className="fixed inset-0 bg-dark flex flex-col overflow-y-auto">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-8 max-w-md mx-auto w-full shrink-0 min-h-[85vh]">
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -79,13 +79,86 @@ export const WelcomeScreen = ({ onPlayAsGuest, onSignIn }: WelcomeScreenProps) =
             </div>
           </button>
         </motion.div>
+
+        <div className="mt-8 text-center">
+          <p className="text-[9px] text-gray-600 font-bold uppercase tracking-widest">
+            You must choose a mode to play
+          </p>
+        </div>
       </div>
 
-      <div className="shrink-0 pb-8 px-6 text-center">
-        <p className="text-[9px] text-gray-600 font-bold uppercase tracking-widest">
-          You must choose a mode to play
-        </p>
-      </div>
+      {/* Crawlable SEO & Feature Overview Section */}
+      <section
+        aria-label="About Variant Multiplayer Word Game"
+        className="w-full max-w-md mx-auto px-6 pb-10 pt-2 border-t border-white/5 text-gray-400 space-y-6 shrink-0"
+      >
+        <div className="space-y-2 text-center">
+          <h2 className="text-xs font-black uppercase tracking-widest text-gray-300">
+            Multiplayer Word Puzzles &amp; Trivia Battles
+          </h2>
+          <p className="text-[11px] text-gray-500 leading-relaxed">
+            Variant is a free online multiplayer word game platform combining daily 5-letter word challenges, real-time 1v1 races, turn-based trivia battles, and tactical crossword grids.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2.5">
+          <article className="bg-white/[0.02] border border-white/5 rounded-xl p-3 space-y-1">
+            <div className="flex items-center gap-1.5 text-correct">
+              <Sparkles className="w-3.5 h-3.5 shrink-0" />
+              <h3 className="text-[10px] font-black uppercase tracking-wider text-gray-200">Daily Word</h3>
+            </div>
+            <p className="text-[10px] text-gray-500 leading-relaxed">
+              Solve the daily hidden word in 6 tries, build streaks, and play past puzzles in the archive.
+            </p>
+          </article>
+
+          <article className="bg-white/[0.02] border border-white/5 rounded-xl p-3 space-y-1">
+            <div className="flex items-center gap-1.5 text-indigo-400">
+              <Swords className="w-3.5 h-3.5 shrink-0" />
+              <h3 className="text-[10px] font-black uppercase tracking-wider text-gray-200">WordUp 1v1</h3>
+            </div>
+            <p className="text-[10px] text-gray-500 leading-relaxed">
+              Battle friends or bots in live and async trivia across vocabulary, idioms, science &amp; more.
+            </p>
+          </article>
+
+          <article className="bg-white/[0.02] border border-white/5 rounded-xl p-3 space-y-1">
+            <div className="flex items-center gap-1.5 text-amber-400">
+              <Grid3X3 className="w-3.5 h-3.5 shrink-0" />
+              <h3 className="text-[10px] font-black uppercase tracking-wider text-gray-200">WordGrid</h3>
+            </div>
+            <p className="text-[10px] text-gray-500 leading-relaxed">
+              Outsmart opponents on a tactical shared crossword grid in turn-based multiplayer matches.
+            </p>
+          </article>
+
+          <article className="bg-white/[0.02] border border-white/5 rounded-xl p-3 space-y-1">
+            <div className="flex items-center gap-1.5 text-emerald-400">
+              <Trophy className="w-3.5 h-3.5 shrink-0" />
+              <h3 className="text-[10px] font-black uppercase tracking-wider text-gray-200">Marathons</h3>
+            </div>
+            <p className="text-[10px] text-gray-500 leading-relaxed">
+              Compete in custom multi-word friend lobbies, daily bot marathons, and global leaderboards.
+            </p>
+          </article>
+        </div>
+
+        <footer className="pt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px] text-gray-600">
+          <a href="/wordup" className="hover:text-gray-400 transition-colors">WordUp</a>
+          <span>•</span>
+          <a href="/wordgrid" className="hover:text-gray-400 transition-colors">WordGrid</a>
+          <span>•</span>
+          <a href="/challenges" className="hover:text-gray-400 transition-colors">Challenges</a>
+          <span>•</span>
+          <a href="/leaderboard" className="hover:text-gray-400 transition-colors">Leaderboard</a>
+          <span>•</span>
+          <a href="/privacy" className="hover:text-gray-400 transition-colors">Privacy</a>
+          <span>•</span>
+          <a href="/tos" className="hover:text-gray-400 transition-colors">Terms</a>
+          <span>•</span>
+          <a href="/deletion" className="hover:text-gray-400 transition-colors">Data Deletion</a>
+        </footer>
+      </section>
     </div>
   );
 };

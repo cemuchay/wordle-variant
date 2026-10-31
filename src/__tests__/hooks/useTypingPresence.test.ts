@@ -93,7 +93,7 @@ describe("useTypingPresence Hook", () => {
       expect(result.current.typingNames).toEqual(["Someone"]);
    });
 
-   it("immediately tracks typing and clears after 3 seconds of inactivity", () => {
+   it("immediately tracks typing, throttles rapid keystrokes, and clears after 3.5 seconds of inactivity", () => {
       const { result } = renderHook(() =>
          useTypingPresence("room-123", "self-id", true, "SelfUser")
       );
@@ -102,13 +102,23 @@ describe("useTypingPresence Hook", () => {
          result.current.setSelfTyping(true);
       });
 
+      expect(mockTrack).toHaveBeenCalledTimes(1);
       expect(mockTrack).toHaveBeenCalledWith(
          expect.objectContaining({ isTyping: true, isRecordingVoice: false, username: "SelfUser" })
       );
 
-      // Fast forward 3 seconds
+      // Rapid keystrokes within 2 seconds should NOT spam channel.track
       act(() => {
-         vi.advanceTimersByTime(3000);
+         vi.advanceTimersByTime(500);
+         result.current.setSelfTyping(true);
+         vi.advanceTimersByTime(500);
+         result.current.setSelfTyping(true);
+      });
+      expect(mockTrack).toHaveBeenCalledTimes(1);
+
+      // Fast forward 3.5 seconds from last keystroke
+      act(() => {
+         vi.advanceTimersByTime(3500);
       });
 
       expect(mockTrack).toHaveBeenLastCalledWith(

@@ -3,9 +3,7 @@
     {
       "source": "/(index.html)?",
       "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
-        { "key": "Pragma", "value": "no-cache" },
-        { "key": "Expires", "value": "0" }
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
       ]
     },
     {
@@ -29,6 +27,9 @@
     }
   ],
   "rewrites": [
+    { "source": "/privacy", "destination": "/privacy.html" },
+    { "source": "/tos", "destination": "/tos.html" },
+    { "source": "/deletion", "destination": "/deletion.html" },
     { "source": "/admin", "destination": "/index.html" },
     { "source": "/unsubscribe", "destination": "/index.html" },
     { "source": "/wordup", "destination": "/index.html" },

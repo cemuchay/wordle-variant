@@ -326,8 +326,11 @@ function MainApp() {
       !hasShownVictorySplashRef.current
     ) {
       hasShownVictorySplashRef.current = true;
-      setVictoryScore(state.guesses.length || 1);
-      setShowVictorySplash(true);
+      const score = state.guesses.length || 1;
+      setVictoryScore(score);
+      if (score >= 1 && score <= 3) {
+        setShowVictorySplash(true);
+      }
     }
   }, [
     state.status,
@@ -361,10 +364,15 @@ function MainApp() {
     if (!isHydrated || !date || tabRestoredRef.current) return;
 
     const initialPath = typeof window !== "undefined" ? window.location.pathname.toLowerCase().replace(/\/$/, "") : "";
+    const isWordUpHost = typeof window !== "undefined" && window.location.hostname.startsWith("wordup.");
     if (initialPath === "/word-grid" || initialPath === "/wordgrid") {
       tabRestoredRef.current = true;
       setIsMoreOpen(true);
       setMoreGameMode("wordgrid");
+      return;
+    }
+    if (isWordUpHost || initialPath === "/wordup" || initialPath === "/challenges" || initialPath === "/chat" || initialPath === "/leaderboard") {
+      tabRestoredRef.current = true;
       return;
     }
 
@@ -677,7 +685,7 @@ function MainApp() {
 
       const isWordUpHost = window.location.hostname.startsWith("wordup.");
       const path = window.location.pathname.toLowerCase().replace(/\/$/, "");
-      const isPathEntry = isWordUpHost || path === "/wordup" || path === "/challenges" || path === "/chat" || path === "/leaderboard";
+      const isPathEntry = isWordUpHost || path === "/wordup" || path === "/wordgrid" || path === "/word-grid" || path === "/challenges" || path === "/chat" || path === "/leaderboard";
 
       if (hasChallenge || hasOpen || isPathEntry) {
         // Clear all other view states to let the notification click override persistence
@@ -697,6 +705,9 @@ function MainApp() {
 
       if (isWordUpHost || path === "/wordup") {
         setIsWordUpOpen(true);
+      } else if (path === "/wordgrid" || path === "/word-grid") {
+        setIsMoreOpen(true);
+        setMoreGameMode("wordgrid");
       } else if (path === "/challenges") {
         setIsChallengeOpen(true);
       } else if (path === "/chat") {
@@ -704,10 +715,6 @@ function MainApp() {
       } else if (path === "/leaderboard") {
         setStatsActiveTab("leaderboard");
         setIsStatsOpen(true);
-      }
-
-      if (isPathEntry) {
-        window.history.replaceState({}, document.title, `/${window.location.search}`);
       }
 
       const challengeId = params.get("challenge");
@@ -1454,15 +1461,15 @@ function MainApp() {
       )}
 
       <div className="fixed bottom-2 left-2 hidden sm:flex items-center gap-2 text-[10px] text-gray-600 z-40">
-        <a href="/privacy.html" className="hover:underline">
+        <a href="/privacy" className="hover:underline">
           Privacy Policy
         </a>
         <span>•</span>
-        <a href="/tos.html" className="hover:underline">
+        <a href="/tos" className="hover:underline">
           Terms of Service
         </a>
         <span>•</span>
-        <a href="/deletion.html" className="hover:underline">
+        <a href="/deletion" className="hover:underline">
           User Data Deletion
         </a>
       </div>
