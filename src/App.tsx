@@ -326,8 +326,11 @@ function MainApp() {
       !hasShownVictorySplashRef.current
     ) {
       hasShownVictorySplashRef.current = true;
-      setVictoryScore(state.guesses.length || 1);
-      setShowVictorySplash(true);
+      const score = state.guesses.length || 1;
+      setVictoryScore(score);
+      if (score >= 1 && score <= 3) {
+        setShowVictorySplash(true);
+      }
     }
   }, [
     state.status,
