@@ -24,13 +24,25 @@ export function useTypingPresence(
    const [typingNames, setTypingNames] = useState<string[]>([]);
    const [recordingNames, setRecordingNames] = useState<string[]>([]);
    const channelRef = useRef<RealtimeChannel | null>(null);
+   const isSubscribedRef = useRef(false);
    const isTypingRef = useRef(false);
    const isRecordingRef = useRef(false);
+   const lastTrackTimeRef = useRef<number>(0);
    const clearTimerRef = useRef<number | null>(null);
    const usernameRef = useRef<string | null | undefined>(username);
 
    useEffect(() => {
       usernameRef.current = username;
+      // If username arrived after typing/recording already started, re-track so peers see the real name
+      if (username && (isTypingRef.current || isRecordingRef.current) && channelRef.current) {
+         lastTrackTimeRef.current = Date.now();
+         void channelRef.current.track({
+            isTyping: isTypingRef.current,
+            isRecordingVoice: isRecordingRef.current,
+            username,
+            ts: Date.now(),
+         });
+      }
    }, [username]);
 
    useEffect(() => {
@@ -40,6 +52,7 @@ export function useTypingPresence(
          return;
       }
 
+      isSubscribedRef.current = false;
       const channel = supabase.channel(`chat_presence_${groupId}`, {
          config: { presence: { key: selfId } },
       });
@@ -85,13 +98,27 @@ export function useTypingPresence(
                   : nextRecording,
             );
          })
-         .subscribe();
+         .subscribe((status?: string) => {
+            if (status === "SUBSCRIBED") {
+               isSubscribedRef.current = true;
+               // Flush any pending typing/recording state that started while joining
+               if (isTypingRef.current || isRecordingRef.current) {
+                  lastTrackTimeRef.current = Date.now();
+                  void channel.track({
+                     isTyping: isTypingRef.current,
+                     isRecordingVoice: isRecordingRef.current,
+                     username: usernameRef.current || "Someone",
+                     ts: Date.now(),
+                  });
+               }
+            }
+         });
 
       channelRef.current = channel;
 
       return () => {
          if (isTypingRef.current || isRecordingRef.current) {
-            channel.track({
+            void channel.track({
                isTyping: false,
                isRecordingVoice: false,
                username: usernameRef.current || "Someone",
@@ -100,12 +127,14 @@ export function useTypingPresence(
          }
          supabase.removeChannel(channel);
          channelRef.current = null;
+         isSubscribedRef.current = false;
          if (clearTimerRef.current) {
             window.clearTimeout(clearTimerRef.current);
             clearTimerRef.current = null;
          }
          isTypingRef.current = false;
          isRecordingRef.current = false;
+         lastTrackTimeRef.current = 0;
       };
    }, [groupId, selfId, enabled]);
 
@@ -120,7 +149,8 @@ export function useTypingPresence(
          }
          if (isTypingRef.current) {
             isTypingRef.current = false;
-            channel?.track({
+            lastTrackTimeRef.current = 0;
+            void channel?.track({
                isTyping: false,
                isRecordingVoice: isRecordingRef.current,
                username: uname,
@@ -131,24 +161,32 @@ export function useTypingPresence(
       }
 
       if (!channel) return;
+
+      const now = Date.now();
+      const shouldBroadcast = !isTypingRef.current || now - lastTrackTimeRef.current >= 2000;
       isTypingRef.current = true;
-      channel.track({
-         isTyping: true,
-         isRecordingVoice: false,
-         username: uname,
-         ts: Date.now(),
-      });
+
+      if (shouldBroadcast) {
+         lastTrackTimeRef.current = now;
+         void channel.track({
+            isTyping: true,
+            isRecordingVoice: false,
+            username: uname,
+            ts: now,
+         });
+      }
 
       if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
       clearTimerRef.current = window.setTimeout(() => {
          isTypingRef.current = false;
-         channelRef.current?.track({
+         lastTrackTimeRef.current = 0;
+         void channelRef.current?.track({
             isTyping: false,
             isRecordingVoice: isRecordingRef.current,
-            username: uname,
+            username: usernameRef.current || "Someone",
             ts: Date.now(),
          });
-      }, 3000);
+      }, 3500);
    }, []);
 
    const setSelfRecording = useCallback((on: boolean) => {

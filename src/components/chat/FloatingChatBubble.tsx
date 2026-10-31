@@ -934,6 +934,8 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
    const globalMessages = useAppStore((s) => s.globalMessages);
    const readReceipts = useAppStore((s) => s.readReceipts);
    const joinedGroupIds = useAppStore((s) => s.joinedGroupIds);
+   const pendingChatGroupId = useAppStore((s) => s.pendingChatGroupId);
+   const pendingDMUserId = useAppStore((s) => s.pendingDMUserId);
    const { user } = useAuth();
 
    // Profiles cache for reactor names
@@ -1352,27 +1354,28 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
       }
    }, [isOverlayOpen, user?.id]);
 
-   // Auto-scroll detailed message view to bottom on initial group open, when new messages arrive/are sent, or when typing indicator appears
+   // Auto-scroll detailed message view to bottom on initial group open, when new messages arrive/are sent, or when typing/recording indicator appears
    const prevGroupIdRef = useRef<string | null>(null);
    const prevMessagesLengthRef = useRef<number>(0);
-   const prevTypingCountRef = useRef<number>(0);
+   const prevActivityCountRef = useRef<number>(0);
 
    useEffect(() => {
       if (!selectedGroupId) {
          prevGroupIdRef.current = null;
          prevMessagesLengthRef.current = 0;
-         prevTypingCountRef.current = 0;
+         prevActivityCountRef.current = 0;
          return;
       }
 
       const roomMessages = globalMessages.filter(m => m.group_id === selectedGroupId && !isReactionRow(m.content));
+      const activityCount = typingNames.length + recordingNames.length;
       const isGroupChange = prevGroupIdRef.current !== selectedGroupId;
       const isNewMessageAdded = roomMessages.length > prevMessagesLengthRef.current;
-      const isTypingStarted = typingNames.length > 0 && prevTypingCountRef.current === 0;
+      const isActivityStarted = activityCount > prevActivityCountRef.current;
 
       prevGroupIdRef.current = selectedGroupId;
       prevMessagesLengthRef.current = roomMessages.length;
-      prevTypingCountRef.current = typingNames.length;
+      prevActivityCountRef.current = activityCount;
 
       if (scrollRef.current) {
          const el = scrollRef.current;
@@ -1380,8 +1383,8 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
          const latestMsg = roomMessages[roomMessages.length - 1];
          const isMyNewMessage = isNewMessageAdded && latestMsg && latestMsg.user_id === user?.id;
 
-         if (isGroupChange || isMyNewMessage || (isNewMessageAdded && isNearBottom) || isTypingStarted) {
-            // Use double-rAF to ensure DOM and layout changes (including typing bubble) have completely painted
+         if (isGroupChange || isMyNewMessage || ((isNewMessageAdded || isActivityStarted) && isNearBottom)) {
+            // Use double-rAF to ensure DOM and layout changes have completely painted
             requestAnimationFrame(() => {
                requestAnimationFrame(() => {
                   if (messagesEndRef.current) {
@@ -1393,7 +1396,7 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
             });
          }
       }
-   }, [selectedGroupId, globalMessages, user?.id, typingNames.length]);
+   }, [selectedGroupId, globalMessages, user?.id, typingNames.length, recordingNames.length]);
 
    // Re-show bubble on new unread after dismissal
    if (unreadCount !== prevUnreadCount) {
@@ -1960,6 +1963,17 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
          window.removeEventListener('new-message-reaction' as any, handleIncomingReaction);
       };
    }, [user?.id, handleStartDM]);
+
+   // Consume pendingChatGroupId / pendingDMUserId when expanding to full chat or opening via store
+   useEffect(() => {
+      if (pendingChatGroupId) {
+         useAppStore.getState().setPendingChatGroupId(null);
+         openConversationBubble(pendingChatGroupId);
+      } else if (pendingDMUserId && user?.id) {
+         useAppStore.getState().setPendingDMUserId(null);
+         void handleStartDM(pendingDMUserId);
+      }
+   }, [pendingChatGroupId, pendingDMUserId, user?.id, openConversationBubble]);
 
    // Reset snapshot on room change
    useEffect(() => {
@@ -2916,10 +2930,6 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                        </div>
                                     );
                                  })}
-                                 <ChatActivityIndicator
-                                    typingNames={typingNames}
-                                    recordingNames={recordingNames}
-                                 />
                                  {/* Bottom scroll anchor sentinel */}
                                  <div ref={messagesEndRef} className="h-1 shrink-0 pointer-events-none" />
 
@@ -2942,6 +2952,16 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                               </div>
                            )}
                         </div>
+
+                        {/* Pinned typing / voice recording indicator right above the input bar */}
+                        {selectedGroupId && !(selectedGroupId === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday) && (typingNames.length > 0 || recordingNames.length > 0) && (
+                           <div className="px-4 py-1 bg-slate-950/80 border-t border-white/5 shrink-0">
+                              <ChatActivityIndicator
+                                 typingNames={typingNames}
+                                 recordingNames={recordingNames}
+                              />
+                           </div>
+                        )}
 
                         {/* Reply footer for detailed chat screen */}
                         {selectedGroupId && !(selectedGroupId === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday) && (
