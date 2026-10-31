@@ -82,6 +82,8 @@ self.addEventListener("push", (event) => {
       body: data.body || "You have a new message.",
       icon: "/pwa_192x192.png",
       badge: "/favicon-32x32.png",
+      tag: data.tag || undefined,
+      renotify: !!data.tag,
       data: { url: data.url || "/" },
    };
 

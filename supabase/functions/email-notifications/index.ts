@@ -207,6 +207,525 @@ const getEmailHtml = (
   `;
 };
 
+// ============================================================================
+// DYNAMIC DUOLINGO-STYLE REMINDER TEMPLATES
+// ============================================================================
+
+interface DynamicEmailTemplate {
+   subject: string;
+   html: string;
+}
+
+const getRandomItem = <T>(items: T[]): T => {
+   return items[Math.floor(Math.random() * items.length)];
+};
+
+// --- Helper: Dynamic Tile Grid Previews ---
+const renderMiniTile = (letter: string, bg: string, color = "#ffffff") => `
+   <div style="display: inline-block; width: 34px; height: 34px; line-height: 34px; background-color: ${bg}; color: ${color}; font-weight: 800; font-size: 16px; border-radius: 6px; margin: 0 2px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; box-shadow: 0 2px 0 rgba(0,0,0,0.1);">${letter}</div>
+`;
+
+const renderTileRow = (letters: string[], bgs: string[]) => `
+   <div style="margin: 4px 0; text-align: center;">
+      ${letters.map((l, i) => renderMiniTile(l, bgs[i] || "#e4e4e7", bgs[i] === "#e4e4e7" ? "#18181b" : "#ffffff")).join("")}
+   </div>
+`;
+
+// Clean Duolingo-style action card wrapper supporting playful color themes
+const getDuolingoCardHtml = (
+   username: string,
+   userId: string,
+   opts: {
+      accentColor: string;
+      accentBg: string;
+      accentBorder: string;
+      btnBg: string;
+      btnColor?: string;
+      badge: string;
+      badgeEmoji: string;
+      title: string;
+      punchline: string;
+      innerCardHtml: string;
+      ctaText: string;
+      footerNote?: string;
+   },
+) => {
+   const formattedName = formatUsername(username);
+   const unsubscribeUrl = `${APP_URL}/unsubscribe?user_id=${userId}`;
+
+   return `
+   <!DOCTYPE html>
+   <html lang="en">
+     <head>
+       <meta charset="utf-8">
+       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+       <title>${opts.title}</title>
+       <style>
+         body {
+           background-color: #f4f4f5;
+           color: #18181b;
+           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+           margin: 0;
+           padding: 0;
+           -webkit-font-smoothing: antialiased;
+         }
+         .container {
+           max-width: 540px;
+           margin: 0 auto;
+           padding: 28px 14px;
+         }
+         .card {
+           background-color: #ffffff;
+           border: 2px solid ${opts.accentBorder};
+           border-radius: 20px;
+           padding: 32px 24px;
+           box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.08);
+           text-align: center;
+         }
+         .brand-header {
+           display: inline-block;
+           font-size: 11px;
+           font-weight: 900;
+           letter-spacing: 0.16em;
+           color: #71717a;
+           text-transform: uppercase;
+           margin-bottom: 20px;
+         }
+         .badge-pill {
+           display: inline-block;
+           background-color: ${opts.accentBg};
+           color: ${opts.accentColor};
+           border: 1.5px solid ${opts.accentBorder};
+           font-size: 12px;
+           font-weight: 800;
+           padding: 6px 14px;
+           border-radius: 999px;
+           text-transform: uppercase;
+           letter-spacing: 0.05em;
+           margin-bottom: 14px;
+         }
+         h1 {
+           font-size: 26px;
+           font-weight: 900;
+           line-height: 1.2;
+           letter-spacing: -0.02em;
+           color: #18181b;
+           margin: 0 0 10px 0;
+         }
+         .punchline {
+           font-size: 16px;
+           font-weight: 500;
+           line-height: 1.5;
+           color: #52525b;
+           margin: 0 auto 20px auto;
+           max-width: 440px;
+         }
+         .inner-card {
+           background-color: ${opts.accentBg};
+           border: 1.5px solid ${opts.accentBorder};
+           border-radius: 14px;
+           padding: 20px 18px;
+           margin: 20px 0 24px 0;
+           text-align: center;
+         }
+         .btn-cta {
+           display: inline-block;
+           background-color: ${opts.btnBg};
+           color: ${opts.btnColor || "#ffffff"} !important;
+           font-size: 15px;
+           font-weight: 800;
+           text-decoration: none;
+           padding: 14px 34px;
+           border-radius: 12px;
+           box-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.12);
+           text-transform: uppercase;
+           letter-spacing: 0.04em;
+         }
+         .footer {
+           margin-top: 28px;
+           text-align: center;
+           border-top: 1px solid #e4e4e7;
+           padding-top: 18px;
+         }
+         .footer-text {
+           color: #a1a1aa;
+           font-size: 11px;
+           line-height: 1.5;
+           margin: 0;
+         }
+         .footer-link {
+           color: #71717a;
+           text-decoration: underline;
+           font-weight: 600;
+         }
+       </style>
+     </head>
+     <body>
+       <div class="container">
+         <div class="card">
+           <div class="brand-header">⚡ VARIANT DAILY WORDS ⚡</div>
+           <div>
+             <span class="badge-pill">${opts.badgeEmoji} ${opts.badge}</span>
+           </div>
+           <h1>${opts.title}</h1>
+           <p class="punchline">Hey <strong>${formattedName}</strong>, ${opts.punchline}</p>
+           
+           <div class="inner-card">
+             ${opts.innerCardHtml}
+           </div>
+
+           <div style="margin: 26px 0 8px 0;">
+             <a href="${APP_URL}" class="btn-cta">${opts.ctaText} →</a>
+           </div>
+
+           ${opts.footerNote ? `<div style="font-size: 12px; font-weight: 600; color: #71717a; margin-top: 12px;">${opts.footerNote}</div>` : ""}
+
+           <div class="footer">
+             <p class="footer-text">
+               Sent with 💚 from <strong>wordle-variant.xyz</strong>.<br/>
+               Take 3 minutes to keep your mind sharp.<br/>
+               <a href="${unsubscribeUrl}" class="footer-link">Unsubscribe or manage notification settings</a>
+             </p>
+           </div>
+         </div>
+       </div>
+     </body>
+   </html>
+   `;
+};
+
+// 1. Morning Skipped Day Reminder - 4 Random Duolingo-style variants
+const getMorningSkippedReminderTemplate = (
+   username: string,
+   userId: string,
+): DynamicEmailTemplate => {
+   const formattedName = formatUsername(username);
+
+   const templates: DynamicEmailTemplate[] = [
+      // Style 1: Playful Guilt / Duolingo Owl Sassy Tone
+      {
+         subject: `👀 ${formattedName}, these words aren't going to guess themselves...`,
+         html: getDuolingoCardHtml(username, userId, {
+            accentColor: "#ea580c",
+            accentBg: "#fff7ed",
+            accentBorder: "#fed7aa",
+            btnBg: "#ea580c",
+            badge: "DAILY HABIT CHECK",
+            badgeEmoji: "🦉",
+            title: "Did you forget about us yesterday?",
+            punchline: "Your brain cells called. They miss the green tiles.",
+            innerCardHtml: `
+               <p style="margin: 0 0 12px 0; font-size: 14px; color: #7c2d12; font-weight: 700;">
+                  Yesterday's puzzle slipped past, but today is wide open!
+               </p>
+               <div style="margin: 10px 0;">
+                  ${renderTileRow(["R", "E", "A", "D", "Y"], ["#538d4e", "#b59f3b", "#e4e4e7", "#538d4e", "#e4e4e7"])}
+                  ${renderTileRow(["S", "H", "A", "R", "P"], ["#538d4e", "#538d4e", "#538d4e", "#538d4e", "#538d4e"])}
+               </div>
+               <p style="margin: 12px 0 0 0; font-size: 13px; color: #9a3412;">
+                  Takes under 3 minutes. Shake off the cobwebs before lunch!
+               </p>
+            `,
+            ctaText: "Play Today's Puzzle",
+            footerNote: "☕ Pairs great with your morning coffee",
+         }),
+      },
+
+      // Style 2: High Energy / Comeback Hype
+      {
+         subject: `🔥 Ready for a comeback, ${formattedName}? Today's puzzle is live!`,
+         html: getDuolingoCardHtml(username, userId, {
+            accentColor: "#16a34a",
+            accentBg: "#f0fdf4",
+            accentBorder: "#bbf7d0",
+            btnBg: "#16a34a",
+            badge: "COMEBACK MISSION",
+            badgeEmoji: "⚡",
+            title: "Bounce Back Like a Champion!",
+            punchline: "You took a day off yesterday, but true word masters always return stronger.",
+            innerCardHtml: `
+               <div style="font-size: 32px; margin-bottom: 8px;">🎯</div>
+               <p style="margin: 0 0 8px 0; font-size: 15px; color: #166534; font-weight: 800;">
+                  Fresh daily secret word waiting for you right now.
+               </p>
+               <p style="margin: 0; font-size: 13px; color: #15803d; line-height: 1.5;">
+                  Choose 4, 5, 6, or 7 letters and crack it in 6 tries. The leaderboard is moving fast!
+               </p>
+            `,
+            ctaText: "Start My Comeback",
+            footerNote: "⚡ 6 guesses • Infinite satisfaction",
+         }),
+      },
+
+      // Style 3: Brain Gym / Mental Fitness Push
+      {
+         subject: `🧠 3-minute morning brain workout for ${formattedName}`,
+         html: getDuolingoCardHtml(username, userId, {
+            accentColor: "#4f46e5",
+            accentBg: "#eef2ff",
+            accentBorder: "#c7d2fe",
+            btnBg: "#4f46e5",
+            badge: "DAILY MENTAL GYM",
+            badgeEmoji: "🧠",
+            title: "Warm Up Your Brain Today",
+            punchline: "Crosswords are too long. Variant takes 3 minutes and wakes up your linguistic cortex.",
+            innerCardHtml: `
+               <p style="margin: 0 0 10px 0; font-size: 14px; color: #3730a3; font-weight: 700;">
+                  TODAY'S WORKOUT TARGET:
+               </p>
+               <div style="margin: 8px 0;">
+                  ${renderTileRow(["S", "O", "L", "V", "E"], ["#538d4e", "#538d4e", "#538d4e", "#538d4e", "#538d4e"])}
+               </div>
+               <p style="margin: 10px 0 0 0; font-size: 13px; color: #4338ca;">
+                  Solve today's puzzle to restart your momentum and stay ahead of the pack.
+               </p>
+            `,
+            ctaText: "Claim My 3-Min Workout",
+            footerNote: "✨ Better than scrolling social media",
+         }),
+      },
+
+      // Style 4: Classic Clean Editorial with a Playful Punch
+      {
+         subject: `📰 Today's secret word is waiting for you, ${formattedName}`,
+         html: getDuolingoCardHtml(username, userId, {
+            accentColor: "#0891b2",
+            accentBg: "#ecfeff",
+            accentBorder: "#a5f3fc",
+            btnBg: "#0891b2",
+            badge: "TODAY'S EDITION",
+            badgeEmoji: "🗞️",
+            title: "A Brand New Puzzle is In Print",
+            punchline: "Yesterday is in the past. Today's word has stumped quite a few players already.",
+            innerCardHtml: `
+               <p style="margin: 0 0 8px 0; font-size: 14px; color: #155e75; font-weight: 700;">
+                  Can you guess it in fewer than 4 attempts?
+               </p>
+               <p style="margin: 0; font-size: 13px; color: #0e7490; line-height: 1.5;">
+                  Log your score, earn points for the weekly trophy, and prove your vocabulary reigns supreme.
+               </p>
+            `,
+            ctaText: "Solve Today's Edition",
+            footerNote: "🏆 Weekly awards are distributed every Monday",
+         }),
+      },
+   ];
+
+   return getRandomItem(templates);
+};
+
+// 2. 3-Day Inactive Reminder - 3 Playful Duolingo-style variants
+const getInactiveReminderTemplate = (
+   username: string,
+   userId: string,
+): DynamicEmailTemplate => {
+   const formattedName = formatUsername(username);
+
+   const templates: DynamicEmailTemplate[] = [
+      // Style 1: Playful Guilt / Missing You
+      {
+         subject: `🥺 We miss you, ${formattedName}! It's been 3 days...`,
+         html: getDuolingoCardHtml(username, userId, {
+            accentColor: "#db2777",
+            accentBg: "#fdf2f8",
+            accentBorder: "#fbcfe8",
+            btnBg: "#db2777",
+            badge: "WE MISS YOU",
+            badgeEmoji: "💔",
+            title: "Don't Leave Us on Read!",
+            punchline: "It's been 3 days since your last solve. The word tiles are getting lonely.",
+            innerCardHtml: `
+               <div style="font-size: 32px; margin-bottom: 6px;">🥺</div>
+               <p style="margin: 0 0 8px 0; font-size: 15px; color: #9d174d; font-weight: 800;">
+                  Just one game to get back in the groove!
+               </p>
+               <p style="margin: 0; font-size: 13px; color: #be185d; line-height: 1.5;">
+                  Your weekly leaderboard position is slipping, but one quick win puts you right back in contention.
+               </p>
+            `,
+            ctaText: "Reclaim My Spot",
+            footerNote: "⏱️ Only 3 minutes to play",
+         }),
+      },
+
+      // Style 2: Challenge & Rivalry
+      {
+         subject: `🏆 Players are passing you on the leaderboard, ${formattedName}!`,
+         html: getDuolingoCardHtml(username, userId, {
+            accentColor: "#9333ea",
+            accentBg: "#faf5ff",
+            accentBorder: "#e9d5ff",
+            btnBg: "#9333ea",
+            badge: "LEADERBOARD ALERT",
+            badgeEmoji: "⚔️",
+            title: "Your Standing is Under Attack!",
+            punchline: "A few days of rest and suddenly your rivals are climbing the ranks.",
+            innerCardHtml: `
+               <p style="margin: 0 0 10px 0; font-size: 14px; color: #6b21a8; font-weight: 700;">
+                  Today is Monday — the new weekly tournament just kicked off!
+               </p>
+               <div style="margin: 8px 0;">
+                  ${renderTileRow(["F", "I", "G", "H", "T"], ["#b59f3b", "#538d4e", "#e4e4e7", "#538d4e", "#538d4e"])}
+               </div>
+               <p style="margin: 10px 0 0 0; font-size: 13px; color: #7e22ce;">
+                  Score high today to get on the podium before the week gets crowded.
+               </p>
+            `,
+            ctaText: "Defend My Rank",
+            footerNote: "🥇 Weekly champions receive profile badges",
+         }),
+      },
+
+      // Style 3: Clean Duolingo Encouragement
+      {
+         subject: `✨ Ready for a fresh start, ${formattedName}? Today's puzzle is waiting`,
+         html: getDuolingoCardHtml(username, userId, {
+            accentColor: "#059669",
+            accentBg: "#ecfdf5",
+            accentBorder: "#a7f3d0",
+            btnBg: "#059669",
+            badge: "FRESH START",
+            badgeEmoji: "🌱",
+            title: "Small Habits Build Big Brains",
+            punchline: "Life gets busy, we get it! But keeping your mind sharp only takes 180 seconds.",
+            innerCardHtml: `
+               <p style="margin: 0 0 8px 0; font-size: 15px; color: #065f46; font-weight: 800;">
+                  Zero stress. Just you and a 5-letter puzzle.
+               </p>
+               <p style="margin: 0; font-size: 13px; color: #047857; line-height: 1.5;">
+                  Grab a cup of something hot, sit back, and enjoy today's challenge.
+               </p>
+            `,
+            ctaText: "Jump Back In",
+            footerNote: "🎮 Free to play • No downloads needed",
+         }),
+      },
+   ];
+
+   return getRandomItem(templates);
+};
+
+// 3. Evening Streak Warning - 4 Dramatic Duolingo-style variants
+const getEveningStreakWarningTemplate = (
+   username: string,
+   userId: string,
+   currentStreak: number,
+): DynamicEmailTemplate => {
+   const formattedName = formatUsername(username);
+
+   const templates: DynamicEmailTemplate[] = [
+      // Style 1: Urgent Duolingo Owl Sassy Alarm
+      {
+         subject: `🚨 ${formattedName}! Don't let your ${currentStreak}-day streak die tonight!`,
+         html: getDuolingoCardHtml(username, userId, {
+            accentColor: "#dc2626",
+            accentBg: "#fef2f2",
+            accentBorder: "#fecaca",
+            btnBg: "#dc2626",
+            badge: "CRITICAL STREAK ALERT",
+            badgeEmoji: "🚨",
+            title: "DON'T LET IT RESET TO ZERO!",
+            punchline: `You worked hard for that <strong>${currentStreak}-day winning streak</strong>. If you don't play before midnight, it's gone forever.`,
+            innerCardHtml: `
+               <div style="font-size: 42px; font-weight: 900; color: #dc2626; margin: 4px 0;">
+                  🔥 ${currentStreak} DAYS 🔥
+               </div>
+               <div style="font-size: 13px; font-weight: 800; color: #991b1b; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px;">
+                  AT RISK RIGHT NOW
+               </div>
+               <p style="margin: 0; font-size: 14px; color: #7f1d1d; line-height: 1.5;">
+                  It takes <strong>less than 3 minutes</strong>. Solve today's word before the clock strikes 12 and keep your crown!
+               </p>
+            `,
+            ctaText: "Save My Streak",
+            footerNote: "⏰ Resets at midnight Africa/Lagos time",
+         }),
+      },
+
+      // Style 2: Dramatic Heartbreak / Personified Streak
+      {
+         subject: `💔 Your ${currentStreak}-day streak is about to vanish, ${formattedName}`,
+         html: getDuolingoCardHtml(username, userId, {
+            accentColor: "#d97706",
+            accentBg: "#fffbeb",
+            accentBorder: "#fde68a",
+            btnBg: "#d97706",
+            badge: "STREAK COUNTDOWN",
+            badgeEmoji: "⏳",
+            title: "Your Streak Needs You!",
+            punchline: `A ${currentStreak}-day streak is rare — fewer than 5% of players ever reach it.`,
+            innerCardHtml: `
+               <p style="margin: 0 0 10px 0; font-size: 15px; color: #92400e; font-weight: 800;">
+                  Don't throw away ${currentStreak} days of perfection!
+               </p>
+               <div style="margin: 10px 0;">
+                  ${renderTileRow(["S", "A", "V", "E", "D"], ["#538d4e", "#538d4e", "#538d4e", "#538d4e", "#538d4e"])}
+               </div>
+               <p style="margin: 10px 0 0 0; font-size: 13px; color: #b45309;">
+                  One quick solve right now preserves your streak history and profile brag rights.
+               </p>
+            `,
+            ctaText: "Keep Streak Alive",
+            footerNote: "🔥 It's waiting for you right now",
+         }),
+      },
+
+      // Style 3: Midnight Countdown Clock
+      {
+         subject: `⏰ Clock is ticking, ${formattedName}! Save your ${currentStreak}-day streak`,
+         html: getDuolingoCardHtml(username, userId, {
+            accentColor: "#b91c1c",
+            accentBg: "#fef2f2",
+            accentBorder: "#fca5a5",
+            btnBg: "#b91c1c",
+            badge: "NIGHT CALL",
+            badgeEmoji: "🌙",
+            title: "A Quick Solve Before Bed?",
+            punchline: `Only a few hours remain before today's puzzle locks and your <strong>${currentStreak}-day streak</strong> expires.`,
+            innerCardHtml: `
+               <div style="font-size: 34px; margin-bottom: 6px;">🛌 ➡️ 🏆</div>
+               <p style="margin: 0 0 8px 0; font-size: 15px; color: #991b1b; font-weight: 800;">
+                  Solve it before you sleep.
+               </p>
+               <p style="margin: 0; font-size: 13px; color: #7f1d1d; line-height: 1.5;">
+                  Nothing sleeps better than the peaceful satisfaction of an all-green word row.
+               </p>
+            `,
+            ctaText: "Play Before Midnight",
+            footerNote: "🌙 Sweet dreams guaranteed with a win",
+         }),
+      },
+
+      // Style 4: Hyped Gamer Focus
+      {
+         subject: `🔥 Defend your honor: ${currentStreak}-day streak on the line, ${formattedName}!`,
+         html: getDuolingoCardHtml(username, userId, {
+            accentColor: "#ea580c",
+            accentBg: "#fff7ed",
+            accentBorder: "#fed7aa",
+            btnBg: "#ea580c",
+            badge: "STREAK DEFENSE",
+            badgeEmoji: "🛡️",
+            title: "Your Streak is on the Line!",
+            punchline: `Day ${currentStreak} was won. Day ${currentStreak + 1} is waiting. Will you answer the call?`,
+            innerCardHtml: `
+               <div style="background: #18181b; border-radius: 10px; padding: 14px; margin: 8px 0; color: #ffffff;">
+                  <span style="font-size: 11px; text-transform: uppercase; color: #a1a1aa; font-weight: 800; letter-spacing: 0.1em; display: block; margin-bottom: 4px;">Streak Multiplier</span>
+                  <span style="font-size: 28px; font-weight: 900; color: #fbbf24;">${currentStreak} ➡️ ${currentStreak + 1}</span>
+               </div>
+               <p style="margin: 10px 0 0 0; font-size: 13px; color: #9a3412; font-weight: 600;">
+                  Lock in today's victory before the midnight refresh.
+               </p>
+            `,
+            ctaText: "Lock in Day " + (currentStreak + 1),
+            footerNote: "⚡ Your streak is your legend",
+         }),
+      },
+   ];
+
+   return getRandomItem(templates);
+};
+
 // Helper to append logs to an email HTML template for developer eyes
 const appendLogsToHtml = (originalHtml: string, logs: string[]) => {
    const logsBlock = `
@@ -637,30 +1156,17 @@ serve(async (req) => {
 
          if (skippedRecipients && skippedRecipients.length > 0) {
             for (const recipient of skippedRecipients) {
-               const content = `
-            <div class="section-box" style="text-align: center;">
-               <h3 style="margin: 0 0 8px 0; color: #18181b; font-size: 16px; font-weight: 800; text-transform: uppercase;">Your Daily Streak Needs You</h3>
-               <p style="margin: 0; color: #52525b; font-size: 14px; line-height: 1.5;">You missed yesterday's puzzle, but today offers a fresh opportunity to stay sharp and defend your standing.</p>
-            </div>
-            <p style="color: #52525b; font-size: 14px; line-height: 1.6; text-align: center;">
-               Today's word puzzle is live. It only takes a few minutes to test your vocabulary and climb the global leaderboard.
-            </p>
-            <div style="margin: 30px 0 16px 0; text-align: center;">
-              <a href="${APP_URL}" class="btn-primary">Play Today's Word</a>
-            </div>
-          `;
-               const html = getEmailHtml(
+               // Select a random catchy Duolingo-style morning reminder
+               const dynamicEmail = getMorningSkippedReminderTemplate(
                   recipient.username,
                   recipient.user_id,
-                  "Your Daily Puzzle Awaits",
-                  content,
                );
 
-               log(`Attempting to send morning email to ${recipient.email}...`);
+               log(`Attempting to send morning email to ${recipient.email} (Subject: ${dynamicEmail.subject})...`);
                const success = await sendEmailWithFallback(
                   recipient.email,
-                  "Your Daily Puzzle Awaits",
-                  html,
+                  dynamicEmail.subject,
+                  dynamicEmail.html,
                );
                if (success) {
                   sentCount++;
@@ -671,30 +1177,17 @@ serve(async (req) => {
 
          if (inactiveRecipients.length > 0) {
             for (const recipient of inactiveRecipients) {
-               const content = `
-            <div class="section-box" style="text-align: center;">
-               <h3 style="margin: 0 0 8px 0; color: #18181b; font-size: 16px; font-weight: 800; text-transform: uppercase;">Reclaim Your Standing</h3>
-               <p style="margin: 0; color: #52525b; font-size: 14px; line-height: 1.5;">It has been a few days since your last solve. The weekly leaderboard is heating up with fresh competition.</p>
-            </div>
-            <p style="color: #52525b; font-size: 14px; line-height: 1.6; text-align: center;">
-               Jump back in this morning to test your skills, reclaim your rank, and qualify for weekly awards.
-            </p>
-            <div style="margin: 30px 0 16px 0; text-align: center;">
-              <a href="${APP_URL}" class="btn-primary">Solve Today's Word</a>
-            </div>
-          `;
-               const html = getEmailHtml(
+               // Select a random catchy Duolingo-style inactive reminder
+               const dynamicEmail = getInactiveReminderTemplate(
                   recipient.username,
                   recipient.user_id,
-                  "Reclaim Your Rank on the Leaderboard",
-                  content,
                );
 
-               log(`Attempting to send inactive reminder to ${recipient.email}...`);
+               log(`Attempting to send inactive reminder to ${recipient.email} (Subject: ${dynamicEmail.subject})...`);
                const success = await sendEmailWithFallback(
                   recipient.email,
-                  "Reclaim Your Rank on the Leaderboard",
-                  html,
+                  dynamicEmail.subject,
+                  dynamicEmail.html,
                );
                if (success) {
                   sentCount++;
@@ -752,32 +1245,18 @@ serve(async (req) => {
          log(`Found ${recipients?.length || 0} streak warning recipients.`);
          if (recipients && recipients.length > 0) {
             for (const recipient of recipients) {
-               const content = `
-            <div class="section-box" style="border-left: 4px solid #f59e0b;">
-               <p style="margin: 0; color: #18181b; font-size: 15px; font-weight: 700;">
-                  You have an active ${recipient.current_streak}-day winning streak at risk.
-               </p>
-               <p style="margin: 8px 0 0 0; color: #52525b; font-size: 14px;">
-                  You haven't played today yet. Solve today's Word before midnight to keep your streak alive.
-               </p>
-            </div>
-            <div style="margin: 30px 0 16px 0; text-align: center;">
-              <a href="${APP_URL}" class="btn-primary">Save My Streak</a>
-            </div>
-          `;
-               const html = getEmailHtml(
+               // Select a random catchy Duolingo-style evening streak warning
+               const dynamicEmail = getEveningStreakWarningTemplate(
                   recipient.username,
                   recipient.user_id,
-                  "Streak Warning: Save Your Streak",
-                  content,
+                  recipient.current_streak || 1,
                );
-               const subject = `Streak Warning: Save your ${recipient.current_streak}-day streak`;
 
-               log(`Attempting to send streak warning to ${recipient.email}...`);
+               log(`Attempting to send streak warning to ${recipient.email} (Subject: ${dynamicEmail.subject})...`);
                const success = await sendEmailWithFallback(
                   recipient.email,
-                  subject,
-                  html,
+                  dynamicEmail.subject,
+                  dynamicEmail.html,
                );
                if (success) {
                   sentCount++;

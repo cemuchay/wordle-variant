@@ -6,13 +6,33 @@
     <changefreq>daily</changefreq>
   </url>
   <url>
+    <loc>https://wordle-variant.xyz/wordup</loc>
+    <priority>0.9</priority>
+    <changefreq>daily</changefreq>
+  </url>
+  <url>
+    <loc>https://wordle-variant.xyz/wordgrid</loc>
+    <priority>0.9</priority>
+    <changefreq>daily</changefreq>
+  </url>
+  <url>
+    <loc>https://wordle-variant.xyz/challenges</loc>
+    <priority>0.8</priority>
+    <changefreq>daily</changefreq>
+  </url>
+  <url>
+    <loc>https://wordle-variant.xyz/leaderboard</loc>
+    <priority>0.8</priority>
+    <changefreq>daily</changefreq>
+  </url>
+  <url>
     <loc>https://wordle-variant.xyz/privacy</loc>
-    <priority>0.5</priority>
+    <priority>0.4</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
     <loc>https://wordle-variant.xyz/tos</loc>
-    <priority>0.5</priority>
+    <priority>0.4</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>

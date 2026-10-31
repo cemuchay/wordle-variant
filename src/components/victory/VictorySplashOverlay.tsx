@@ -129,15 +129,19 @@ interface Rocket {
 
 export const VictorySplashOverlay: React.FC<VictorySplashOverlayProps> = ({
   score,
-  maxAttempts = 6,
   targetWord,
   onDismiss,
   durationSeconds = 10,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [timeLeft, setTimeLeft] = useState(durationSeconds);
-  const normalizedScore = Math.min(Math.max(score, 1), maxAttempts);
-  const theme = SCORE_THEMES[normalizedScore] || SCORE_THEMES[4];
+
+  // Victory splash only plays for high achievements: scores 1, 2, or 3
+  if (score < 1 || score > 3) {
+    return null;
+  }
+
+  const theme = SCORE_THEMES[score];
 
   // Auto-dismiss countdown
   useEffect(() => {
