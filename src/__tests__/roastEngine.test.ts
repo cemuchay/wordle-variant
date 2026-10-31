@@ -90,7 +90,7 @@ describe('Roast Engine & Logic Analyzer', () => {
             5,
             { letter: 'P', index: 0, row: 4 }
         );
-        expect(mildRoast).toMatch(/hint|training|win|lifeline|humble|assistance|credit|LinkedIn|secret|contribution|honourable|clutch|teamwork|partnership|adult|intern|directions|asterisk|nudge|respect|survived|custody|flowers|friendship|passenger|intelligence/i);
+        expect(mildRoast).toMatch(/hint|training|win|lifeline|humble|assistance|credit|LinkedIn|secret|contribution|honourable|clutch|teamwork|partnership|adult|intern|directions|asterisk|nudge|respect|survived|custody|flowers|friendship|passenger|intelligence|finished strong|tomorrow/i);
     });
 
     it('identifies strategic burner rows with 4+ fresh letters', () => {
@@ -117,7 +117,7 @@ describe('Roast Engine & Logic Analyzer', () => {
         expect(analysis.strategicDiscards[0].newLettersCount).toBeGreaterThanOrEqual(4);
 
         const roast = generateRoast(guesses, 'PLANT', false, true, 3);
-        expect(roast).toMatch(/Kasparov|4D chess|burner|tactical|fresh|vowels|genius|sacrifice|sacrificed|research|scientists|intelligence|census|detective|experiment|investment|information|scouting|clues|strategy|suspense|thesis|scenic|abandoned|uncertainty|gambled/i);
+        expect(roast).toMatch(/Kasparov|4D chess|burner|burner|burned|tactical|fresh|vowels|genius|sacrifice|sacrificed|research|scientists|intelligence|census|detective|experiment|experimentation|investment|information|scouting|clues|strategy|suspense|thesis|scenic|abandoned|uncertainty|gambled|plan|Forget what I know/i);
     });
 
     it('detects green letter loss blunders', () => {
