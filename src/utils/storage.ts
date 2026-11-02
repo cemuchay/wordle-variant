@@ -326,11 +326,20 @@ export function purgeStaleStorage(): number {
       // 4. Stale view states & temporary caches
       if (
         key.startsWith('challenge-view-state-') ||
+        key.endsWith('_lock') ||
         key === 'wordup_cached_history_matches' ||
         key === 'wordup_cached_async_history_matches' ||
         key === 'wordup_seen_matches'
       ) {
         keysToRemove.push(key);
+      }
+
+      // 5. Expired bot marathon tracker keys (older than 14 days)
+      if (key.startsWith('bot_marathon_')) {
+        const dateMatch = key.match(/^bot_marathon_(\d{4}-\d{2}-\d{2})$/);
+        if (dateMatch && dateMatch[1] < sevenDaysAgo) {
+          keysToRemove.push(key);
+        }
       }
     }
 

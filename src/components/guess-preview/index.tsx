@@ -482,7 +482,9 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
     (async () => {
       let wordToUse = targetWord || (await getDailyConfig(!!profile, targetDate)).word;
 
-      if (isMarathon && targetWord) {
+      if (isShapeshifter && gameData?.target_words && gameData.target_words.length > 0) {
+        wordToUse = gameData.target_words[gameData.target_words.length - 1];
+      } else if (isMarathon && targetWord) {
         try {
           wordToUse = activeGame ? activeGame.word : "";
         } catch (e) {
@@ -494,7 +496,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
 
       setTargetWordToUse(wordToUse);
     })();
-  }, [targetWord, profile, targetDate, isMarathon, activeGame, salt]);
+  }, [targetWord, profile, targetDate, isMarathon, activeGame, salt, isShapeshifter, gameData?.target_words]);
 
 
   const breakdown = calculateSkillIndex({

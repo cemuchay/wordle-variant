@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Clock, Play, Plus, Search, X, HelpCircle, Save, Download, Trash2 } from 'lucide-react';
 import { ReigningBadge } from '../common/ReigningBadge';
-import { memo, useState, useMemo, useCallback, useEffect } from 'react';
+import { memo, useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useChallengeContext } from '../../context/ChallengeContext';
 import { useConfirmation } from '../../hooks/useConfirmation';
 import { useAdminStatus } from '../../hooks/useAdminStatus';
@@ -1159,16 +1159,25 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         errorCount: errors.length,
     }), [mode, length, maxAttempts, maxTime, marathonGames, marathonForceOrder, timerType, marathonTimersArray, invitedIds, isPublic, maxParticipants, lifespanHours, isCustomWord, customMarathonWords, isHandicap, handicapMode, handicapLevel, handicapRows, handicapEnforced, isShapeshifter, disableHints, isBotMarathon, editingChallenge, errors]);
 
+    const topRef = useRef<HTMLDivElement>(null);
+
     const handleNextStep = useCallback(() => {
         setStep(s => Math.min(s + 1, 3));
     }, []);
 
     useEffect(() => {
+        if (topRef.current) {
+            topRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            const scrollParent = topRef.current.closest('.overflow-y-auto');
+            if (scrollParent) {
+                scrollParent.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }, [step]);
 
     return (
-        <div className="space-y-6 max-w-xl mx-auto w-full">
+        <div ref={topRef} className="space-y-6 max-w-xl mx-auto w-full">
             <CreateStepIndicator steps={['Setup', 'Rules', 'Lobby', 'Confirm']} currentStep={step} />
 
             {step === 0 && (
