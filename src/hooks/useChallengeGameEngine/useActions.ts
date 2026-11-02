@@ -179,9 +179,6 @@ export const useActions = ({
             result = shiftResult.feedback;
             finalTargetWord = shiftResult.nextWord;
 
-            if (updatedTargetWords.length === 0) {
-               updatedTargetWords.push(initialTargetWord);
-            }
             updatedTargetWords.push(finalTargetWord);
 
             setTargetWords(updatedTargetWords);

@@ -968,14 +968,34 @@ const BotMarathonManagement = ({ triggerToast }: { triggerToast: (text: string, 
                             Control and monitor system-managed weekly events
                         </p>
                     </div>
-                    <button
-                        onClick={createNextWeekMarathon}
-                        disabled={loading}
-                        className="bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white font-black uppercase text-[10px] tracking-widest px-6 py-3 rounded-xl transition-all shadow-lg shadow-indigo-500/20 flex items-center gap-2 cursor-pointer"
-                    >
-                        {loading ? <RefreshCw size={14} className="animate-spin" /> : <Trophy size={14} />}
-                        Create Next Week's Event
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => {
+                                let count = 0;
+                                for (let i = localStorage.length - 1; i >= 0; i--) {
+                                    const key = localStorage.key(i);
+                                    if (key && (key.startsWith('bot_marathon_') || key.endsWith('_lock'))) {
+                                        localStorage.removeItem(key);
+                                        count++;
+                                    }
+                                }
+                                triggerToast(`Cleared ${count} bot marathon cache keys.`);
+                            }}
+                            type="button"
+                            className="bg-white/5 hover:bg-white/10 text-gray-300 font-black uppercase text-[10px] tracking-widest px-4 py-3 rounded-xl transition-all border border-white/10 flex items-center gap-1.5 cursor-pointer"
+                            title="Clear any client-side localStorage flags so creation can re-test freely"
+                        >
+                            <Trash2 size={13} /> Clear Local Cache
+                        </button>
+                        <button
+                            onClick={createNextWeekMarathon}
+                            disabled={loading}
+                            className="bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white font-black uppercase text-[10px] tracking-widest px-6 py-3 rounded-xl transition-all shadow-lg shadow-indigo-500/20 flex items-center gap-2 cursor-pointer"
+                        >
+                            {loading ? <RefreshCw size={14} className="animate-spin" /> : <Trophy size={14} />}
+                            Create Next Week's Event
+                        </button>
+                    </div>
                 </div>
 
                 <div className="space-y-4">

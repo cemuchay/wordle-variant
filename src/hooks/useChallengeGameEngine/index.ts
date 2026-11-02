@@ -177,6 +177,7 @@ export const useChallengeGameEngine = ({
       guesses,
       usedHint,
       hintRecord,
+      targetWords,
       wordLength,
       gameIndex,
       wrappedSubmitResult,
@@ -338,12 +339,12 @@ export const useChallengeGameEngine = ({
             }
 
             if (challenge.is_shapeshifter) {
-               const resolvedWords =
+               setTargetWords(localTargetWords);
+               setActiveTargetWord(
                   localTargetWords.length > 0
-                     ? localTargetWords
-                     : [initialTargetWord];
-               setTargetWords(resolvedWords);
-               setActiveTargetWord(resolvedWords[resolvedWords.length - 1]);
+                     ? localTargetWords[localTargetWords.length - 1]
+                     : initialTargetWord,
+               );
             } else {
                setTargetWords([initialTargetWord]);
                setActiveTargetWord(initialTargetWord);
@@ -537,6 +538,10 @@ export const useChallengeGameEngine = ({
                   localGuesses = startersList.map((starter) =>
                      checkGuess(starter.toUpperCase(), currentWordForStarter)
                   );
+                  if (challenge.is_shapeshifter && localTargetWords.length === 0) {
+                     localTargetWords = startersList.map(() => currentWordForStarter);
+                     setTargetWords(localTargetWords);
+                  }
                   isStarterEnforced = true;
                }
             }
@@ -600,9 +605,12 @@ export const useChallengeGameEngine = ({
                await wrappedSubmitResult(
                   {
                      status: "playing",
-                     attempts: 1,
+                     attempts: localGuesses.length,
                      guesses: localGuesses,
                      started_at: new Date().toISOString(),
+                     ...(challenge.is_shapeshifter
+                        ? { target_words: localTargetWords }
+                        : {}),
                   },
                   isMarathon ? wordLength : undefined,
                   isMarathon ? gameIndex! : undefined,
