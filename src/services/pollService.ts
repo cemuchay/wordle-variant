@@ -1,6 +1,10 @@
 import { supabase } from "../lib/supabaseClient";
 import { safeLocalStorage } from "../utils/storage";
 import {
+   sendAdminPollCreatedPush,
+   sendAdminPollExpiredPush,
+} from "../lib/clientPush";
+import {
    type Poll,
    type PollVote,
    type CreatePollInput,
@@ -178,6 +182,16 @@ export const createPoll = async (
          };
          saveLocalPoll(normalized);
          notifyPollUpdated(normalized.id);
+
+         // Trigger client-side push notification broadcast if this is an Admin Poll
+         if (normalized.is_admin_poll) {
+            void sendAdminPollCreatedPush({
+               pollId: normalized.id,
+               question: normalized.question,
+               creatorId: normalized.creator_id,
+            });
+         }
+
          return normalized;
       }
    } catch (err) {
@@ -185,6 +199,15 @@ export const createPoll = async (
    }
 
    notifyPollUpdated(fullPoll.id);
+
+   if (fullPoll.is_admin_poll) {
+      void sendAdminPollCreatedPush({
+         pollId: fullPoll.id,
+         question: fullPoll.question,
+         creatorId: fullPoll.creator_id,
+      });
+   }
+
    return fullPoll;
 };
 
@@ -430,6 +453,70 @@ export const setAdminPollPinned = async (
 };
 
 /**
+ * Evaluates votes on an expired admin poll and dispatches an expiration push notification exactly once.
+ */
+export const checkAndNotifyAdminPollExpired = async (
+   pollId: string
+): Promise<boolean> => {
+   const { poll, votes } = await fetchPollWithVotes(pollId);
+   if (!poll || !poll.is_admin_poll || poll.notified_expired_at) {
+      return false;
+   }
+
+   const nowIso = new Date().toISOString();
+
+   // Mark notified_expired_at locally and on server first to prevent race conditions
+   const localMap = getLocalPolls();
+   if (localMap[pollId]) {
+      localMap[pollId] = {
+         ...localMap[pollId],
+         notified_expired_at: nowIso,
+      };
+      safeLocalStorage.setItem(LOCAL_POLLS_KEY, JSON.stringify(localMap));
+   }
+
+   try {
+      await supabase
+         .from("chat_polls")
+         .update({ notified_expired_at: nowIso })
+         .eq("id", pollId);
+   } catch (err) {
+      console.warn("[PollService] Could not update notified_expired_at in Supabase:", err);
+   }
+
+   // Calculate winning option & percentage
+   const totalVotes = votes.length;
+   let winningText = "";
+   let winningPercentage = 0;
+
+   if (totalVotes > 0 && poll.options && poll.options.length > 0) {
+      let maxCount = -1;
+      let winningOpt = poll.options[0];
+
+      poll.options.forEach((opt) => {
+         const count = votes.filter((v) => v.option_id === opt.id).length;
+         if (count > maxCount) {
+            maxCount = count;
+            winningOpt = opt;
+         }
+      });
+
+      winningText = winningOpt.text;
+      winningPercentage = Math.round((maxCount / totalVotes) * 100);
+   }
+
+   void sendAdminPollExpiredPush({
+      pollId: poll.id,
+      question: poll.question,
+      winningOptionText: winningText || null,
+      winningPercentage,
+      totalVotes,
+   });
+
+   return true;
+};
+
+/**
  * Ends an admin poll early by setting expires_at to now() and unpinning it
  */
 export const endPollEarly = async (pollId: string): Promise<Poll | null> => {
@@ -445,6 +532,8 @@ export const endPollEarly = async (pollId: string): Promise<Poll | null> => {
       safeLocalStorage.setItem(LOCAL_POLLS_KEY, JSON.stringify(localMap));
    }
 
+   let endedPoll: Poll | null = null;
+
    try {
       const { data, error } = await supabase
          .from("chat_polls")
@@ -459,15 +548,22 @@ export const endPollEarly = async (pollId: string): Promise<Poll | null> => {
             options: Array.isArray(data.options) ? data.options : [],
          };
          saveLocalPoll(normalized);
-         notifyPollUpdated(pollId);
-         return normalized;
+         endedPoll = normalized;
       }
    } catch {
       // fallback
    }
 
+   if (!endedPoll && localMap[pollId]) {
+      endedPoll = localMap[pollId];
+   }
+
    notifyPollUpdated(pollId);
-   return localMap[pollId] || null;
+
+   // Dispatch expired results push notification
+   void checkAndNotifyAdminPollExpired(pollId);
+
+   return endedPoll;
 };
 
 /**

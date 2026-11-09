@@ -5,6 +5,7 @@ import {
    submitPollVote,
    fetchActivePinnedPoll,
    subscribeToLocalPollEvents,
+   checkAndNotifyAdminPollExpired,
 } from "../services/pollService";
 import type { Poll, PollVote, PollOptionResult } from "../types/poll";
 
@@ -104,7 +105,11 @@ export const usePoll = (
 
    const isExpired = useMemo(() => {
       if (!poll) return false;
-      return new Date(poll.expires_at).getTime() <= nowTick;
+      const expired = new Date(poll.expires_at).getTime() <= nowTick;
+      if (expired && poll.is_admin_poll && !poll.notified_expired_at) {
+         void checkAndNotifyAdminPollExpired(poll.id);
+      }
+      return expired;
    }, [poll, nowTick]);
 
    const timeRemainingText = useMemo(() => {
