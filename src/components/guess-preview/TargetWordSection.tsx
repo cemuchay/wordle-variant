@@ -65,19 +65,24 @@ export const TargetWordSection = memo(({
 
     const isSentence = challenge?.is_sentence;
     const marathonGames = isSentence ? parseMarathonGames(challenge.target_word, challenge.salt) : [];
+    const shiftHistoryWords: string[] = isShapeshifter && Array.isArray(gameData?.target_words)
+        ? (Array.isArray(gameData?.guesses) && gameData.target_words.length === gameData.guesses.length + 1
+            ? gameData.target_words.slice(1)
+            : gameData.target_words)
+        : [];
 
     return (
         <div className="mb-6 mt-3 flex flex-col items-center">
-            {isShapeshifter && gameData?.target_words && gameData.target_words.length > 0 ? (
+            {isShapeshifter && shiftHistoryWords.length > 0 ? (
                 <div className="flex flex-col items-center animate-in zoom-in duration-300 w-full">
                     <span className="text-[9px] uppercase font-black text-gray-500 mb-2">
                         Shape Shifter Shift History
                     </span>
                     <div className="flex flex-wrap gap-2 justify-center items-center max-w-sm p-3 bg-white/5 border border-white/10 rounded-2xl">
-                        {(gameData.target_words || []).map((w: string, idx: number) => (
+                        {shiftHistoryWords.map((w: string, idx: number) => (
                             <div key={idx} className="flex items-center gap-1.5">
                                 {idx > 0 && <span className="text-correct font-black text-xs font-mono">&rarr;</span>}
-                                <span className={`px-2.5 py-1 text-xs font-black uppercase font-mono rounded-lg transition-all ${idx === (gameData.target_words || []).length - 1 ? 'bg-correct text-black shadow-md shadow-correct/25 scale-105' : 'bg-white/5 text-white/50 border border-white/5'}`}>
+                                <span className={`px-2.5 py-1 text-xs font-black uppercase font-mono rounded-lg transition-all ${idx === shiftHistoryWords.length - 1 ? 'bg-correct text-black shadow-md shadow-correct/25 scale-105' : 'bg-white/5 text-white/50 border border-white/5'}`}>
                                     {w}
                                 </span>
                             </div>

@@ -47,6 +47,7 @@ import { flushNotificationQueue } from "./lib/clientPush";
 import { useWordGridStore } from "./store/useWordGridStore";
 import { generateShareText } from "./lib/share";
 import { VictorySplashOverlay } from "./components/victory/VictorySplashOverlay";
+import { autoCreateWeeklyBotChallenge } from "./services/dailyBotChallengeService";
 
 const StatsModal = safeLazy(() => import("./components/social-leaderboard").then(m => ({ default: m.SocialStatsModal })));
 const ChallengeModal = safeLazy(() => import("./components/ChallengeModal").then(m => ({ default: m.ChallengeModal })));
@@ -76,6 +77,8 @@ function MainApp() {
 
   useEffect(() => {
     initTelemetry();
+    // Silently check if Sunday auto-generation of weekly Daily Bot Challenge is needed
+    autoCreateWeeklyBotChallenge().catch(() => {});
   }, []);
 
   const [guestOptedIn, setGuestOptedIn] = useState(() =>

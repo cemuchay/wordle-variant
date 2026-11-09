@@ -131,7 +131,7 @@ export const VictorySplashOverlay: React.FC<VictorySplashOverlayProps> = ({
   score,
   targetWord,
   onDismiss,
-  durationSeconds = 10,
+  durationSeconds = 5,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [timeLeft, setTimeLeft] = useState(durationSeconds);
@@ -180,10 +180,10 @@ export const VictorySplashOverlay: React.FC<VictorySplashOverlayProps> = ({
     const particles: Particle[] = [];
     const rockets: Rocket[] = [];
 
-    const spawnBurst = (x: number, y: number, colorPool: string[], count = 60) => {
+    const spawnBurst = (x: number, y: number, colorPool: string[], count = 35) => {
       for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count + (Math.random() * 0.2 - 0.1);
-        const speed = Math.random() * 7 + 2;
+        const speed = Math.random() * 6 + 2;
         const color = colorPool[Math.floor(Math.random() * colorPool.length)];
         particles.push({
           x,
@@ -192,11 +192,11 @@ export const VictorySplashOverlay: React.FC<VictorySplashOverlayProps> = ({
           vy: Math.sin(angle) * speed,
           color,
           alpha: 1,
-          decay: Math.random() * 0.015 + 0.01,
-          size: Math.random() * 3 + 1.5,
+          decay: Math.random() * 0.02 + 0.015,
+          size: Math.random() * 2.5 + 1.5,
           gravity: 0.12,
           friction: 0.96,
-          shimmer: Math.random() > 0.4,
+          shimmer: false,
         });
       }
     };
@@ -227,17 +227,11 @@ export const VictorySplashOverlay: React.FC<VictorySplashOverlayProps> = ({
     let lastLaunchTime = performance.now();
 
     const loop = (timestamp: number) => {
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
-      ctx.fillRect(0, 0, width, height);
-      ctx.globalCompositeOperation = 'lighter';
+      ctx.clearRect(0, 0, width, height);
 
       // Launch new rockets at rhythmic intervals
-      if (timestamp - lastLaunchTime > 380) {
+      if (timestamp - lastLaunchTime > 650) {
         launchRocket();
-        if (Math.random() > 0.5) {
-          launchRocket();
-        }
         lastLaunchTime = timestamp;
       }
 
@@ -249,7 +243,7 @@ export const VictorySplashOverlay: React.FC<VictorySplashOverlayProps> = ({
         r.vy += 0.15; // rocket gravity deceleration
 
         r.trail.push({ x: r.x, y: r.y, alpha: 1 });
-        if (r.trail.length > 8) r.trail.shift();
+        if (r.trail.length > 5) r.trail.shift();
 
         // Draw trail
         ctx.beginPath();
@@ -257,7 +251,7 @@ export const VictorySplashOverlay: React.FC<VictorySplashOverlayProps> = ({
           const pt = r.trail[j];
           ctx.strokeStyle = r.color;
           ctx.globalAlpha = (j / r.trail.length) * 0.7;
-          ctx.lineWidth = 2.5;
+          ctx.lineWidth = 2;
           if (j === 0) ctx.moveTo(pt.x, pt.y);
           else ctx.lineTo(pt.x, pt.y);
         }
@@ -267,17 +261,17 @@ export const VictorySplashOverlay: React.FC<VictorySplashOverlayProps> = ({
         ctx.beginPath();
         ctx.fillStyle = '#FFFFFF';
         ctx.globalAlpha = 1;
-        ctx.arc(r.x, r.y, 2.5, 0, Math.PI * 2);
+        ctx.arc(r.x, r.y, 2, 0, Math.PI * 2);
         ctx.fill();
 
         // Explode condition
         if (r.y <= r.targetY || r.vy >= -1) {
-          spawnBurst(r.x, r.y, r.colors, 65);
+          spawnBurst(r.x, r.y, r.colors, 35);
           rockets.splice(i, 1);
         }
       }
 
-      // Update & Draw Particles
+      // Update & Draw Particles (batched without heavy shadowBlur)
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         p.vx *= p.friction;
@@ -292,15 +286,11 @@ export const VictorySplashOverlay: React.FC<VictorySplashOverlayProps> = ({
           continue;
         }
 
-        ctx.save();
         ctx.beginPath();
-        ctx.globalAlpha = p.shimmer ? p.alpha * (0.6 + Math.random() * 0.4) : p.alpha;
+        ctx.globalAlpha = p.alpha;
         ctx.fillStyle = p.color;
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = p.color;
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fill();
-        ctx.restore();
       }
 
       animId = requestAnimationFrame(loop);
@@ -322,33 +312,15 @@ export const VictorySplashOverlay: React.FC<VictorySplashOverlayProps> = ({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, scale: 0.97 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden bg-black/80 backdrop-blur-md select-none"
+      className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden bg-transparent select-none pointer-events-none"
     >
-      {/* Dynamic Canvas Fireworks Layer */}
-      <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none w-full h-full" />
-
-      {/* Radiant Background Glow */}
-      <div className="absolute inset-0 pointer-events-none opacity-40 mix-blend-screen bg-radial from-violet-600/30 via-transparent to-transparent" />
-
-      {/* Top Bar with 'X' Close Button */}
-      <div className="absolute top-4 right-4 z-20">
-        <button
-          onClick={onDismiss}
-          className="group flex items-center justify-center w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white/80 hover:text-white border border-white/20 backdrop-blur-lg shadow-lg transition-all duration-200 cursor-pointer"
-          title="Skip to results (Esc)"
-          aria-label="Close victory splash"
-        >
-          <X className="w-6 h-6 transition-transform group-hover:rotate-90 duration-300" />
-        </button>
-      </div>
-
       {/* Main Victory Card */}
       <motion.div
         initial={{ scale: 0.82, y: 25, opacity: 0 }}
         animate={{ scale: 1, y: 0, opacity: 1 }}
         exit={{ scale: 0.9, y: 15, opacity: 0 }}
         transition={{ type: 'spring', damping: 22, stiffness: 280 }}
-        className={`relative z-10 w-[92%] max-w-md mx-auto p-6 sm:p-8 rounded-3xl bg-slate-900/85 border border-white/20 backdrop-blur-xl flex flex-col items-center text-center text-white ${theme.cardGlow}`}
+        className={`pointer-events-auto relative z-10 w-[92%] max-w-md mx-auto p-6 sm:p-8 rounded-3xl bg-slate-950/40 border border-white/15 backdrop-blur-md shadow-2xl flex flex-col items-center text-center text-white`}
       >
         {/* Animated Trophy / Sparkle Icon */}
         <motion.div
@@ -434,6 +406,21 @@ export const VictorySplashOverlay: React.FC<VictorySplashOverlayProps> = ({
           </span>
         </div>
       </motion.div>
+
+      {/* Dynamic Canvas Fireworks Layer (Rendered on top of the frosted card) */}
+      <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none w-full h-full z-20" />
+
+      {/* Top Bar with 'X' Close Button */}
+      <div className="absolute top-4 right-4 z-30 pointer-events-auto">
+        <button
+          onClick={onDismiss}
+          className="group flex items-center justify-center w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white/80 hover:text-white border border-white/20 backdrop-blur-lg shadow-lg transition-all duration-200 cursor-pointer"
+          title="Skip to results (Esc)"
+          aria-label="Close victory splash"
+        >
+          <X className="w-6 h-6 transition-transform group-hover:rotate-90 duration-300" />
+        </button>
+      </div>
     </motion.div>
   );
 };

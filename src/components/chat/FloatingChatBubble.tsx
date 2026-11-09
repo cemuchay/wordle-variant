@@ -3,11 +3,17 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence, useMotionValue, useDragControls } from "framer-motion";
 import type { PanInfo } from "framer-motion";
-import { Search, MessageCircle, X, Send, ArrowLeft, ExternalLink, Edit2, Trash2, Check, CheckCheck, ShieldAlert, Mic, Image as ImageIcon, Smile, Reply, Users, Phone, ChevronDown, Plus } from "lucide-react";
+import { Search, MessageCircle, X, Send, ArrowLeft, ExternalLink, Edit2, Trash2, Check, CheckCheck, ShieldAlert, Mic, Image as ImageIcon, Smile, Reply, Users, Phone, ChevronDown, Plus, BarChart3 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useAppStore } from "../../store/useAppStore";
 import { TOAST_DURATION } from "../../constants/ui";
 import { useAuth } from "../../hooks/useAuth";
+import { useAdminStatus } from "../../hooks/useAdminStatus";
+import { usePinnedPoll } from "../../hooks/usePoll";
+import { CreatePollModal } from "./poll/CreatePollModal";
+import { ChatPollCard } from "./poll/ChatPollCard";
+import { PinnedPollBanner } from "./poll/PinnedPollBanner";
+import { GENERAL_GROUP_ID, type Poll } from "../../types/poll";
 import { decryptDM, encryptDM, getDMRoomKey, compressImage } from "../../hooks/useChat";
 import { supabase } from "../../lib/supabaseClient";
 import { editMessage, deleteMessage, reactToMessage } from "../../hooks/chatActions";
@@ -937,6 +943,8 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
    const pendingChatGroupId = useAppStore((s) => s.pendingChatGroupId);
    const pendingDMUserId = useAppStore((s) => s.pendingDMUserId);
    const { user } = useAuth();
+   const { isAdmin } = useAdminStatus(user?.id);
+   const [isCreatePollOpen, setIsCreatePollOpen] = useState(false);
 
    // Profiles cache for reactor names
    const profilesCacheRef = useRef<Record<string, string>>({});
@@ -2019,6 +2027,53 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
 
    const selectedGroupObject = groups.find(g => g.id === selectedGroupId);
    const selectedGroupName = selectedGroupObject?.name || "Conversation";
+   const isGeneralGroup = selectedGroupObject?.type === "general" || selectedGroupId === GENERAL_GROUP_ID;
+   const { pinnedPoll, refreshPinned } = usePinnedPoll(selectedGroupId, isGeneralGroup);
+
+   const handlePollCreated = (poll: Poll) => {
+      if (!user?.id || !selectedGroupId) return;
+      const pollTag = `[poll:${poll.id}]`;
+      const tempId = crypto.randomUUID();
+      const messagePayload: any = {
+         id: tempId,
+         content: pollTag,
+         user_id: user.id,
+         group_id: selectedGroupId,
+         is_read: false,
+      };
+      useAppStore.getState().addGlobalMessage({
+         ...messagePayload,
+         created_at: new Date().toISOString(),
+         status: "sending",
+         profiles: { id: user.id, username: profile?.username || "User", avatar_url: profile?.avatar_url || "" },
+      });
+      pendingRetriesRef.current.set(tempId, { kind: "text", payload: messagePayload, fallbackText: pollTag });
+      void queueAndDeliver(
+         {
+            id: tempId,
+            kind: "text",
+            payload: messagePayload,
+            fallbackText: pollTag,
+            groupId: selectedGroupId,
+            createdAt: new Date().toISOString(),
+         },
+         () => deliverTextMessage(messagePayload, pollTag),
+      );
+      void refreshPinned();
+      triggerToast("Poll published to General chat!", TOAST_DURATION.SHORT);
+   };
+
+   const handleJumpToPollMessage = (pollId: string) => {
+      const targetMsg = allRoomMessages.find((m: any) => {
+         const text = getDecryptedContent(m) || "";
+         return text.includes(`[poll:${pollId}]`);
+      });
+      if (targetMsg) {
+         handleJumpToMessage(targetMsg.id);
+      } else {
+         triggerToast("Poll message is further up in history", TOAST_DURATION.SHORT);
+      }
+   };
 
    return (
       <>
@@ -2413,6 +2468,26 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                            </div>
                         )}
 
+                        {/* Pinned Admin Poll Banner on top of General Chat */}
+                        {selectedGroupId && isGeneralGroup && pinnedPoll && (
+                           <PinnedPollBanner
+                              pinnedPoll={pinnedPoll}
+                              currentUserId={user?.id}
+                              currentUserProfile={
+                                 user?.id
+                                    ? {
+                                         id: user.id,
+                                         username: profile?.username || "User",
+                                         avatar_url: profile?.avatar_url || "",
+                                      }
+                                    : undefined
+                              }
+                              isAdmin={Boolean(isAdmin)}
+                              onJumpToPollMessage={handleJumpToPollMessage}
+                              onUnpinned={() => void refreshPinned()}
+                           />
+                        )}
+
                         {/* Content List */}
                         <div className="flex-1 overflow-y-auto p-4 min-h-0 scrollbar-hide h-full" ref={scrollRef} onScroll={handleScroll}>
                            {!selectedGroupId ? (
@@ -2581,6 +2656,8 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                                       <span className="text-indigo-400 font-semibold">🎤 Voice note</span>
                                                    ) : lastMessage.image_url ? (
                                                       <span className="text-indigo-400 font-semibold">📷 Image</span>
+                                                   ) : /^\[poll:[a-zA-Z0-9-_]+\]$/.test(getDecryptedContent(lastMessage) || "") ? (
+                                                      <span className="text-indigo-400 font-semibold">📊 Poll</span>
                                                    ) : (
                                                       maskSpoilerText(getDecryptedContent(lastMessage), dailyWord, !isDM)
                                                    )}
@@ -2835,6 +2912,20 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                                             />
                                                          ) : msg.image_url ? (
                                                             <ChatImage url={msg.image_url} />
+                                                         ) : /^\[poll:([a-zA-Z0-9-_]+)\]$/.test((content || "").trim()) ? (
+                                                            <ChatPollCard
+                                                               pollId={(content || "").trim().match(/^\[poll:([a-zA-Z0-9-_]+)\]$/)?.[1] || ""}
+                                                               currentUserId={user?.id}
+                                                               currentUserProfile={
+                                                                  user?.id
+                                                                     ? {
+                                                                          id: user.id,
+                                                                          username: profile?.username || "User",
+                                                                          avatar_url: profile?.avatar_url || "",
+                                                                       }
+                                                                     : undefined
+                                                               }
+                                                            />
                                                          ) : (
                                                             <p className={`text-xs text-left mt-1 leading-relaxed whitespace-pre-wrap break-words px-3 py-2 rounded-2xl ${isMe
                                                                ? 'bg-indigo-600 border border-indigo-500 text-white'
@@ -3012,13 +3103,25 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
 
                               <div className="flex items-center gap-1.5 w-full">
                                  {!isRecording && (
-                                    <button
-                                       onClick={() => fileInputRef.current?.click()}
-                                       className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white cursor-pointer transition-colors"
-                                       title="Send image"
-                                    >
-                                       <ImageIcon className="w-4 h-4" />
-                                    </button>
+                                    <>
+                                       <button
+                                          onClick={() => fileInputRef.current?.click()}
+                                          className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white cursor-pointer transition-colors"
+                                          title="Send image"
+                                       >
+                                          <ImageIcon className="w-4 h-4" />
+                                       </button>
+                                       {isGeneralGroup && (
+                                          <button
+                                             type="button"
+                                             onClick={() => setIsCreatePollOpen(true)}
+                                             className="p-2 bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 rounded-xl text-indigo-300 cursor-pointer transition-colors"
+                                             title="Create a Poll"
+                                          >
+                                             <BarChart3 className="w-4 h-4" />
+                                          </button>
+                                       )}
+                                    </>
                                  )}
 
                                  {isRecording ? (
@@ -3376,6 +3479,23 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                handleStartDM(uid);
             }}
          />
+
+         {/* Create Poll Modal (General Group) */}
+         {user?.id && selectedGroupId && isGeneralGroup && (
+            <CreatePollModal
+               isOpen={isCreatePollOpen}
+               onClose={() => setIsCreatePollOpen(false)}
+               groupId={selectedGroupId}
+               creatorId={user.id}
+               creatorProfile={{
+                  id: user.id,
+                  username: profile?.username || "User",
+                  avatar_url: profile?.avatar_url || "",
+               }}
+               isAdmin={Boolean(isAdmin)}
+               onPollCreated={handlePollCreated}
+            />
+         )}
 
          {/* Dismiss Zone overlay at the bottom center */}
          <AnimatePresence>

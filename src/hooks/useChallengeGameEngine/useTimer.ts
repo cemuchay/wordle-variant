@@ -16,6 +16,7 @@ interface UseTimerProps {
    guesses: any[];
    usedHint: boolean;
    hintRecord: any;
+   targetWords: string[];
    wordLength: number;
    gameIndex: number | null | undefined;
    wrappedSubmitResult: (payload: any, wordLen?: number, gIdx?: number) => Promise<boolean>;
@@ -36,6 +37,7 @@ export const useTimer = ({
    guesses,
    usedHint,
    hintRecord,
+   targetWords,
    wordLength,
    gameIndex,
    wrappedSubmitResult,
@@ -66,6 +68,9 @@ export const useTimer = ({
                   hints_used: usedHint,
                   hint_record: hintRecord,
                   time_taken: timeTaken,
+                  ...(challenge.is_shapeshifter
+                     ? { target_words: targetWords }
+                     : {}),
                },
                wordLength,
                gameIndex!,
@@ -81,6 +86,9 @@ export const useTimer = ({
                hints_used: usedHint,
                hint_record: hintRecord,
                time_taken: timeTaken,
+               ...(challenge.is_shapeshifter
+                  ? { target_words: targetWords }
+                  : {}),
             });
             if (!success) triggerToast("Failed to save result.", TOAST_DURATION.LONG);
             onFinish();
@@ -94,12 +102,14 @@ export const useTimer = ({
       triggerToast,
       setIsSaving,
       challenge.mode,
+      challenge.is_shapeshifter,
       effectiveMaxTime,
       isMarathon,
       wrappedSubmitResult,
       guesses,
       usedHint,
       hintRecord,
+      targetWords,
       wordLength,
       gameIndex,
       onLengthComplete,
