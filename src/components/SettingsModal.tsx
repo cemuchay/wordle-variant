@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, ShieldCheck, MessageSquareQuote, LogOut, Terminal, Mail, FileText, Bell, Download, Search, Shield, Pencil, Check } from 'lucide-react';
+import { X, ShieldCheck, MessageSquareQuote, LogOut, Terminal, Mail, FileText, Bell, Download, Search, Shield, Pencil, Check, BarChart3 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
@@ -10,6 +10,7 @@ import { usePWAInstall } from '../hooks/usePWAInstall';
 import { useAppStore } from '../store/useAppStore';
 import { useAdminStatus } from '../hooks/useAdminStatus';
 import { ModalLayout } from './layout/ModalLayout';
+import { AdminPollsModal } from './admin/polls/AdminPollsModal';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -44,6 +45,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     const { isStandalone, handleInstall, isInstalling, isIOS } = usePWAInstall();
     const [showIOSInstallInstructions, setShowIOSInstallInstructions] = useState(false);
     const { isAdmin } = useAdminStatus(profile?.id);
+    const [isAdminPollsOpen, setIsAdminPollsOpen] = useState(false);
 
     const handleSignOut = async () => {
         const confirmed = await ask({
@@ -805,7 +807,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
 
 
                             {/* Admin Portal (Only for Admins) */}
-                            {isAdmin && (matchesSearch('Admin') || matchesSearch('Portal') || matchesSearch('Shield')) && (
+                            {isAdmin && (matchesSearch('Admin') || matchesSearch('Portal') || matchesSearch('Shield') || matchesSearch('Polls') || matchesSearch('Results')) && (
                                 <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                                     <div className="flex items-center gap-2 mb-1">
                                         <Shield size={14} className="text-correct" />
@@ -827,6 +829,19 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                                         <Shield size={20} className="text-correct opacity-40 group-hover:opacity-100 transition-opacity" />
                                     </a>
 
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsAdminPollsOpen(true)}
+                                        className="w-full text-left flex items-center justify-between p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl hover:bg-amber-500/10 transition-all group cursor-pointer"
+                                    >
+                                        <div className="flex-1 pr-4">
+                                            <p className="text-sm font-bold text-amber-300">Admin Polls & Results</p>
+                                            <p className="text-[11px] text-gray-500 leading-relaxed">
+                                                View General chat admin polls, inspect live vote breakdowns, and manage pinned polls.
+                                            </p>
+                                        </div>
+                                        <BarChart3 size={20} className="text-amber-300 opacity-50 group-hover:opacity-100 transition-opacity shrink-0" />
+                                    </button>
 
                                 </section>
                             )}
@@ -998,6 +1013,14 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                     )}
                 </div>
             </div>
+
+            {isAdmin && (
+                <AdminPollsModal
+                    isOpen={isAdminPollsOpen}
+                    onClose={() => setIsAdminPollsOpen(false)}
+                    currentUserId={profile?.id}
+                />
+            )}
         </ModalLayout>
     );
 };

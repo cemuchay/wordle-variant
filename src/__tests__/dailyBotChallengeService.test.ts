@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
     BOT_MARATHON_PRESETS,
     isLagosSunday,
-    getNextWeekSpan
+    getNextWeekSpan,
+    resolvePresetVariations
 } from '../services/dailyBotChallengeService';
 
 describe('dailyBotChallengeService', () => {
@@ -19,6 +20,23 @@ describe('dailyBotChallengeService', () => {
                 expect(len).toBeGreaterThanOrEqual(3);
                 expect(len).toBeLessThanOrEqual(7);
             }
+        }
+    });
+
+    it('resolves preset variations dynamically with valid parameters (Layer 2)', () => {
+        for (const preset of BOT_MARATHON_PRESETS) {
+            const resolved = resolvePresetVariations(preset);
+            expect(resolved.wordLengths.length).toBeGreaterThanOrEqual(4);
+            expect(resolved.wordLengths.length).toBeLessThanOrEqual(7);
+            for (const len of resolved.wordLengths) {
+                expect(len).toBeGreaterThanOrEqual(3);
+                expect(len).toBeLessThanOrEqual(7);
+            }
+            expect(resolved.maxAttempts).toBeGreaterThanOrEqual(4);
+            expect(resolved.maxAttempts).toBeLessThanOrEqual(7);
+            expect(typeof resolved.marathonForceOrder).toBe('boolean');
+            expect(typeof resolved.disableHints).toBe('boolean');
+            expect(typeof resolved.isHandicap).toBe('boolean');
         }
     });
 
