@@ -458,11 +458,9 @@ export async function sendDirectMessagePushNotification({
    senderId,
    senderName,
    recipientId,
-   recipientLastSeenAt: _recipientLastSeenAt,
    isRecipientOnline,
    messageSnippet,
    groupId,
-   sentAt: _sentAt = new Date().toISOString(),
 }: {
    senderId: string;
    senderName: string;
@@ -535,4 +533,148 @@ export async function sendDirectMessagePushNotification({
       },
    });
 }
+
+// ==========================================
+// Admin Poll Client Notification Helpers
+// ==========================================
+
+/**
+ * Dispatches push notifications to active push subscribers when a new Admin Poll is published.
+ */
+export async function sendAdminPollCreatedPush({
+   pollId,
+   question,
+   creatorId,
+}: {
+   pollId: string;
+   question: string;
+   creatorId?: string;
+}): Promise<number> {
+   if (typeof window === "undefined" || !pollId) return 0;
+
+   try {
+      // 1. Fetch user IDs of all registered push subscribers
+      const { data: subs, error } = await supabase
+         .from("push_subscriptions")
+         .select("user_id");
+
+      if (error || !subs || subs.length === 0) {
+         return 0;
+      }
+
+      // 2. Deduplicate user IDs & exclude the creating admin
+      const recipientIds = Array.from(
+         new Set(
+            subs
+               .map((s) => s.user_id)
+               .filter((uid): uid is string => Boolean(uid) && isUuid(uid) && uid !== creatorId)
+         )
+      );
+
+      if (recipientIds.length === 0) return 0;
+
+      let cleanQuestion = (question || "").trim();
+      if (cleanQuestion.length > 70) {
+         cleanQuestion = cleanQuestion.slice(0, 67) + "...";
+      }
+
+      const promises = recipientIds.map((userId) => {
+         const notifId = generateDeterministicUUID(`admin_poll_created_${pollId}_${userId}`);
+         return sendClientNotification({
+            id: notifId,
+            user_id: userId,
+            type: "ADMIN_BROADCAST",
+            title: "New Community Poll! 📊",
+            message: `"${cleanQuestion}" • Tap to cast your vote!`,
+            data: {
+               mode: "admin_poll",
+               poll_id: pollId,
+               group_id: "00000000-0000-0000-0000-000000000001",
+               action_url: "/?open=chat&group_id=00000000-0000-0000-0000-000000000001",
+            },
+         });
+      });
+
+      const results = await Promise.allSettled(promises);
+      const sentCount = results.filter((r) => r.status === "fulfilled" && r.value === true).length;
+      return sentCount;
+   } catch (err) {
+      console.warn("[ClientPush] Error sending admin poll created push:", err);
+      return 0;
+   }
+}
+
+/**
+ * Dispatches push notifications to active push subscribers when an Admin Poll ends/expires.
+ */
+export async function sendAdminPollExpiredPush({
+   pollId,
+   question,
+   winningOptionText,
+   winningPercentage,
+   totalVotes,
+}: {
+   pollId: string;
+   question: string;
+   winningOptionText?: string | null;
+   winningPercentage?: number;
+   totalVotes: number;
+}): Promise<number> {
+   if (typeof window === "undefined" || !pollId) return 0;
+
+   try {
+      const { data: subs, error } = await supabase
+         .from("push_subscriptions")
+         .select("user_id");
+
+      if (error || !subs || subs.length === 0) {
+         return 0;
+      }
+
+      const recipientIds = Array.from(
+         new Set(
+            subs
+               .map((s) => s.user_id)
+               .filter((uid): uid is string => Boolean(uid) && isUuid(uid))
+         )
+      );
+
+      if (recipientIds.length === 0) return 0;
+
+      let cleanQuestion = (question || "").trim();
+      if (cleanQuestion.length > 50) {
+         cleanQuestion = cleanQuestion.slice(0, 47) + "...";
+      }
+
+      const message =
+         totalVotes > 0 && winningOptionText
+            ? `Poll closed: "${cleanQuestion}" — Winner: ${winningOptionText} (${winningPercentage || 0}%).`
+            : `Poll closed: "${cleanQuestion}" — Final voting concluded.`;
+
+      const promises = recipientIds.map((userId) => {
+         const notifId = generateDeterministicUUID(`admin_poll_expired_${pollId}_${userId}`);
+         return sendClientNotification({
+            id: notifId,
+            user_id: userId,
+            type: "ADMIN_BROADCAST",
+            title: "Poll Results are In! 🏆",
+            message,
+            data: {
+               mode: "admin_poll_result",
+               poll_id: pollId,
+               group_id: "00000000-0000-0000-0000-000000000001",
+               action_url: "/?open=chat&group_id=00000000-0000-0000-0000-000000000001",
+            },
+         });
+      });
+
+      const results = await Promise.allSettled(promises);
+      const sentCount = results.filter((r) => r.status === "fulfilled" && r.value === true).length;
+      return sentCount;
+   } catch (err) {
+      console.warn("[ClientPush] Error sending admin poll expired push:", err);
+      return 0;
+   }
+}
+
 
