@@ -28,6 +28,7 @@ export interface Poll {
    is_admin_poll: boolean;
    is_pinned: boolean;
    pinned_at?: string | null;
+   notified_expired_at?: string | null;
    expires_at: string;
    created_at: string;
    profiles?: {
