@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import type { JSX } from "react";
 import { calculateSkillIndex } from '../../../lib/game-logic';
 import { MENTION_COLORS, URL_REGEX } from './constants';
+import { ChatPollCard } from '../poll/ChatPollCard';
 
 interface MessageContentProps {
     content: string;
@@ -15,6 +16,20 @@ interface MessageContentProps {
 export const MessageContent = ({ content, isMe, users, dailyGuesses, currentUserId }: MessageContentProps) => {
     return useMemo(() => {
         if (!content) return null;
+
+        // Render Poll tag inline
+        const pollMatch = content.match(/\[poll:([a-zA-Z0-9-_]+)\]/);
+        if (pollMatch) {
+            const pollId = pollMatch[1];
+            const viewerProfile = users.find(u => u.id === currentUserId);
+            return (
+                <ChatPollCard
+                    pollId={pollId}
+                    currentUserId={currentUserId}
+                    currentUserProfile={viewerProfile}
+                />
+            );
+        }
 
         // Render Guess tag inline
         const guessMatch = content.match(/\[guess:([a-zA-Z0-9-_]+)\]/);

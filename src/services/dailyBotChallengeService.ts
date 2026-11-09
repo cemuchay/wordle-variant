@@ -13,17 +13,91 @@ export interface BotMarathonPreset {
    id: string;
    name: string;
    description: string;
-   wordLengths: number[]; // 4 to 7 games per day (no sentences)
+   wordLengths: number[]; // Default base sequence (4 to 7 games per day)
+   wordLengthOptions?: number[][]; // Dynamic variations of lengths to randomly select from
    maxAttempts: number;
+   maxAttemptOptions?: number[]; // Dynamic variations of max attempts
    difficulty: "easy" | "normal" | ("easy" | "normal")[];
-   isShapeshifter?: boolean;
+   difficultyOptions?: ("easy" | "normal" | ("easy" | "normal")[])[];
    disableHints?: boolean;
+   disableHintOptions?: boolean[];
    marathonForceOrder?: boolean;
+   marathonForceOrderOptions?: boolean[];
    isHandicap?: boolean;
    handicapEnforced?: boolean;
    handicapLevel?: HandicapLevel;
    handicapRows?: HandicapRows;
+   handicapOptions?: {
+      isHandicap: boolean;
+      handicapEnforced?: boolean;
+      handicapLevel?: HandicapLevel;
+      handicapRows?: HandicapRows;
+   }[];
    marathonTimers?: number[] | null;
+}
+
+export interface ResolvedBotPreset {
+   id: string;
+   name: string;
+   description: string;
+   wordLengths: number[];
+   maxAttempts: number;
+   difficulty: "easy" | "normal" | ("easy" | "normal")[];
+   disableHints: boolean;
+   marathonForceOrder: boolean;
+   isHandicap: boolean;
+   handicapEnforced: boolean;
+   handicapLevel?: HandicapLevel;
+   handicapRows?: HandicapRows;
+   marathonTimers?: number[] | null;
+}
+
+/**
+ * Resolves a preset by randomly selecting among its dynamic variation options (Layer 2)
+ * so that every time a preset is picked, its exact play configuration feels fresh.
+ */
+export function resolvePresetVariations(
+   preset: BotMarathonPreset,
+): ResolvedBotPreset {
+   const pick = <T>(options: T[] | undefined, fallback: T): T => {
+      if (options && options.length > 0) {
+         return options[Math.floor(Math.random() * options.length)];
+      }
+      return fallback;
+   };
+
+   const wordLengths = pick(preset.wordLengthOptions, preset.wordLengths);
+   const maxAttempts = pick(preset.maxAttemptOptions, preset.maxAttempts);
+   const difficulty = pick(preset.difficultyOptions, preset.difficulty);
+   const disableHints = pick(preset.disableHintOptions, !!preset.disableHints);
+   const marathonForceOrder = pick(
+      preset.marathonForceOrderOptions,
+      !!preset.marathonForceOrder,
+   );
+
+   const defaultHandicap = {
+      isHandicap: !!preset.isHandicap,
+      handicapEnforced: !!preset.handicapEnforced,
+      handicapLevel: preset.handicapLevel,
+      handicapRows: preset.handicapRows,
+   };
+   const handicap = pick(preset.handicapOptions, defaultHandicap);
+
+   return {
+      id: preset.id,
+      name: preset.name,
+      description: preset.description,
+      wordLengths,
+      maxAttempts,
+      difficulty,
+      disableHints,
+      marathonForceOrder,
+      isHandicap: handicap.isHandicap,
+      handicapEnforced: !!handicap.handicapEnforced,
+      handicapLevel: handicap.handicapLevel,
+      handicapRows: handicap.handicapRows,
+      marathonTimers: preset.marathonTimers,
+   };
 }
 
 export const BOT_MARATHON_PRESETS: BotMarathonPreset[] = [
@@ -32,10 +106,27 @@ export const BOT_MARATHON_PRESETS: BotMarathonPreset[] = [
       name: "Standard Escalation",
       description: "Classic progression from 4 to 7 letter words.",
       wordLengths: [4, 5, 6, 7],
+      wordLengthOptions: [
+         [4, 5, 6, 7],
+         [4, 5, 5, 6, 7],
+         [4, 4, 5, 6, 7],
+      ],
       maxAttempts: 6,
+      maxAttemptOptions: [5, 6],
       difficulty: "normal",
+      difficultyOptions: ["normal", ["easy", "normal", "normal", "normal"]],
       marathonForceOrder: true,
+      marathonForceOrderOptions: [true, false],
       isHandicap: false,
+      handicapOptions: [
+         { isHandicap: false },
+         {
+            isHandicap: true,
+            handicapEnforced: false,
+            handicapLevel: "easy",
+            handicapRows: 1,
+         },
+      ],
    },
    {
       id: "speed-sprint",
@@ -43,10 +134,27 @@ export const BOT_MARATHON_PRESETS: BotMarathonPreset[] = [
       description:
          "Brisk 5-game sprint with accessible lengths and tighter attempts.",
       wordLengths: [4, 4, 5, 5, 6],
+      wordLengthOptions: [
+         [4, 4, 5, 5, 6],
+         [4, 5, 5, 5, 6],
+         [4, 4, 4, 5, 6],
+      ],
       maxAttempts: 5,
+      maxAttemptOptions: [5, 6],
       difficulty: "easy",
+      difficultyOptions: ["easy", "normal"],
       marathonForceOrder: false,
+      marathonForceOrderOptions: [false, true],
       isHandicap: false,
+      handicapOptions: [
+         { isHandicap: false },
+         {
+            isHandicap: true,
+            handicapEnforced: false,
+            handicapLevel: "easy",
+            handicapRows: 1,
+         },
+      ],
    },
    {
       id: "grand-gauntlet",
@@ -54,24 +162,65 @@ export const BOT_MARATHON_PRESETS: BotMarathonPreset[] = [
       description:
          "Max 7 games challenge testing full endurance with flexible play order.",
       wordLengths: [4, 5, 5, 6, 6, 7, 7],
+      wordLengthOptions: [
+         [4, 5, 5, 6, 6, 7, 7],
+         [4, 4, 5, 5, 6, 6, 7],
+         [5, 5, 6, 6, 7, 7, 7],
+      ],
       maxAttempts: 6,
+      maxAttemptOptions: [6, 7],
       difficulty: "normal",
+      difficultyOptions: ["normal", "easy"],
       marathonForceOrder: false,
+      marathonForceOrderOptions: [false, true],
       isHandicap: true,
       handicapEnforced: false,
       handicapLevel: "easy",
       handicapRows: 1,
+      handicapOptions: [
+         {
+            isHandicap: true,
+            handicapEnforced: false,
+            handicapLevel: "easy",
+            handicapRows: 1,
+         },
+         {
+            isHandicap: true,
+            handicapEnforced: false,
+            handicapLevel: "normal",
+            handicapRows: 1,
+         },
+         { isHandicap: false },
+      ],
    },
    {
-      id: "shapeshifter-mystery",
-      name: "Shapeshifter Mystery",
-      description: "Target words morph dynamically as you guess!",
+      id: "mystery-trial",
+      name: "Mystery Trial",
+      description:
+         "Progressive ladder with hints disabled to test pure deduction.",
       wordLengths: [4, 5, 6, 6, 7],
+      wordLengthOptions: [
+         [4, 5, 6, 6, 7],
+         [4, 5, 5, 6, 7],
+         [4, 4, 5, 6, 7],
+      ],
       maxAttempts: 6,
+      maxAttemptOptions: [5, 6],
       difficulty: "normal",
-      isShapeshifter: true,
       disableHints: true,
+      disableHintOptions: [true],
       marathonForceOrder: true,
+      marathonForceOrderOptions: [true, false],
+      isHandicap: false,
+      handicapOptions: [
+         { isHandicap: false },
+         {
+            isHandicap: true,
+            handicapEnforced: false,
+            handicapLevel: "easy",
+            handicapRows: 1,
+         },
+      ],
    },
    {
       id: "climbing-ladder",
@@ -79,10 +228,19 @@ export const BOT_MARATHON_PRESETS: BotMarathonPreset[] = [
       description:
          "Steady 5-stage progression with accessible standard vocabulary and 6 attempts.",
       wordLengths: [4, 5, 5, 6, 7],
+      wordLengthOptions: [
+         [4, 5, 5, 6, 7],
+         [4, 5, 6, 6, 7],
+         [4, 5, 6, 7],
+      ],
       maxAttempts: 6,
+      maxAttemptOptions: [6, 7],
       difficulty: "normal",
+      difficultyOptions: ["normal", "easy"],
       disableHints: false,
+      disableHintOptions: [false, true],
       marathonForceOrder: true,
+      marathonForceOrderOptions: [true, false],
    },
    {
       id: "handicap-showdown",
@@ -90,13 +248,41 @@ export const BOT_MARATHON_PRESETS: BotMarathonPreset[] = [
       description:
          "Enforced random starter row on every game to test adaptability.",
       wordLengths: [4, 5, 6, 7],
+      wordLengthOptions: [
+         [4, 5, 6, 7],
+         [4, 5, 5, 6, 7],
+         [4, 4, 5, 6],
+      ],
       maxAttempts: 6,
+      maxAttemptOptions: [5, 6],
       difficulty: "normal",
+      difficultyOptions: ["normal", "easy"],
       marathonForceOrder: true,
+      marathonForceOrderOptions: [true, false],
       isHandicap: true,
       handicapEnforced: true,
       handicapLevel: "normal",
       handicapRows: 1,
+      handicapOptions: [
+         {
+            isHandicap: true,
+            handicapEnforced: true,
+            handicapLevel: "normal",
+            handicapRows: 1,
+         },
+         {
+            isHandicap: true,
+            handicapEnforced: true,
+            handicapLevel: "easy",
+            handicapRows: 1,
+         },
+         {
+            isHandicap: true,
+            handicapEnforced: false,
+            handicapLevel: "normal",
+            handicapRows: 1,
+         },
+      ],
    },
    {
       id: "pentathlon",
@@ -104,9 +290,30 @@ export const BOT_MARATHON_PRESETS: BotMarathonPreset[] = [
       description:
          "5 varied stages mixing quick 4-letter words with longer challenges.",
       wordLengths: [4, 4, 5, 6, 7],
+      wordLengthOptions: [
+         [4, 4, 5, 6, 7],
+         [4, 5, 5, 6, 7],
+         [4, 5, 6, 7, 7],
+      ],
       maxAttempts: 6,
+      maxAttemptOptions: [5, 6],
       difficulty: ["easy", "easy", "normal", "normal", "normal"],
+      difficultyOptions: [
+         ["easy", "easy", "normal", "normal", "normal"],
+         "normal",
+         "easy",
+      ],
       marathonForceOrder: true,
+      marathonForceOrderOptions: [true, false],
+      handicapOptions: [
+         { isHandicap: false },
+         {
+            isHandicap: true,
+            handicapEnforced: false,
+            handicapLevel: "easy",
+            handicapRows: 1,
+         },
+      ],
    },
    {
       id: "double-six-endurance",
@@ -114,37 +321,101 @@ export const BOT_MARATHON_PRESETS: BotMarathonPreset[] = [
       description:
          "6 heavy games focusing on 5, 6, and 7 letter challenges with optional starters.",
       wordLengths: [5, 6, 6, 6, 7, 7],
+      wordLengthOptions: [
+         [5, 6, 6, 6, 7, 7],
+         [4, 5, 6, 6, 7, 7],
+         [5, 5, 6, 6, 7, 7],
+      ],
       maxAttempts: 6,
+      maxAttemptOptions: [6, 7],
       difficulty: "normal",
+      difficultyOptions: ["normal", "easy"],
       marathonForceOrder: false,
+      marathonForceOrderOptions: [false, true],
       isHandicap: true,
       handicapEnforced: false,
       handicapLevel: "normal",
       handicapRows: 1,
+      handicapOptions: [
+         {
+            isHandicap: true,
+            handicapEnforced: false,
+            handicapLevel: "normal",
+            handicapRows: 1,
+         },
+         {
+            isHandicap: true,
+            handicapEnforced: true,
+            handicapLevel: "easy",
+            handicapRows: 1,
+         },
+         { isHandicap: false },
+      ],
    },
    {
       id: "sudden-death",
       name: "Sudden Death",
       description: "Only 4 attempts per game, aided by a helpful starter row.",
       wordLengths: [4, 5, 6, 7],
+      wordLengthOptions: [
+         [4, 5, 6, 7],
+         [4, 4, 5, 6],
+         [4, 5, 5, 6],
+      ],
       maxAttempts: 4,
+      maxAttemptOptions: [4, 5],
       difficulty: "normal",
+      difficultyOptions: ["normal", "easy"],
       marathonForceOrder: true,
+      marathonForceOrderOptions: [true, false],
       isHandicap: true,
       handicapEnforced: true,
       handicapLevel: "easy",
       handicapRows: 1,
+      handicapOptions: [
+         {
+            isHandicap: true,
+            handicapEnforced: true,
+            handicapLevel: "easy",
+            handicapRows: 1,
+         },
+         {
+            isHandicap: true,
+            handicapEnforced: true,
+            handicapLevel: "easy",
+            handicapRows: 2,
+         },
+      ],
    },
    {
       id: "hexagon-clash",
       name: "Hexagon Clash",
       description:
-         "6 stages with shapeshifting twists and ordered progression.",
+         "6 stages with escalating lengths and strict ordered progression.",
       wordLengths: [4, 5, 5, 6, 7, 7],
+      wordLengthOptions: [
+         [4, 5, 5, 6, 7, 7],
+         [4, 4, 5, 6, 6, 7],
+         [4, 5, 6, 6, 7, 7],
+      ],
       maxAttempts: 6,
+      maxAttemptOptions: [5, 6],
       difficulty: "normal",
-      isShapeshifter: true,
+      difficultyOptions: [
+         "normal",
+         ["easy", "normal", "normal", "normal", "normal", "normal"],
+      ],
       marathonForceOrder: true,
+      marathonForceOrderOptions: [true, false],
+      handicapOptions: [
+         { isHandicap: false },
+         {
+            isHandicap: true,
+            handicapEnforced: false,
+            handicapLevel: "easy",
+            handicapRows: 1,
+         },
+      ],
    },
 ];
 
@@ -257,14 +528,22 @@ export async function autoCreateWeeklyBotChallenge(): Promise<boolean> {
          safeLocalStorage.removeItem(weekKey);
       }
 
-      // 2. Pick a random preset from the 10 presets
-      const preset =
+      // 2. Pick a random preset from the 10 presets and resolve its dynamic variation (Layer 2)
+      const basePreset =
          BOT_MARATHON_PRESETS[
             Math.floor(Math.random() * BOT_MARATHON_PRESETS.length)
          ];
+      const preset = resolvePresetVariations(basePreset);
       logger.info(
-         "[BotMarathon] Auto-creating 7-day bot challenge using preset:",
-         preset.name,
+         `[BotMarathon] Auto-creating 7-day bot challenge using preset: ${preset.name}`,
+         {
+            lengths: preset.wordLengths,
+            attempts: preset.maxAttempts,
+            forceOrder: preset.marathonForceOrder,
+            isHandicap: preset.isHandicap,
+            handicapEnforced: preset.handicapEnforced,
+            hintsDisabled: preset.disableHints,
+         },
       );
 
       // 3. Build 7-day sequence (numDays = 7, lifespanHours = 168)
@@ -357,7 +636,7 @@ export async function autoCreateWeeklyBotChallenge(): Promise<boolean> {
                marathon_force_order: !!preset.marathonForceOrder,
                is_bot_marathon: true,
                is_sentence: false, // Strictly no sentence games
-               is_shapeshifter: !!preset.isShapeshifter,
+               is_shapeshifter: false,
                notify_creator: false,
             },
          ]);

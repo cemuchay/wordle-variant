@@ -1,9 +1,9 @@
 /** Duration (ms) for toast notification visibility. */
 export const TOAST_DURATION = {
    /** Brief toast. */
-   SHORT: 2000,
+   SHORT: 2500,
    /** Standard toast. */
-   DEFAULT: 3000,
+   DEFAULT: 3500,
    /** Long toast. */
    LONG: 4000,
    /** Extra-long toast. */
@@ -28,16 +28,16 @@ export const Z_INDEX = {
    AUTH_MODAL: 200,
    /** Toast notifications. */
    TOAST: 300,
-    /** Dynamic Island status overlay (highest priority). */
-    DYNAMIC_ISLAND: 999,
-    /** Floating chat bubble overlay. */
-    CHAT_BUBBLE: 99999,
-    /** Fullscreen image preview modal (sits above everything including chat bubble). */
-    IMAGE_PREVIEW: 100000,
-    /** User profile modal overlay. */
-    USER_PROFILE: 10000,
-    /** Topic details modal. */
-    TOPIC_DETAILS: 1000,
+   /** Dynamic Island status overlay (highest priority). */
+   DYNAMIC_ISLAND: 999,
+   /** Floating chat bubble overlay. */
+   CHAT_BUBBLE: 99999,
+   /** Fullscreen image preview modal (sits above everything including chat bubble). */
+   IMAGE_PREVIEW: 100000,
+   /** User profile modal overlay. */
+   USER_PROFILE: 10000,
+   /** Topic details modal. */
+   TOPIC_DETAILS: 1000,
 } as const;
 
 /** Duration (ms) for various animations. */
@@ -47,9 +47,9 @@ export const ANIMATION_DURATION = {
    /** Standard transition. */
    NORMAL: 300,
    /** Per-tile reveal in the guess grid. */
-   TILE_REVEAL: 400,
+   TILE_REVEAL: 200,
    /** Per-tile reveal for longer words (7+ letters). */
-   TILE_REVEAL_LONG: 600,
+   TILE_REVEAL_LONG: 300,
    /** Shake animation on invalid guess. */
    SHAKE: 500,
 } as const;
