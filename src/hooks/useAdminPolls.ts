@@ -42,8 +42,9 @@ export const useAdminPolls = (enabled: boolean, currentUserId?: string) => {
          void loadAll();
       });
 
+      const channelId = `admin_polls_settings_live_${Math.random().toString(36).slice(2, 9)}`;
       const channel = supabase
-         .channel("admin_polls_settings_live")
+         .channel(channelId)
          .on("postgres_changes", { event: "*", schema: "public", table: "chat_polls" }, () => {
             void loadAll();
          })
