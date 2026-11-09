@@ -71,8 +71,9 @@ export const usePoll = (
          }
       });
 
+      const channelId = `poll_live_${pollId}_${Math.random().toString(36).slice(2, 9)}`;
       const channel = supabase
-         .channel(`poll_live_${pollId}`)
+         .channel(channelId)
          .on(
             "postgres_changes",
             { event: "*", schema: "public", table: "chat_polls", filter: `id=eq.${pollId}` },
@@ -203,8 +204,9 @@ export const usePinnedPoll = (groupId: string | null | undefined, isGeneralGroup
          void loadPinned();
       });
 
+      const channelId = `pinned_poll_${groupId}_${Math.random().toString(36).slice(2, 9)}`;
       const channel = supabase
-         .channel(`pinned_poll_${groupId}`)
+         .channel(channelId)
          .on(
             "postgres_changes",
             { event: "*", schema: "public", table: "chat_polls", filter: `group_id=eq.${groupId}` },
