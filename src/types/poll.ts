@@ -72,7 +72,8 @@ export interface PollWithResults {
 }
 
 export const GENERAL_GROUP_ID = "00000000-0000-0000-0000-000000000001";
-export const MAX_POLL_DURATION_HOURS = 168; // 7 days
+export const MAX_POLL_DURATION_HOURS = 168; // 7 days max upon creation
+export const MAX_POLL_LIFETIME_HOURS = 240; // 10 days absolute max total lifetime (with extensions)
 export const MIN_POLL_OPTIONS = 2;
 export const MAX_POLL_OPTIONS = 6;
 export const MAX_POLL_EXTENSIONS = 2;

@@ -125,7 +125,6 @@ export const ModalsManager = ({
         dismiss: dismissChallengeAnnouncement,
     } = useChallengeAnnouncement({
         userId: gameContext.user?.id,
-        challenges: (gameContext as any).challenges,
         activeNavigationItem,
         isChallengeModalOpen: modals.isChallengeOpen,
         isOtherModalOpen: isAnyModalOpen,

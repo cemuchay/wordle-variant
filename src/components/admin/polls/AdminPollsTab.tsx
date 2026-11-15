@@ -13,7 +13,7 @@ import {
 import { useAdminPolls } from "../../../hooks/useAdminPolls";
 import { formatPollRemainingTime } from "../../../hooks/usePoll";
 import { extendPollLifetime } from "../../../services/pollService";
-import { MAX_POLL_DURATION_HOURS, MAX_POLL_EXTENSIONS, type Poll } from "../../../types/poll";
+import { MAX_POLL_LIFETIME_HOURS, MAX_POLL_EXTENSIONS, type Poll } from "../../../types/poll";
 import { AdminPollDetailView } from "./AdminPollDetailView";
 
 interface AdminPollsTabProps {
@@ -53,20 +53,31 @@ export const AdminPollsTab = ({ currentUserId, onToast }: AdminPollsTabProps) =>
       }
       const createdMs = new Date(poll.created_at).getTime();
       const expiresMs = new Date(poll.expires_at).getTime();
-      const maxMs = createdMs + MAX_POLL_DURATION_HOURS * 60 * 60 * 1000;
+      const maxMs = createdMs + MAX_POLL_LIFETIME_HOURS * 60 * 60 * 1000;
       if (expiresMs >= maxMs) {
-         return { allowed: false, reason: "Already at 7-day max lifetime" };
+         return { allowed: false, reason: "Already at 10-day max lifetime" };
       }
       return { allowed: true };
    };
 
+   const [extendDaysByPoll, setExtendDaysByPoll] = useState<Record<string, number>>({});
+
+   const getRemainingExtendableDays = (poll: Poll): number => {
+      const createdMs = new Date(poll.created_at).getTime();
+      const expiresMs = new Date(poll.expires_at).getTime();
+      const maxMs = createdMs + MAX_POLL_LIFETIME_HOURS * 60 * 60 * 1000;
+      const remainingMs = Math.max(0, maxMs - expiresMs);
+      return Math.floor(remainingMs / (24 * 60 * 60 * 1000));
+   };
+
    const handleExtend = async (e: React.MouseEvent, poll: Poll) => {
       e.stopPropagation();
+      const days = extendDaysByPoll[poll.id] ?? 1;
       setExtendingId(poll.id);
       try {
-         await extendPollLifetime(poll.id);
+         await extendPollLifetime(poll.id, days);
          await refresh();
-         onToast("Poll lifetime extended by +1 day.", "success");
+         onToast(`Poll lifetime extended by +${days} ${days === 1 ? "day" : "days"}.`, "success");
       } catch (err: unknown) {
          onToast(err instanceof Error ? err.message : "Failed to extend poll", "error");
       } finally {
@@ -218,11 +229,43 @@ export const AdminPollsTab = ({ currentUserId, onToast }: AdminPollsTabProps) =>
                               onClick={(e) => e.stopPropagation()}
                               className="pt-2 border-t border-white/10 flex items-center gap-2 flex-wrap"
                            >
+                              {extCheck.allowed && (
+                                 <select
+                                    value={extendDaysByPoll[poll.id] ?? 1}
+                                    onChange={(e) =>
+                                       setExtendDaysByPoll((prev) => ({
+                                          ...prev,
+                                          [poll.id]: Number(e.target.value),
+                                       }))
+                                    }
+                                    disabled={extendingId === poll.id}
+                                    aria-label="Days to extend poll"
+                                    className="px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-[11px] font-bold cursor-pointer focus:outline-none focus:border-indigo-400"
+                                 >
+                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((d) => {
+                                       const maxExtendable = getRemainingExtendableDays(poll);
+                                       const isDisabled = d > maxExtendable;
+                                       return (
+                                          <option
+                                             key={d}
+                                             value={d}
+                                             disabled={isDisabled}
+                                             className="bg-gray-900 text-gray-200 disabled:text-gray-600"
+                                          >
+                                             +{d} {d === 1 ? "Day" : "Days"}
+                                          </option>
+                                       );
+                                    })}
+                                 </select>
+                              )}
                               <button
                                  type="button"
                                  disabled={!extCheck.allowed || extendingId === poll.id}
                                  onClick={(e) => void handleExtend(e, poll)}
-                                 title={extCheck.reason || "Extend poll lifetime by +1 day"}
+                                 title={
+                                    extCheck.reason ||
+                                    `Extend poll lifetime by +${extendDaysByPoll[poll.id] ?? 1} ${(extendDaysByPoll[poll.id] ?? 1) === 1 ? "day" : "days"}`
+                                 }
                                  className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider inline-flex items-center gap-1.5 transition-all border ${
                                     extCheck.allowed
                                        ? "bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-400 cursor-pointer"
@@ -234,7 +277,7 @@ export const AdminPollsTab = ({ currentUserId, onToast }: AdminPollsTabProps) =>
                                     {extendingId === poll.id
                                        ? "Extending..."
                                        : extCheck.allowed
-                                       ? "Extend +1 Day"
+                                       ? `Extend +${extendDaysByPoll[poll.id] ?? 1}d`
                                        : extCheck.reason}
                                  </span>
                               </button>

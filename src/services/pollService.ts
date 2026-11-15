@@ -10,6 +10,7 @@ import {
    type CreatePollInput,
    type PollOption,
    MAX_POLL_DURATION_HOURS,
+   MAX_POLL_LIFETIME_HOURS,
    MIN_POLL_OPTIONS,
    MAX_POLL_OPTIONS,
    MAX_POLL_EXTENSIONS,
@@ -636,7 +637,7 @@ export const fetchAllAdminPollsWithVotes = async (): Promise<{
  * Extends an active poll's lifetime by 1 day (24 hours), up to a maximum of 7 days total
  * from creation and a maximum of 2 extensions per poll.
  */
-export const extendPollLifetime = async (pollId: string): Promise<Poll> => {
+export const extendPollLifetime = async (pollId: string, days = 1): Promise<Poll> => {
    const { poll } = await fetchPollWithVotes(pollId);
    if (!poll) {
       throw new Error("Poll not found.");
@@ -654,14 +655,15 @@ export const extendPollLifetime = async (pollId: string): Promise<Poll> => {
    }
 
    const createdMs = new Date(poll.created_at).getTime();
-   const maxAllowedExpiresMs = createdMs + MAX_POLL_DURATION_HOURS * 60 * 60 * 1000;
+   const maxAllowedExpiresMs = createdMs + MAX_POLL_LIFETIME_HOURS * 60 * 60 * 1000;
    const oneDayMs = 24 * 60 * 60 * 1000;
 
    if (currentExpiresMs >= maxAllowedExpiresMs) {
-      throw new Error("Poll is already at the maximum 7-day lifetime.");
+      throw new Error("Poll is already at the maximum 10-day lifetime.");
    }
 
-   const nextExpiresMs = Math.min(currentExpiresMs + oneDayMs, maxAllowedExpiresMs);
+   const safeDays = Math.max(1, Math.floor(days));
+   const nextExpiresMs = Math.min(currentExpiresMs + safeDays * oneDayMs, maxAllowedExpiresMs);
    const nextExpiresIso = new Date(nextExpiresMs).toISOString();
    const nextExtensionCount = currentExtensions + 1;
 
@@ -670,32 +672,31 @@ export const extendPollLifetime = async (pollId: string): Promise<Poll> => {
       expires_at: nextExpiresIso,
       extension_count: nextExtensionCount,
    };
-   saveLocalPoll(updatedLocal);
+   const { data, error } = await supabase
+      .from("chat_polls")
+      .update({
+         expires_at: nextExpiresIso,
+         extension_count: nextExtensionCount,
+      })
+      .eq("id", pollId)
+      .select("*, profiles:creator_id(id, username, avatar_url)")
+      .maybeSingle();
 
-   try {
-      const { data, error } = await supabase
-         .from("chat_polls")
-         .update({
-            expires_at: nextExpiresIso,
-            extension_count: nextExtensionCount,
-         })
-         .eq("id", pollId)
-         .select("*, profiles:creator_id(id, username, avatar_url)")
-         .maybeSingle();
-
-      if (!error && data) {
-         const normalized: Poll = {
-            ...data,
-            options: Array.isArray(data.options) ? data.options : poll.options,
-         };
-         saveLocalPoll(normalized);
-         notifyPollUpdated(pollId);
-         return normalized;
-      }
-   } catch {
-      // fallback to local
+   if (error) {
+      throw new Error(error.message || "Failed to extend poll lifetime.");
    }
 
+   if (data) {
+      const normalized: Poll = {
+         ...data,
+         options: Array.isArray(data.options) ? data.options : poll.options,
+      };
+      saveLocalPoll(normalized);
+      notifyPollUpdated(pollId);
+      return normalized;
+   }
+
+   saveLocalPoll(updatedLocal);
    notifyPollUpdated(pollId);
    return updatedLocal;
 };
