@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { supabase } from "../lib/supabaseClient";
 import {
    createPoll,
    submitPollVote,
@@ -177,5 +178,98 @@ describe("pollService", () => {
       await setAdminPollPinned(adminPoll1.id, GENERAL_GROUP_ID, true);
       activePinned = await fetchActivePinnedPoll(GENERAL_GROUP_ID);
       expect(activePinned?.id).toBe(adminPoll1.id);
+   });
+
+   describe('extendPollLifetime', () => {
+      it('extends an active poll by 1 day and increments extension_count', async () => {
+         const created = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+         const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+         const mockPoll = {
+            id: 'poll-1',
+            created_at: created,
+            expires_at: expires,
+            extension_count: 0,
+         };
+
+         const updateMock = vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+               select: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({
+                     data: { ...mockPoll, extension_count: 1 },
+                     error: null,
+                  }),
+               }),
+            }),
+         });
+
+         vi.spyOn(supabase, 'from').mockImplementation(((table: string) => {
+            if (table === 'chat_polls') {
+               return {
+                  select: vi.fn().mockReturnValue({
+                     eq: vi.fn().mockReturnValue({
+                        maybeSingle: vi.fn().mockResolvedValue({ data: mockPoll, error: null }),
+                     }),
+                  }),
+                  update: updateMock,
+               } as never;
+            }
+            return {
+               select: vi.fn().mockReturnValue({
+                  eq: vi.fn().mockReturnValue({
+                     order: vi.fn().mockResolvedValue({ data: [], error: null }),
+                  }),
+               }),
+            } as never;
+         }) as never);
+
+         const { extendPollLifetime } = await import('../services/pollService');
+         const result = await extendPollLifetime('poll-1');
+         expect(result.extension_count).toBe(1);
+         expect(updateMock).toHaveBeenCalledWith(
+            expect.objectContaining({ extension_count: 1 })
+         );
+      });
+
+      it('rejects extending an expired poll', async () => {
+         const mockPoll = {
+            id: 'poll-expired',
+            created_at: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+            expires_at: new Date(Date.now() - 1000).toISOString(),
+            extension_count: 0,
+         };
+
+         vi.spyOn(supabase, 'from').mockReturnValue({
+            select: vi.fn().mockReturnValue({
+               eq: vi.fn().mockReturnValue({
+                  maybeSingle: vi.fn().mockResolvedValue({ data: mockPoll, error: null }),
+                  order: vi.fn().mockResolvedValue({ data: [], error: null }),
+               }),
+            }),
+         } as never);
+
+         const { extendPollLifetime } = await import('../services/pollService');
+         await expect(extendPollLifetime('poll-expired')).rejects.toThrow(/expired/i);
+      });
+
+      it('rejects extending a poll that reached max extensions (2)', async () => {
+         const mockPoll = {
+            id: 'poll-maxed',
+            created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            extension_count: 2,
+         };
+
+         vi.spyOn(supabase, 'from').mockReturnValue({
+            select: vi.fn().mockReturnValue({
+               eq: vi.fn().mockReturnValue({
+                  maybeSingle: vi.fn().mockResolvedValue({ data: mockPoll, error: null }),
+                  order: vi.fn().mockResolvedValue({ data: [], error: null }),
+               }),
+            }),
+         } as never);
+
+         const { extendPollLifetime } = await import('../services/pollService');
+         await expect(extendPollLifetime('poll-maxed')).rejects.toThrow(/2 times/i);
+      });
    });
 });

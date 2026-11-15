@@ -12,6 +12,7 @@ import {
    MAX_POLL_DURATION_HOURS,
    MIN_POLL_OPTIONS,
    MAX_POLL_OPTIONS,
+   MAX_POLL_EXTENSIONS,
 } from "../types/poll";
 
 const LOCAL_POLLS_KEY = "chat_polls_local_cache_v1";
@@ -630,3 +631,72 @@ export const fetchAllAdminPollsWithVotes = async (): Promise<{
 
    return { polls, votesByPollId };
 };
+
+/**
+ * Extends an active poll's lifetime by 1 day (24 hours), up to a maximum of 7 days total
+ * from creation and a maximum of 2 extensions per poll.
+ */
+export const extendPollLifetime = async (pollId: string): Promise<Poll> => {
+   const { poll } = await fetchPollWithVotes(pollId);
+   if (!poll) {
+      throw new Error("Poll not found.");
+   }
+
+   const nowMs = Date.now();
+   const currentExpiresMs = new Date(poll.expires_at).getTime();
+   if (currentExpiresMs <= nowMs) {
+      throw new Error("Cannot extend an expired poll.");
+   }
+
+   const currentExtensions = poll.extension_count ?? 0;
+   if (currentExtensions >= MAX_POLL_EXTENSIONS) {
+      throw new Error(`A poll can only be extended ${MAX_POLL_EXTENSIONS} times.`);
+   }
+
+   const createdMs = new Date(poll.created_at).getTime();
+   const maxAllowedExpiresMs = createdMs + MAX_POLL_DURATION_HOURS * 60 * 60 * 1000;
+   const oneDayMs = 24 * 60 * 60 * 1000;
+
+   if (currentExpiresMs >= maxAllowedExpiresMs) {
+      throw new Error("Poll is already at the maximum 7-day lifetime.");
+   }
+
+   const nextExpiresMs = Math.min(currentExpiresMs + oneDayMs, maxAllowedExpiresMs);
+   const nextExpiresIso = new Date(nextExpiresMs).toISOString();
+   const nextExtensionCount = currentExtensions + 1;
+
+   const updatedLocal: Poll = {
+      ...poll,
+      expires_at: nextExpiresIso,
+      extension_count: nextExtensionCount,
+   };
+   saveLocalPoll(updatedLocal);
+
+   try {
+      const { data, error } = await supabase
+         .from("chat_polls")
+         .update({
+            expires_at: nextExpiresIso,
+            extension_count: nextExtensionCount,
+         })
+         .eq("id", pollId)
+         .select("*, profiles:creator_id(id, username, avatar_url)")
+         .maybeSingle();
+
+      if (!error && data) {
+         const normalized: Poll = {
+            ...data,
+            options: Array.isArray(data.options) ? data.options : poll.options,
+         };
+         saveLocalPoll(normalized);
+         notifyPollUpdated(pollId);
+         return normalized;
+      }
+   } catch {
+      // fallback to local
+   }
+
+   notifyPollUpdated(pollId);
+   return updatedLocal;
+};
+

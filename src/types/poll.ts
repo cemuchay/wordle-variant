@@ -29,6 +29,7 @@ export interface Poll {
    is_pinned: boolean;
    pinned_at?: string | null;
    notified_expired_at?: string | null;
+   extension_count?: number;
    expires_at: string;
    created_at: string;
    profiles?: {
@@ -74,6 +75,7 @@ export const GENERAL_GROUP_ID = "00000000-0000-0000-0000-000000000001";
 export const MAX_POLL_DURATION_HOURS = 168; // 7 days
 export const MIN_POLL_OPTIONS = 2;
 export const MAX_POLL_OPTIONS = 6;
+export const MAX_POLL_EXTENSIONS = 2;
 
 export const formatDurationLabel = (hours: number): string => {
    if (hours >= 24 && hours % 24 === 0) {

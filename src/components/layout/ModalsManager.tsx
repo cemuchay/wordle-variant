@@ -14,6 +14,7 @@ const AuthModal = safeLazy(() => import('../AuthModal').then(m => ({ default: m.
 const UserProfileModal = safeLazy(() => import('../UserProfileModal').then(m => ({ default: m.UserProfileModal })));
 
 import { useAnnouncements } from '../../hooks/useAnnouncements';
+import { usePollAnnouncements } from '../../hooks/usePollAnnouncements';
 import { setActiveSection } from '../../lib/telemetry';
 import { StreakMilestoneModal } from '../StreakMilestoneModal';
 
@@ -98,6 +99,12 @@ export const ModalsManager = ({
         moreGameMode,
     ]);
 
+    const {
+        activePoll,
+        isOpen: isPollAnnouncementOpen,
+        markPollSeenToday,
+    } = usePollAnnouncements(gameContext.user?.id);
+
     useEffect(() => {
         const preloadComponents = () => {
             StatsModal.preload?.();
@@ -115,11 +122,21 @@ export const ModalsManager = ({
 
     return (
         <Suspense fallback={null}>
-            {currentAnnouncement && (
+            {(currentAnnouncement || activePoll) && (
                 <AnnouncementModal
-                    isOpen={isAnnouncementOpen}
+                    isOpen={isAnnouncementOpen || isPollAnnouncementOpen}
                     announcement={currentAnnouncement}
-                    onClose={markAsRead}
+                    activePoll={activePoll}
+                    currentUserId={gameContext.user?.id}
+                    currentUserProfile={gameContext.user ? {
+                        id: gameContext.user.id,
+                        username: gameContext.user.user_metadata?.username || 'Player',
+                        avatar_url: gameContext.user.user_metadata?.avatar_url || '',
+                    } : undefined}
+                    onClose={() => {
+                        if (isAnnouncementOpen) markAsRead();
+                        if (isPollAnnouncementOpen) markPollSeenToday();
+                    }}
                 />
             )}
             {gameContext.user && modals.isSettingsOpen && (

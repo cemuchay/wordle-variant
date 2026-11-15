@@ -2,6 +2,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import {
     ArrowUpDown,
+    BarChart3,
     Bell,
     Bold,
     BookOpen,
@@ -32,6 +33,7 @@ import {
     X
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AdminPollsTab } from './polls/AdminPollsTab';
 import { getWORDS_3, getWORDS_4, OFFICIAL_WORDS } from '../../data/words';
 import { useAdminStatus } from '../../hooks/useAdminStatus';
 import { useAuth } from '../../hooks/useAuth';
@@ -1595,7 +1597,7 @@ export const AdminPage: React.FC = () => {
     const { isAdmin, loading: adminLoading } = useAdminStatus(user?.id);
 
     // Admin tab configuration
-    type AdminTabId = 'words' | 'marathon' | 'wordup' | 'topics' | 'dynamic_topics' | 'stats' | 'telemetry' | 'broadcast';
+    type AdminTabId = 'words' | 'marathon' | 'wordup' | 'topics' | 'dynamic_topics' | 'stats' | 'telemetry' | 'broadcast' | 'polls';
 
     const TAB_CLICK_STORAGE_KEY = 'variant_admin_tab_clicks_v1';
 
@@ -1609,6 +1611,7 @@ export const AdminPage: React.FC = () => {
         dynamic_topics: 40,
         marathon: 30,
         broadcast: 20,
+        polls: 10,
     };
 
     const getStoredTabFrequencies = (): Record<AdminTabId, number> => {
@@ -1635,6 +1638,7 @@ export const AdminPage: React.FC = () => {
             { id: 'dynamic_topics', label: 'Dynamic Topics', icon: <Sparkles size={14} />, colorClass: 'bg-correct text-black shadow-lg shadow-correct/25' },
             { id: 'marathon', label: 'Bot Marathon', icon: <Trophy size={14} />, colorClass: 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' },
             { id: 'broadcast', label: 'Broadcast', icon: <Bell size={14} />, colorClass: 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25' },
+            { id: 'polls', label: 'Polls', icon: <BarChart3 size={14} />, colorClass: 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25' },
         ];
 
         return [...tabDefs].sort((a, b) => (tabFrequencies[b.id] || 0) - (tabFrequencies[a.id] || 0));
@@ -2854,6 +2858,8 @@ SELECT create_admin_user(
                 ) : activeTab === 'broadcast' ? (
 
                     <AdminCustomNotificationBroadcaster triggerToast={triggerToast} />
+                ) : activeTab === 'polls' ? (
+                    <AdminPollsTab currentUserId={user?.id} onToast={triggerToast} />
                 ) : (
                     <GameStats triggerToast={triggerToast} />
                 )}
