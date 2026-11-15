@@ -9,6 +9,24 @@ export interface Announcement {
 
 export const ANNOUNCEMENTS: Announcement[] = [
    {
+      id: "settings-redesign-and-reveal-style",
+      title: "Settings Redesign & Tile Reveal Styles ✨",
+      date: "2026-11-15",
+      type: "update",
+      lifespanDays: 14,
+      content: `
+             <h3>Cleaner Settings & Custom Tile Reveals</h3>
+             <p>We've simplified <strong>Settings</strong> into 3 clean sections with automatic draft saving, a <strong>Clear Draft</strong> option, and a <strong>Review Changes</strong> screen before you save.</p>
+             <p>You can also now choose your <strong>Tile Reveal Style</strong> under <strong>Gameplay & Alerts</strong>:</p>
+             <ul>
+                <li><strong>Normal</strong> — Classic flip reveal</li>
+                <li><strong>Slow</strong> — Smooth left-to-right color reveal</li>
+                <li><strong>Instant</strong> — Immediate reveal with no delay</li>
+             </ul>
+             <p>Applies to Standard, Challenge, and Guest games.</p>
+          `,
+   },
+   {
       id: "streak-freeze-protection",
       title: "New: Streak Freeze Protection ❄️",
       date: "2026-10-18",

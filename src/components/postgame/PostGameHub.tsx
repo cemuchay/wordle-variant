@@ -26,6 +26,7 @@ interface PostGameHubProps {
   isMarathonError?: boolean;
   setSelectedChallengeId?: (id: string | null) => void;
   setIsChallengeOpen?: (open: boolean) => void;
+  hideShareCard?: boolean;
 }
 
 export const PostGameHub: React.FC<PostGameHubProps> = ({
@@ -46,6 +47,7 @@ export const PostGameHub: React.FC<PostGameHubProps> = ({
   isMarathonError = false,
   setSelectedChallengeId,
   setIsChallengeOpen,
+  hideShareCard = false,
 }) => {
   const { stats, profile } = useApp();
   const isGuestMode = gameplayType === 'guest';
@@ -67,19 +69,21 @@ export const PostGameHub: React.FC<PostGameHubProps> = ({
       className="w-full mx-auto flex flex-col space-y-3 pb-0 md:pb-2 pt-1 px-1 text-white"
     >
       {/* Row 1: Share Victory Card & Word Trivia Side by Side on Desktop */}
-      <div className={`grid gap-3 items-stretch ${isGuestMode ? 'grid-cols-1 max-w-xl mx-auto w-full' : 'grid-cols-1 md:grid-cols-2'}`}>
-        <ShareCard
-          date={date}
-          guesses={guesses}
-          maxAttempts={maxAttempts}
-          won={isWon}
-          usedHint={usedHint}
-          gameMessage={gameMessage}
-          wordLength={effectiveWordLength}
-          hintRecord={hintRecord}
-          isAuthenticated={isGuestMode ? false : !!profile}
-          showGrid={false}
-        />
+      <div className={`grid gap-3 items-stretch ${isGuestMode || hideShareCard ? 'grid-cols-1 max-w-xl mx-auto w-full' : 'grid-cols-1 md:grid-cols-2'}`}>
+        {!hideShareCard && (
+          <ShareCard
+            date={date}
+            guesses={guesses}
+            maxAttempts={maxAttempts}
+            won={isWon}
+            usedHint={usedHint}
+            gameMessage={gameMessage}
+            wordLength={effectiveWordLength}
+            hintRecord={hintRecord}
+            isAuthenticated={isGuestMode ? false : !!profile}
+            showGrid={false}
+          />
+        )}
 
         {!isGuestMode && (
           <WordTriviaCard
@@ -92,20 +96,22 @@ export const PostGameHub: React.FC<PostGameHubProps> = ({
         )}
       </div>
 
-      {/* Row 2: Secondary Game Loops & Launchpads */}
-      <NextActionCard
-        onOpenArchive={() => onOpenFreePlay?.("archive")}
-        onOpenGuestGame={() => onOpenFreePlay?.("guest")}
-        onNavigateWordUp={() => onNavigate("wordup")}
-        onNavigateChallenges={() => onNavigate("challenges")}
-        isGuestGame={isGuestMode}
-        onReturnHome={handleReturnHome}
-        activeDailyMarathons={activeDailyMarathons}
-        isMarathonLoading={isMarathonLoading}
-        isMarathonError={isMarathonError}
-        setSelectedChallengeId={setSelectedChallengeId}
-        setIsChallengeOpen={setIsChallengeOpen}
-      />
+      {/* Row 2: Secondary Game Loops & Launchpads (First on mobile for prominence) */}
+      <div className="order-first md:order-none">
+        <NextActionCard
+          onOpenArchive={() => onOpenFreePlay?.("archive")}
+          onOpenGuestGame={() => onOpenFreePlay?.("guest")}
+          onNavigateWordUp={() => onNavigate("wordup")}
+          onNavigateChallenges={() => onNavigate("challenges")}
+          isGuestGame={isGuestMode}
+          onReturnHome={handleReturnHome}
+          activeDailyMarathons={activeDailyMarathons}
+          isMarathonLoading={isMarathonLoading}
+          isMarathonError={isMarathonError}
+          setSelectedChallengeId={setSelectedChallengeId}
+          setIsChallengeOpen={setIsChallengeOpen}
+        />
+      </div>
 
       {/* Row 3: Streak Milestones & Leaderboard Snapshot (Hidden in guest mode) */}
       {!isGuestMode && (
