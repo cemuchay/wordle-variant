@@ -5,6 +5,11 @@ export const CATEGORIES = [
       desc: "Embark on the ultimate vocabulary quest. Decipher anagrams, spot hidden letters, climb word ladders, and test your linguistic reflexes in a high-speed battle of wits.",
       featured: true,
    },
+   {
+      id: "reverse_wordle",
+      name: "Reverse Wordle",
+      desc: "Deduce the secret target word from colored Wordle guess patterns under the clock.",
+   },
 
    // Procedural knowledge categories
    {

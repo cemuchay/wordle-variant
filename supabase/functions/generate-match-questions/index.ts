@@ -143,7 +143,7 @@ function generateQuestion(
    // ── Choice count normalization safety: Ensure strictly 4 options (or 2 for T/F) ──
    if (qObj && qObj.choices && Array.isArray(qObj.choices)) {
       const isTrueFalse = qObj.choices.includes("True") && qObj.choices.includes("False");
-      if (!isTrueFalse && qObj.choices.length < 4 && qObj.answer) {
+      if (!isTrueFalse && qObj.answer) {
          const fallbackPool = [
             "Book of Thomas",
             "Genesis",
@@ -161,18 +161,28 @@ function generateQuestion(
             "Romans",
             "Corinthians"
          ];
-         const uniqueChoices = new Set(qObj.choices);
-         uniqueChoices.add(qObj.answer);
-         let fbIdx = 0;
-         while (uniqueChoices.size < 4 && fbIdx < fallbackPool.length) {
-            const pad = fallbackPool[fbIdx++];
-            if (pad !== qObj.answer) uniqueChoices.add(pad);
+         const uniqueChoices = Array.from(new Set(qObj.choices)).filter((c) => Boolean(c));
+         if (!uniqueChoices.includes(qObj.answer)) {
+            uniqueChoices.unshift(qObj.answer);
          }
-         let padCounter = 1;
-         while (uniqueChoices.size < 4) {
-            uniqueChoices.add(`Option ${padCounter++}`);
+         if (uniqueChoices.length > 4) {
+            const distractorsOnly = uniqueChoices.filter((c) => c !== qObj.answer).slice(0, 3);
+            qObj.choices = seededShuffle([qObj.answer, ...distractorsOnly], rng);
+         } else if (uniqueChoices.length < 4) {
+            const padded = new Set(uniqueChoices);
+            let fbIdx = 0;
+            while (padded.size < 4 && fbIdx < fallbackPool.length) {
+               const pad = fallbackPool[fbIdx++];
+               if (pad !== qObj.answer) padded.add(pad);
+            }
+            let padCounter = 1;
+            while (padded.size < 4) {
+               padded.add(`Option ${padCounter++}`);
+            }
+            qObj.choices = seededShuffle(Array.from(padded), rng);
+         } else {
+            qObj.choices = uniqueChoices;
          }
-         qObj.choices = seededShuffle(Array.from(uniqueChoices), rng);
       }
    }
 

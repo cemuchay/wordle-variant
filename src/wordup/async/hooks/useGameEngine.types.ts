@@ -49,7 +49,7 @@ export const initialState: EngineState = {
    matchData: null,
    questions: [],
    opponentStats: null,
-   countdownText: "3",
+   countdownText: "1",
 };
 
 export function gameEngineReducer(

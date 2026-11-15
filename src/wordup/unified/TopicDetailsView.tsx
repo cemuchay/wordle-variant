@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Swords, UserPlus, Search, Trophy, ChevronLeft, Play, Users, Flame, PauseCircle, Trash2 } from "lucide-react";
+import { Swords, UserPlus, Search, ChevronLeft, ChevronRight, Play, Users, Flame, PauseCircle, Trash2, Eye, X } from "lucide-react";
+import { fetchTopicPreviewMedia, type TopicPreviewMedia } from "../shared/topicPreviewMedia";
 import { CATEGORIES } from "../shared/constants";
 import { CATEGORY_STYLE_MAP, DEFAULT_STYLE } from "../shared/categorySelectConstants";
 import { type ProfileStats } from "../shared/types";
@@ -45,7 +46,7 @@ export const TopicDetailsView = ({
    onResumePausedMatch,
    onDiscardPausedMatch,
 }: TopicDetailsViewProps) => {
-   const [activeSection, setActiveSection] = useState<"play" | "rankings">("play");
+   const [activeSection] = useState<"play" | "rankings">("play");
    const [playerSearch, setPlayerSearch] = useState("");
    const [showInviteOverlay, setShowInviteOverlay] = useState(false);
    const [categoryStats, setCategoryStats] = useState<ProfileStats | null>(null);
@@ -86,6 +87,46 @@ export const TopicDetailsView = ({
          setIsCreatingMatch(null);
       }
    };
+
+   // Topic preview media (video + screenshots from Supabase Storage)
+   const [previewMedia, setPreviewMedia] = useState<TopicPreviewMedia | null>(null);
+   const [lightboxOpen, setLightboxOpen] = useState(false);
+   const [lightboxIndex, setLightboxIndex] = useState(0);
+   const [showLightboxControls, setShowLightboxControls] = useState(true);
+   const lightboxTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+   const bumpLightboxControls = () => {
+      setShowLightboxControls(true);
+      if (lightboxTimerRef.current) clearTimeout(lightboxTimerRef.current);
+      lightboxTimerRef.current = setTimeout(() => {
+         setShowLightboxControls(false);
+      }, 2000);
+   };
+
+   useEffect(() => {
+      if (!lightboxOpen) {
+         if (lightboxTimerRef.current) clearTimeout(lightboxTimerRef.current);
+         return;
+      }
+      bumpLightboxControls();
+      return () => {
+         if (lightboxTimerRef.current) clearTimeout(lightboxTimerRef.current);
+      };
+   }, [lightboxOpen, lightboxIndex]);
+
+   useEffect(() => {
+      let cancelled = false;
+      setPreviewMedia(null);
+      setLightboxOpen(false);
+      setLightboxIndex(0);
+      if (!categoryId) return;
+      fetchTopicPreviewMedia(categoryId).then((media) => {
+         if (!cancelled) setPreviewMedia(media);
+      });
+      return () => {
+         cancelled = true;
+      };
+   }, [categoryId]);
 
    useEffect(() => {
       if (showInviteOverlay) {
@@ -162,29 +203,15 @@ export const TopicDetailsView = ({
                </h1>
             </div>
 
-            {/* Navigation Tabs */}
-            <div className="flex bg-black/40 p-1 rounded-xl border border-white/10">
-               <button
-                  onClick={() => setActiveSection("play")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${activeSection === "play"
-                        ? "bg-[#E85151] text-white shadow-md"
-                        : "text-white/70 hover:text-white"
-                     }`}
-               >
-                  <Play size={13} />
-                  <span>Play</span>
-               </button>
-               <button
-                  onClick={() => setActiveSection("rankings")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${activeSection === "rankings"
-                        ? "bg-[#E85151] text-white shadow-md"
-                        : "text-white/70 hover:text-white"
-                     }`}
-               >
-                  <Trophy size={13} />
-                  <span>Rankings</span>
-               </button>
-            </div>
+            {/* Top Action: Play Live Match */}
+            <button
+               type="button"
+               onClick={onPlayLive}
+               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#E85151] hover:bg-[#d64545] text-white text-xs font-black uppercase tracking-wider shadow-md transition-all active:scale-98 cursor-pointer"
+            >
+               <Swords size={14} />
+               <span>Play Live Match</span>
+            </button>
          </div>
 
          {/* Content Area */}
@@ -200,9 +227,57 @@ export const TopicDetailsView = ({
                   >
                      {/* LEFT COLUMN: Cover Header & User Stats */}
                      <div className="space-y-5">
-                        <div className="relative pt-6 pb-8 px-6 bg-linear-to-b from-[#E85151]/20 via-[#181818]/60 to-[#121212] border border-white/10 rounded-3xl flex flex-col items-center text-center shadow-lg">
+                        <div
+                           onClick={() => {
+                              if (previewMedia?.videoUrl || (previewMedia && previewMedia.screenshots.length > 0)) {
+                                 setLightboxIndex(0);
+                                 setLightboxOpen(true);
+                              }
+                           }}
+                           className={`relative overflow-hidden min-h-[240px] pt-10 pb-8 px-6 bg-linear-to-b from-[#E85151]/20 via-[#181818]/60 to-[#121212] border border-white/10 rounded-3xl flex flex-col items-center justify-end text-center shadow-lg ${
+                              previewMedia?.videoUrl || (previewMedia && previewMedia.screenshots.length > 0) ? "cursor-pointer" : ""
+                           }`}
+                        >
+                           {/* Background Gameplay Preview Media */}
+                           {previewMedia?.videoUrl ? (
+                              <>
+                                 <video
+                                    src={previewMedia.videoUrl}
+                                    autoPlay
+                                    loop
+                                    muted
+                                    playsInline
+                                    className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                                 />
+                                 <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/30 to-[#121212]/75 pointer-events-none" />
+                              </>
+                           ) : previewMedia && previewMedia.screenshots.length > 0 ? (
+                              <>
+                                 <img
+                                    src={previewMedia.screenshots[0].url}
+                                    alt={categoryObj.name}
+                                    className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                                 />
+                                 <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/30 to-[#121212]/75 pointer-events-none" />
+                              </>
+                           ) : null}
+
+                           {(previewMedia?.videoUrl || (previewMedia && previewMedia.screenshots.length > 0)) && (
+                              <button
+                                 type="button"
+                                 onClick={() => {
+                                    setLightboxIndex(0);
+                                    setLightboxOpen(true);
+                                 }}
+                                 className="absolute top-3 right-3 z-20 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 hover:bg-black/80 border border-white/20 text-[10px] font-black uppercase tracking-wider text-white/90 backdrop-blur-sm transition-colors cursor-pointer"
+                              >
+                                 <Eye className="w-3 h-3" />
+                                 Preview
+                              </button>
+                           )}
+
                            {/* Category Emoji/SVG Circle */}
-                           <div className="w-20 h-20 rounded-full bg-white/10 border-2 border-white/20 flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.1)] mb-4 overflow-hidden p-4">
+                           <div className="relative z-10 w-20 h-20 rounded-full bg-white/10 border-2 border-white/20 flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.1)] mb-4 overflow-hidden p-4 backdrop-blur-sm pointer-events-none">
                               {style.svg ? (
                                  <div className="w-full h-full text-white flex items-center justify-center [&>svg]:w-full [&>svg]:h-full" dangerouslySetInnerHTML={{ __html: style.svg }} />
                               ) : (
@@ -211,10 +286,10 @@ export const TopicDetailsView = ({
                            </div>
 
                            {/* Category Title & Description */}
-                           <h2 className="text-2xl font-black uppercase tracking-wider text-white mb-2">
+                           <h2 className="relative z-10 text-2xl font-black uppercase tracking-wider text-white mb-2 pointer-events-none">
                               {categoryObj.name}
                            </h2>
-                           <p className="text-xs text-white/80 font-bold max-w-sm leading-relaxed">
+                           <p className="relative z-10 text-xs text-white/80 font-bold max-w-sm leading-relaxed pointer-events-none">
                               {categoryObj.desc}
                            </p>
                         </div>
@@ -439,6 +514,88 @@ export const TopicDetailsView = ({
                      Cancel & Return
                   </button>
                )}
+            </div>
+         )}
+         {lightboxOpen && previewMedia && (
+            <div
+               className="fixed inset-0 flex items-center justify-center bg-black/90 backdrop-blur-md p-4"
+               style={{ zIndex: Z_INDEX.TOPIC_DETAILS }}
+               onClick={() => setLightboxOpen(false)}
+            >
+               <div
+                  className="relative w-full max-w-2xl bg-[#121212] border border-white/15 rounded-2xl overflow-hidden shadow-2xl"
+                  onClick={(e) => {
+                     e.stopPropagation();
+                     bumpLightboxControls();
+                  }}
+                  onMouseMove={bumpLightboxControls}
+                  onTouchStart={bumpLightboxControls}
+               >
+                  <div className={`flex items-center justify-between px-4 py-3 border-b border-white/10 transition-opacity duration-300 ${showLightboxControls ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+                     <span className="text-xs font-black uppercase tracking-wider text-white">
+                        {categoryObj.name} Preview
+                     </span>
+                     <button
+                        type="button"
+                        onClick={() => setLightboxOpen(false)}
+                        className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-white/70 hover:text-white transition-colors cursor-pointer"
+                     >
+                        <X className="w-4 h-4" />
+                     </button>
+                  </div>
+
+                  {(() => {
+                     const items: { type: "video" | "image"; url: string }[] = [
+                        ...(previewMedia.videoUrl ? [{ type: "video" as const, url: previewMedia.videoUrl }] : []),
+                        ...previewMedia.screenshots.map((s) => ({ type: "image" as const, url: s.url })),
+                     ];
+                     const current = items[lightboxIndex] ?? items[0];
+                     if (!current) return null;
+
+                     return (
+                        <div className="relative bg-black flex items-center justify-center min-h-[260px] max-h-[70vh]">
+                           {current.type === "video" ? (
+                              <video
+                                 src={current.url}
+                                 autoPlay
+                                 loop
+                                 muted
+                                 playsInline
+                                 className="w-full max-h-[70vh] object-contain"
+                              />
+                           ) : (
+                              <img
+                                 src={current.url}
+                                 alt={`${categoryObj.name} screenshot`}
+                                 className="w-full max-h-[70vh] object-contain"
+                              />
+                           )}
+
+                           {items.length > 1 && (
+                              <div className={`transition-opacity duration-300 ${showLightboxControls ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+                                 <button
+                                    type="button"
+                                    onClick={() => setLightboxIndex((i) => (i - 1 + items.length) % items.length)}
+                                    className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/70 hover:bg-black text-white border border-white/15 cursor-pointer"
+                                 >
+                                    <ChevronLeft className="w-4 h-4" />
+                                 </button>
+                                 <button
+                                    type="button"
+                                    onClick={() => setLightboxIndex((i) => (i + 1) % items.length)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/70 hover:bg-black text-white border border-white/15 cursor-pointer"
+                                 >
+                                    <ChevronRight className="w-4 h-4" />
+                                 </button>
+                                 <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-full bg-black/70 text-[10px] font-bold text-white/80">
+                                    {lightboxIndex + 1} / {items.length}
+                                 </div>
+                              </div>
+                           )}
+                        </div>
+                     );
+                  })()}
+               </div>
             </div>
          )}
       </div>

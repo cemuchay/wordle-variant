@@ -437,7 +437,7 @@ export const BattleView = ({
                   <div className="absolute inset-y-0 -right-3 flex items-center z-10 pointer-events-none">
                      <ScoreBar score={oppScore} latestCorrect={revealAnswers ? oppChoice === activeQuestion.answer : undefined} side="right" themeColor="bg-[#E85151]" />
                   </div>
-                  {activeQuestion.choices.map((choice, index) => {
+                  {activeQuestion.choices.slice(0, 4).map((choice, index) => {
                      const isSelected = selectedAnswer === choice;
                      const isCorrect = choice === activeQuestion.answer;
                      const isOppSelected = revealAnswers && oppChoice === choice;
@@ -483,7 +483,7 @@ export const BattleView = ({
 
                      return (
                         <motion.button
-                           key={choice}
+                           key={`${currentIdx}-${index}-${choice}`}
                            disabled={selectedAnswer !== null || revealAnswers}
                            onClick={() => onChoiceSelect(choice)}
                            animate={buttonAnimate}
@@ -523,7 +523,7 @@ export const BattleView = ({
                   <div className="absolute inset-y-0 -right-3 flex items-center z-10 pointer-events-none">
                      <ScoreBar score={oppScore} latestCorrect={revealAnswers ? oppChoice === activeQuestion.answer : undefined} side="right" themeColor="bg-[#E85151]" />
                   </div>
-                  {activeQuestion.choices.map((choice) => {
+                  {activeQuestion.choices.slice(0, 4).map((choice, index) => {
                      const isSelected = selectedAnswer === choice;
                      const isCorrect = choice === activeQuestion.answer;
                      const isOppSelected = revealAnswers && oppChoice === choice;
@@ -580,7 +580,7 @@ export const BattleView = ({
 
                      return (
                         <motion.button
-                           key={choice}
+                           key={`${currentIdx}-${index}-${choice}`}
                            disabled={selectedAnswer !== null || revealAnswers}
                            onClick={() => onChoiceSelect(choice)}
                            animate={buttonAnimate}

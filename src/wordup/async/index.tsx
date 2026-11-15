@@ -589,7 +589,7 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
                   message={connectingMsg}
                />
             )}
-            {view === "countdown" && <CountdownView countdownText={String(countdownText || "3")} />}
+            {view === "countdown" && <CountdownView countdownText={String(countdownText || "1")} />}
             {view === "battle" && (
                <BattleView
                   questions={questions} currentIdx={currentIdx} matchData={matchData}

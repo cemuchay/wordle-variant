@@ -537,7 +537,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
                )
             )}
             {view === "countdown" && (
-               <CountdownView countdownText={String(engine.state.countdownText || "3")} />
+               <CountdownView countdownText={String(engine.state.countdownText || "1")} />
             )}
             {view === "loading" && (
                <VSPreview

@@ -870,17 +870,30 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                                     )}
 
                                     {isAdmin && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsAdminPollsOpen(true)}
-                                            className="w-full p-4 flex items-center justify-between text-left hover:bg-white/5 transition-colors"
-                                        >
-                                            <div className="flex items-center gap-2.5">
-                                                <BarChart3 className="w-4 h-4 text-indigo-400" />
-                                                <span className="text-sm font-semibold text-white">Admin Polls</span>
-                                            </div>
-                                            <span className="text-xs font-semibold text-gray-400">Open</span>
-                                        </button>
+                                        <>
+                                            <a
+                                                href="/admin"
+                                                onClick={onClose}
+                                                className="w-full p-4 flex items-center justify-between text-left hover:bg-white/5 transition-colors"
+                                            >
+                                                <div className="flex items-center gap-2.5">
+                                                    <Shield className="w-4 h-4 text-[#E85151]" />
+                                                    <span className="text-sm font-semibold text-white">Admin Dashboard</span>
+                                                </div>
+                                                <span className="text-xs font-semibold text-gray-400">Open</span>
+                                            </a>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsAdminPollsOpen(true)}
+                                                className="w-full p-4 flex items-center justify-between text-left hover:bg-white/5 transition-colors"
+                                            >
+                                                <div className="flex items-center gap-2.5">
+                                                    <BarChart3 className="w-4 h-4 text-indigo-400" />
+                                                    <span className="text-sm font-semibold text-white">Admin Polls</span>
+                                                </div>
+                                                <span className="text-xs font-semibold text-gray-400">Open</span>
+                                            </button>
+                                        </>
                                     )}
 
                                     <div className="p-4 flex items-center justify-between gap-3">

@@ -38,6 +38,8 @@ const resolveAllowedLengths = (category: string): number[] => {
          return [6];
       case "7_plus":
          return [7, 8, 9, 10];
+      case "reverse_wordle":
+         return [3, 4, 5];
       default:
          return ALLOWED_LENGTHS_DEFAULT;
    }

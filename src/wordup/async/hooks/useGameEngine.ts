@@ -556,8 +556,8 @@ export function useGameEngine(props: EngineProps) {
       (match: any) => {
          clearT("countdownInterval");
          dispatch({ type: "SET_PHASE", phase: "countdown" });
-         let c = 3;
-         dispatch({ type: "SET_COUNTDOWN_TEXT", text: "3" });
+         let c = 1;
+         dispatch({ type: "SET_COUNTDOWN_TEXT", text: "1" });
          T.current.countdownInterval = window.setInterval(() => {
             c--;
             if (c <= 0) {

@@ -119,7 +119,7 @@ export function useGameEngine(props: EngineProps) {
     const [opponentScore, setOpponentScore] = useState(0);
     const [myCurrentPoints, setMyCurrentPoints] = useState(0);
     const [opponentCurrentPoints, setOpponentCurrentPoints] = useState(0);
-    const [countdownText, setCountdownText] = useState("3");
+    const [countdownText, setCountdownText] = useState("1");
     const [lastRoundPopup, setLastRoundPopup] = useState(false);
 
     // Live PvP States
@@ -465,7 +465,7 @@ export function useGameEngine(props: EngineProps) {
     }, [triggerToast, advanceRound, endGame, stopRoundTick, stopBotTimer]);
 
     // ══════════════════════════════════════════════════════════════════
-    // EFFECT 1 — Countdown (3 → 2 → 1 → playing)
+    // EFFECT 1 — Countdown (1 → playing)
     // ══════════════════════════════════════════════════════════════════
     useEffect(() => {
         if (phase !== "countdown") return;
@@ -474,10 +474,10 @@ export function useGameEngine(props: EngineProps) {
         const isResuming = targetRound > 0;
 
         Promise.resolve().then(() => {
-            setCountdownText(isResuming ? "Resuming in 3..." : "3");
+            setCountdownText(isResuming ? "Resuming in 1..." : "1");
         });
-        wordupAudio.playCountdownTick(3);
-        let count = 3;
+        wordupAudio.playCountdownTick(1);
+        let count = 1;
 
         countdownRef.current = window.setInterval(() => {
             count--;

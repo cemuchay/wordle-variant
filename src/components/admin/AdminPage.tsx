@@ -39,6 +39,8 @@ import { useAdminStatus } from '../../hooks/useAdminStatus';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabaseClient';
 import TopicHub from './TopicHub';
+import { TopicPreviewMediaManager } from './TopicPreviewMediaManager';
+import { fetchTopicPreviewMedia } from '../../wordup/shared/topicPreviewMedia';
 import GameStats from './GameStats';
 import { BarChart2, Activity } from 'lucide-react';
 import { useTopics, useSaveTopicMutation, useToggleTopicActiveMutation, useToggleTopicSuspendedMutation, type WordUpTopic } from '../../hooks/queries/useTopics';
@@ -2016,7 +2018,33 @@ const WordUpTopicsManager = ({ triggerToast }: { triggerToast: (text: string, ty
     const toggleSuspendedMutation = useToggleTopicSuspendedMutation();
 
     const [editingTopic, setEditingTopic] = useState<WordUpTopic | null>(null);
+    const [mediaTopic, setMediaTopic] = useState<WordUpTopic | null>(null);
+    const [mediaStatusMap, setMediaStatusMap] = useState<Record<string, boolean>>({});
+    const [mediaSort, setMediaSort] = useState<'none' | 'missing-first' | 'has-first'>('none');
     const [isCreating, setIsCreating] = useState(false);
+
+    useEffect(() => {
+        if (!topics.length) return;
+        let cancelled = false;
+        Promise.all(
+            topics.map(async (t) => {
+                const m = await fetchTopicPreviewMedia(t.slug);
+                return [t.slug, Boolean(m.videoUrl || m.screenshots.length > 0)] as const;
+            })
+        ).then((entries) => {
+            if (!cancelled) setMediaStatusMap(Object.fromEntries(entries));
+        });
+        return () => { cancelled = true; };
+    }, [topics, mediaTopic]);
+
+    const sortedTopics = useMemo(() => {
+        if (mediaSort === 'none') return topics;
+        return [...topics].sort((a, b) => {
+            const aHas = mediaStatusMap[a.slug] ? 1 : 0;
+            const bHas = mediaStatusMap[b.slug] ? 1 : 0;
+            return mediaSort === 'missing-first' ? aHas - bHas : bHas - aHas;
+        });
+    }, [topics, mediaSort, mediaStatusMap]);
 
     const [formSlug, setFormSlug] = useState('');
     const [formName, setFormName] = useState('');
@@ -2279,11 +2307,22 @@ const WordUpTopicsManager = ({ triggerToast }: { triggerToast: (text: string, ty
                                     <th className="py-3.5 px-4">Procedural</th>
                                     <th className="py-3.5 px-4">Weave Prob</th>
                                     <th className="py-3.5 px-4">Status</th>
+                                    <th
+                                        className="py-3.5 px-4 cursor-pointer select-none hover:text-white transition-colors"
+                                        onClick={() =>
+                                            setMediaSort((s) =>
+                                                s === 'none' ? 'missing-first' : s === 'missing-first' ? 'has-first' : 'none'
+                                            )
+                                        }
+                                        title="Click to sort by media availability"
+                                    >
+                                        Media {mediaSort === 'missing-first' ? '↑' : mediaSort === 'has-first' ? '↓' : '↕'}
+                                    </th>
                                     <th className="py-3.5 px-4 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5 font-medium text-gray-300">
-                                {topics.map(t => (
+                                {sortedTopics.map(t => (
                                     <tr key={t.id} className="hover:bg-white/5 transition-colors">
                                         <td className="py-3 px-4 font-black text-white flex items-center gap-2">
                                             <span>{t.emoji}</span>
@@ -2326,13 +2365,34 @@ const WordUpTopicsManager = ({ triggerToast }: { triggerToast: (text: string, ty
                                                 </button>
                                             </div>
                                         </td>
+                                        <td className="py-3 px-4">
+                                            {mediaStatusMap[t.slug] === undefined ? (
+                                                <span className="text-[10px] text-gray-500 font-bold">...</span>
+                                            ) : mediaStatusMap[t.slug] ? (
+                                                <span className="px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                                    Has Media
+                                                </span>
+                                            ) : (
+                                                <span className="px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                                                    No Media
+                                                </span>
+                                            )}
+                                        </td>
                                         <td className="py-3 px-4 text-right">
-                                            <button
-                                                onClick={() => openEdit(t)}
-                                                className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
-                                            >
-                                                Edit Config
-                                            </button>
+                                            <div className="inline-flex items-center gap-2">
+                                                <button
+                                                    onClick={() => setMediaTopic(t)}
+                                                    className="px-3 py-1.5 bg-[#E85151]/15 hover:bg-[#E85151]/25 text-[#E85151] border border-[#E85151]/30 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                                                >
+                                                    Preview Media
+                                                </button>
+                                                <button
+                                                    onClick={() => openEdit(t)}
+                                                    className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
+                                                >
+                                                    Edit Config
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -2342,6 +2402,15 @@ const WordUpTopicsManager = ({ triggerToast }: { triggerToast: (text: string, ty
                 )}
 
             </div>
+
+            {mediaTopic && (
+                <TopicPreviewMediaManager
+                    topicSlug={mediaTopic.slug}
+                    topicName={mediaTopic.name}
+                    onClose={() => setMediaTopic(null)}
+                    triggerToast={triggerToast}
+                />
+            )}
         </div>
     );
 };

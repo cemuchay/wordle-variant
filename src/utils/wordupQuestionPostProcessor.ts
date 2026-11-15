@@ -194,12 +194,34 @@ export async function preloadMatchImages(
        return url;
     };
 
+    const rawChoices = Array.isArray(q.choices) ? q.choices.map(decodeEntities) : [];
+    const decodedAnswer = decodeEntities(q.answer);
+    const uniqueChoices: string[] = [];
+    for (const c of rawChoices) {
+       if (c && !uniqueChoices.includes(c)) {
+          uniqueChoices.push(c);
+       }
+    }
+    const isTwoChoice =
+       uniqueChoices.length === 2 ||
+       (uniqueChoices.includes("True") && uniqueChoices.includes("False")) ||
+       (uniqueChoices.includes("Real") && uniqueChoices.includes("Fake"));
+    let finalChoices = uniqueChoices;
+    if (!isTwoChoice && uniqueChoices.length > 4) {
+       if (uniqueChoices.includes(decodedAnswer)) {
+          const keep = uniqueChoices.filter((c) => c !== decodedAnswer).slice(0, 3);
+          finalChoices = uniqueChoices.filter((c) => c === decodedAnswer || keep.includes(c)).slice(0, 4);
+       } else {
+          finalChoices = uniqueChoices.slice(0, 4);
+       }
+    }
+
     return {
        ...q,
        prompt: decodeEntities(q.prompt),
        subPrompt: q.subPrompt ? decodeEntities(q.subPrompt) : undefined,
-       answer: decodeEntities(q.answer),
-       choices: q.choices.map(decodeEntities),
+       answer: decodedAnswer,
+       choices: finalChoices,
        explanation: q.explanation ? decodeEntities(q.explanation) : undefined,
        imageUrl: q.imageUrl ? resolveWiki(q.imageUrl) : undefined,
        imageUrls: undefined,

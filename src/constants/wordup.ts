@@ -82,9 +82,9 @@ export const WORDUP_TIMEOUT = {
    /** Safety timer (ms) — aborts to lobby if game doesn't start. */
    SAFETY: 15000,
    /** Matchmaking search timeout (ms) before falling back to bot. */
-   MATCHMAKING: 8000,
+   MATCHMAKING: 1500,
    /** Matchmaking search timeout (ms) when no other users are online. */
-   MATCHMAKING_NO_USERS: 2000,
+   MATCHMAKING_NO_USERS: 1000,
    /** Delay (ms) before auto-matching with a bot after queue expires. */
    BOT_FALLBACK: 30000,
    /** How long (ms) an invite ring notification is shown. */
@@ -92,7 +92,7 @@ export const WORDUP_TIMEOUT = {
    /** Interval (ms) between countdown ticks. */
    COUNTDOWN_INTERVAL: 1000,
    /** Starting countdown value before a match begins. */
-   COUNTDOWN_START: 3,
+   COUNTDOWN_START: 1,
    /** Default duration (ms) for WordUp toast notifications. */
    TOAST_DURATION: 4000,
 } as const;

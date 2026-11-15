@@ -121,7 +121,7 @@ export const UnifiedLobby = ({
    const [showHelp, setShowHelp] = useState(false);
    const [showCategoryModalFor, setShowCategoryModalFor] = useState<"live" | "async" | null>(null);
    const [frequentCategoryIds, setFrequentCategoryIds] = useState<string[]>(() =>
-      getTopFrequentCategories(loadClickData(), 4)
+      getTopFrequentCategories(loadClickData(), 6)
    );
    const [playerSearch, setPlayerSearch] = useState("");
 
@@ -138,7 +138,7 @@ export const UnifiedLobby = ({
 
    const trackTopicClick = useCallback((catId: string) => {
       const data = recordClick(catId);
-      setFrequentCategoryIds(getTopFrequentCategories(data, 4));
+      setFrequentCategoryIds(getTopFrequentCategories(data, 6));
       setSelectedCategoryId(catId);
    }, []);
 
@@ -236,13 +236,7 @@ export const UnifiedLobby = ({
    const frequentCategories = frequentCategoryIds
       .map(id => CATEGORIES.find(c => c.id === id))
       .filter((c): c is NonNullable<typeof c> => !!c);
-   const featuredCategories = CATEGORIES.filter((c) => c.featured)
-      .sort((a, b) => a.name.localeCompare(b.name));
-   const extraFeatured = featuredCategories.slice(4);
-   const allCategories = [
-      ...CATEGORIES.filter((c) => !c.featured),
-      ...extraFeatured,
-   ].sort((a, b) => a.name.localeCompare(b.name));
+   const allCategories = [...CATEGORIES].sort((a, b) => a.name.localeCompare(b.name));
 
    const filteredPlayers = (allProfiles || []).filter((p: any) =>
       p.id !== currentUser?.id &&
@@ -442,9 +436,18 @@ export const UnifiedLobby = ({
                      {/* Frequently Used Topics */}
                      {frequentCategories.length > 0 && (
                         <div className="space-y-2">
-                           <p className="text-[12px] font-black uppercase tracking-wider text-white">Frequently Played</p>
+                           <div className="flex items-center justify-between">
+                              <p className="text-[12px] font-black uppercase tracking-wider text-white">Frequently Played</p>
+                              <button
+                                 type="button"
+                                 onClick={() => document.getElementById("all-topics-section")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                                 className="text-[10px] font-black uppercase tracking-wider text-[#E85151] hover:text-white transition-colors cursor-pointer"
+                              >
+                                 See All Topics
+                              </button>
+                           </div>
                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
-                              {frequentCategories.slice(0, 4).map((cat) => {
+                              {frequentCategories.slice(0, 6).map((cat) => {
                                  const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
                                  return (
                                     <div
@@ -516,7 +519,7 @@ export const UnifiedLobby = ({
                      />
 
                      {/* All Topics */}
-                     <div className="space-y-2">
+                     <div id="all-topics-section" className="space-y-2">
                         <p className="text-[12px] font-black uppercase tracking-wider text-white">Topics</p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
                            {allCategories.map((cat) => {
