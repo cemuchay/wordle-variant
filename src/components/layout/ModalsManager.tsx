@@ -15,6 +15,7 @@ const UserProfileModal = safeLazy(() => import('../UserProfileModal').then(m => 
 
 import { useAnnouncements } from '../../hooks/useAnnouncements';
 import { usePollAnnouncements } from '../../hooks/usePollAnnouncements';
+import { useChallengeAnnouncement } from '../../hooks/useChallengeAnnouncement';
 import { setActiveSection } from '../../lib/telemetry';
 import { StreakMilestoneModal } from '../StreakMilestoneModal';
 
@@ -105,6 +106,31 @@ export const ModalsManager = ({
         markPollSeenToday,
     } = usePollAnnouncements(gameContext.user?.id);
 
+    const isAnyModalOpen = Boolean(
+        isAnnouncementOpen ||
+            isPollAnnouncementOpen ||
+            modals.isSettingsOpen ||
+            modals.isInfoOpen ||
+            modals.isStatsOpen ||
+            modals.isChallengeOpen ||
+            modals.isNotificationsOpen ||
+            modals.isAuthOpen ||
+            viewedProfileId
+    );
+
+    const {
+        isOpen: isChallengeAnnouncementOpen,
+        marathonChallenge,
+        hasJoined: hasJoinedChallenge,
+        dismiss: dismissChallengeAnnouncement,
+    } = useChallengeAnnouncement({
+        userId: gameContext.user?.id,
+        challenges: (gameContext as any).challenges,
+        activeNavigationItem,
+        isChallengeModalOpen: modals.isChallengeOpen,
+        isOtherModalOpen: isAnyModalOpen,
+    });
+
     useEffect(() => {
         const preloadComponents = () => {
             StatsModal.preload?.();
@@ -122,11 +148,17 @@ export const ModalsManager = ({
 
     return (
         <Suspense fallback={null}>
-            {(currentAnnouncement || activePoll) && (
+            {(currentAnnouncement || activePoll || marathonChallenge) && (
                 <AnnouncementModal
-                    isOpen={isAnnouncementOpen || isPollAnnouncementOpen}
+                    isOpen={isAnnouncementOpen || isPollAnnouncementOpen || isChallengeAnnouncementOpen}
                     announcement={currentAnnouncement}
                     activePoll={activePoll}
+                    marathonChallenge={marathonChallenge}
+                    hasJoinedChallenge={hasJoinedChallenge}
+                    onPlayChallenge={() => {
+                        dismissChallengeAnnouncement();
+                        actions.setChallengeOpen(true);
+                    }}
                     currentUserId={gameContext.user?.id}
                     currentUserProfile={gameContext.user ? {
                         id: gameContext.user.id,
@@ -136,6 +168,7 @@ export const ModalsManager = ({
                     onClose={() => {
                         if (isAnnouncementOpen) markAsRead();
                         if (isPollAnnouncementOpen) markPollSeenToday();
+                        if (isChallengeAnnouncementOpen) dismissChallengeAnnouncement();
                     }}
                 />
             )}
