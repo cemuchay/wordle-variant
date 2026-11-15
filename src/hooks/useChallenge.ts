@@ -128,7 +128,8 @@ export const useChallenge = (_user: AppUser | null) => {
             supabase.removeChannel(existingChannel);
         }
 
-        const fetchAndSet = async () => {
+        const fetchAndSet = async (source = 'unknown') => {
+            console.log(`[NET-LOG][useChallenge.fetchAndSet] challengeId=${challengeId} source=${source}`, new Error().stack);
             if (participantsRef.current.length === 0) {
                 setLoadingParticipants(true);
             }
@@ -187,7 +188,7 @@ export const useChallenge = (_user: AppUser | null) => {
             }
         };
 
-        fetchRef.current = fetchAndSet;
+        fetchRef.current = () => fetchAndSet('retryFetchParticipants');
 
         const channel = supabase
             .channel(channelName)
@@ -196,17 +197,17 @@ export const useChallenge = (_user: AppUser | null) => {
                 schema: 'public',
                 table: 'challenge_participants',
                 filter: `challenge_id=eq.${challengeId}`
-            }, fetchAndSet)
+            }, (payload) => fetchAndSet(`realtime:challenge_participants:${payload.eventType}`))
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
                 table: 'challenge_participants_marathon',
                 filter: `challenge_id=eq.${challengeId}`
-            }, fetchAndSet)
+            }, (payload) => fetchAndSet(`realtime:challenge_participants_marathon:${payload.eventType}`))
             .subscribe();
 
                 // Initial fetch
-        fetchAndSet();
+        fetchAndSet('initial-subscribeToParticipants');
 
         // Return a cleanup function instead of the raw channel
         return () => {

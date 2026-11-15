@@ -42,6 +42,7 @@ export const useMyChallengesSub = (userId: string | undefined) => {
          let createdChallenges: any[] = [];
 
          if (userId) {
+            console.log(`[NET-LOG][useMyChallengesSub] userId=${userId}`, new Error().stack);
             // 2. Fire independent queries concurrently using Promise.all
             const [pResponse, cResponse] = await Promise.all([
                supabase

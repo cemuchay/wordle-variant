@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GuessResult, LetterStatus } from '../../types/game';
-import { ANIMATION_DURATION } from '../../constants/ui';
-import { ANIMATION } from '../../constants/game';
 import { useApp } from '../../context/AppContext';
 import { useIsResponsive } from '../../hooks/useResponsive';
 import { MobileGameLayout } from './game/MobileGameLayout';
 import { DesktopGameLayout } from './game/DesktopGameLayout';
+import returnAnimationTime from '../../utils/returnAnimationTime';
 
 interface GameAreaProps {
     wordLength: number;
@@ -175,9 +174,10 @@ export const GameArea = ({
             setKeyboardStatuses(letterStatuses);
             return;
         }
+        const delay = returnAnimationTime(wordLength);
         const timer = setTimeout(() => {
             setKeyboardStatuses(letterStatuses);
-        }, wordLength * ANIMATION_DURATION.TILE_REVEAL + 400);
+        }, delay);
         return () => clearTimeout(timer);
     }, [guesses.length, letterStatuses, wordLength]);
 
@@ -186,7 +186,7 @@ export const GameArea = ({
             if (wasGameOverOnMount.current || isAlreadyPlayed) {
                 setHideKeyboard(true);
             } else {
-                const hideDelay = wordLength * ANIMATION_DURATION.TILE_REVEAL + ANIMATION.REVEAL_BUFFER;
+                const hideDelay = returnAnimationTime(wordLength);
                 const timer = setTimeout(() => {
                     setHideKeyboard(true);
                 }, hideDelay);

@@ -1,5 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
-import { X, ShieldCheck, MessageSquareQuote, LogOut, Terminal, Mail, FileText, Bell, Download, Search, Shield, Pencil, Check, BarChart3 } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import {
+    X, LogOut, Terminal, Bell, Download, Shield, Pencil, Check,
+    BarChart3, RotateCcw, ArrowRight, Sparkles
+} from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
@@ -7,7 +10,7 @@ import { useConfirmation } from '../hooks/useConfirmation';
 import { logger } from '../lib/logger';
 import { subscribeToPush, unsubscribeFromPush } from '../lib/pushService';
 import { usePWAInstall } from '../hooks/usePWAInstall';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore, type TileRevealStyle } from '../store/useAppStore';
 import { useAdminStatus } from '../hooks/useAdminStatus';
 import { ModalLayout } from './layout/ModalLayout';
 import { AdminPollsModal } from './admin/polls/AdminPollsModal';
@@ -17,42 +20,312 @@ interface SettingsModalProps {
     onClose: () => void;
 }
 
-export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
+interface SettingsDraft {
+    editUsername: string;
+    commentsDisabled: boolean;
+    tileRevealStyle: TileRevealStyle;
+    allowRoasts: boolean;
+    compactMode: boolean;
+    rememberLastView: boolean;
+    receiveEmails: boolean;
+}
+
+interface SettingDiff {
+    name: string;
+    from: string;
+    to: string;
+}
+
+const REVEAL_STYLE_LABELS: Record<TileRevealStyle, string> = {
+    normal: 'Normal',
+    slow: 'Slow',
+    instant: 'Instant',
+};
+
+const ToggleSwitch = ({
+    checked,
+    onChange,
+    disabled = false,
+}: {
+    checked: boolean;
+    onChange: (next: boolean) => void;
+    disabled?: boolean;
+}) => (
+    <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 ${checked ? 'bg-emerald-500' : 'bg-white/15'
+            }`}
+    >
+        <span
+            className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${checked ? 'translate-x-5' : 'translate-x-0'
+                }`}
+        />
+    </button>
+);
+
+export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
     const { profile, preferences, refreshProfile, triggerToast } = useApp();
     const { signOut } = useAuth();
     const { ask } = useConfirmation();
     const [loading, setLoading] = useState(false);
     const [sendingLogs, setSendingLogs] = useState(false);
     const [userEmail, setUserEmail] = useState<string>('');
+
+    const draftStorageKey = `settings_draft_${profile?.id || 'guest'}`;
+
     const [allowRoasts, setAllowRoasts] = useState(preferences.allowRoasts);
     const [compactMode, setCompactMode] = useState(preferences.compactMode);
     const [rememberLastView, setRememberLastView] = useState(preferences.rememberLastView || false);
-    const [prevPreferences, setPrevPreferences] = useState(preferences);
-
-    if (preferences !== prevPreferences) {
-        setPrevPreferences(preferences);
-        setAllowRoasts(preferences.allowRoasts);
-        setCompactMode(preferences.compactMode);
-        setRememberLastView(preferences.rememberLastView || false);
-    }
-
+    const [tileRevealStyle, setTileRevealStyle] = useState<TileRevealStyle>(preferences.tileRevealStyle || 'normal');
     const [receiveEmails, setReceiveEmails] = useState(true);
+    const [initialReceiveEmails, setInitialReceiveEmails] = useState(true);
+    const [editUsername, setEditUsername] = useState(profile?.username || '');
+    const [commentsDisabled, setCommentsDisabled] = useState(profile?.comments_disabled || false);
+
+    const [isUsernameEditable, setIsUsernameEditable] = useState(false);
+    const [showConfirmSummary, setShowConfirmSummary] = useState(false);
+    const [draftRestored, setDraftRestored] = useState(false);
+
     const [pushSupported, setPushSupported] = useState(false);
     const [pushEnabled, setPushEnabled] = useState(false);
     const [pushPermission, setPushPermission] = useState<NotificationPermission>('default');
-    const [searchQuery, setSearchQuery] = useState('');
 
     const { isStandalone, handleInstall, isInstalling, isIOS } = usePWAInstall();
     const [showIOSInstallInstructions, setShowIOSInstallInstructions] = useState(false);
     const { isAdmin } = useAdminStatus(profile?.id);
     const [isAdminPollsOpen, setIsAdminPollsOpen] = useState(false);
 
+    const usernameInputRef = useRef<HTMLInputElement>(null);
+    const prevIsOpenRef = useRef(false);
+
+    // Sync from store/profile when modal opens, then overlay any saved draft from localStorage
+    useEffect(() => {
+        const justOpened = isOpen && !prevIsOpenRef.current;
+        prevIsOpenRef.current = isOpen;
+        if (!justOpened) return;
+
+        setShowConfirmSummary(false);
+        setIsUsernameEditable(false);
+
+        const baseAllowRoasts = preferences.allowRoasts;
+        const baseCompactMode = preferences.compactMode;
+        const baseRememberLastView = preferences.rememberLastView || false;
+        const baseTileRevealStyle = preferences.tileRevealStyle || 'normal';
+        const baseUsername = profile?.username || '';
+        const baseCommentsDisabled = profile?.comments_disabled || false;
+
+        setAllowRoasts(baseAllowRoasts);
+        setCompactMode(baseCompactMode);
+        setRememberLastView(baseRememberLastView);
+        setTileRevealStyle(baseTileRevealStyle);
+        setEditUsername(baseUsername);
+        setCommentsDisabled(baseCommentsDisabled);
+
+        try {
+            const rawDraft = localStorage.getItem(draftStorageKey);
+            if (rawDraft) {
+                const draft: Partial<SettingsDraft> = JSON.parse(rawDraft);
+                // eslint-disable-next-line react-hooks/set-state-in-effect
+                if (typeof draft.allowRoasts === 'boolean') setAllowRoasts(draft.allowRoasts);
+                if (typeof draft.compactMode === 'boolean') setCompactMode(draft.compactMode);
+                if (typeof draft.rememberLastView === 'boolean') setRememberLastView(draft.rememberLastView);
+                if (draft.tileRevealStyle) setTileRevealStyle(draft.tileRevealStyle);
+                if (typeof draft.editUsername === 'string') setEditUsername(draft.editUsername);
+                if (typeof draft.commentsDisabled === 'boolean') setCommentsDisabled(draft.commentsDisabled);
+                if (typeof draft.receiveEmails === 'boolean') setReceiveEmails(draft.receiveEmails);
+                setDraftRestored(true);
+            } else {
+                setDraftRestored(false);
+            }
+        } catch {
+            setDraftRestored(false);
+        }
+    }, [isOpen, draftStorageKey, preferences, profile]);
+
+    // Fetch auth email, email preferences, and push status when modal opens
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const fetchAuthData = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user?.email) setUserEmail(user.email);
+        };
+
+        const fetchEmailPreferences = async () => {
+            if (profile?.id) {
+                const { data, error } = await supabase
+                    .from('email_preferences')
+                    .select('receive_emails')
+                    .eq('user_id', profile.id)
+                    .maybeSingle();
+                if (!error && data) {
+                    setInitialReceiveEmails(data.receive_emails);
+                    // Only overwrite if no draft is overriding it
+                    const rawDraft = localStorage.getItem(draftStorageKey);
+                    if (!rawDraft) {
+                        setReceiveEmails(data.receive_emails);
+                    }
+                }
+            }
+        };
+
+        const fetchPushStatus = async () => {
+            const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+            setPushSupported(supported);
+            if (supported) {
+                setPushPermission(Notification.permission);
+                try {
+                    const reg = await navigator.serviceWorker.ready;
+                    const sub = await reg.pushManager.getSubscription();
+                    setPushEnabled(!!sub && Notification.permission === 'granted');
+                } catch (err) {
+                    console.warn('[Settings] Error checking push subscription status:', err);
+                }
+            }
+        };
+
+        fetchAuthData();
+        fetchEmailPreferences();
+        fetchPushStatus();
+    }, [isOpen, profile?.id, draftStorageKey]);
+
+    // Compute diff between saved state and current draft
+    const changes = useMemo<SettingDiff[]>(() => {
+        const list: SettingDiff[] = [];
+        const savedUsername = profile?.username || '';
+        if (profile?.id && editUsername.trim() !== savedUsername) {
+            list.push({
+                name: 'Username',
+                from: savedUsername || 'None',
+                to: editUsername.trim() || 'None',
+            });
+        }
+        if (profile?.id && commentsDisabled !== (profile?.comments_disabled || false)) {
+            list.push({
+                name: 'Profile Comments',
+                from: profile?.comments_disabled ? 'Disabled' : 'Enabled',
+                to: commentsDisabled ? 'Disabled' : 'Enabled',
+            });
+        }
+        const savedReveal = (preferences.tileRevealStyle || 'normal') as TileRevealStyle;
+        if (tileRevealStyle !== savedReveal) {
+            list.push({
+                name: 'Tile Reveal Style',
+                from: REVEAL_STYLE_LABELS[savedReveal],
+                to: REVEAL_STYLE_LABELS[tileRevealStyle],
+            });
+        }
+        if (allowRoasts !== preferences.allowRoasts) {
+            list.push({
+                name: 'Wordle Roasts',
+                from: preferences.allowRoasts ? 'On' : 'Off',
+                to: allowRoasts ? 'On' : 'Off',
+            });
+        }
+        if (compactMode !== preferences.compactMode) {
+            list.push({
+                name: 'Compact Mode',
+                from: preferences.compactMode ? 'On' : 'Off',
+                to: compactMode ? 'On' : 'Off',
+            });
+        }
+        if (rememberLastView !== (preferences.rememberLastView || false)) {
+            list.push({
+                name: 'Remember Last View',
+                from: preferences.rememberLastView ? 'On' : 'Off',
+                to: rememberLastView ? 'On' : 'Off',
+            });
+        }
+        if (profile?.id && receiveEmails !== initialReceiveEmails) {
+            list.push({
+                name: 'Email Updates',
+                from: initialReceiveEmails ? 'On' : 'Off',
+                to: receiveEmails ? 'On' : 'Off',
+            });
+        }
+        return list;
+    }, [
+        profile,
+        preferences,
+        editUsername,
+        commentsDisabled,
+        tileRevealStyle,
+        allowRoasts,
+        compactMode,
+        rememberLastView,
+        receiveEmails,
+        initialReceiveEmails,
+    ]);
+
+    const hasChanges = changes.length > 0;
+
+    // Persist draft to localStorage whenever draftable values change
+    useEffect(() => {
+        if (!isOpen) return;
+        if (hasChanges) {
+            const draft: SettingsDraft = {
+                editUsername,
+                commentsDisabled,
+                tileRevealStyle,
+                allowRoasts,
+                compactMode,
+                rememberLastView,
+                receiveEmails,
+            };
+            try {
+                localStorage.setItem(draftStorageKey, JSON.stringify(draft));
+            } catch {
+                // Ignore storage quota errors
+            }
+        } else {
+            try {
+                localStorage.removeItem(draftStorageKey);
+            } catch {
+                // Ignore
+            }
+        }
+    }, [
+        isOpen,
+        hasChanges,
+        draftStorageKey,
+        editUsername,
+        commentsDisabled,
+        tileRevealStyle,
+        allowRoasts,
+        compactMode,
+        rememberLastView,
+        receiveEmails,
+    ]);
+
+    const handleClearDraft = () => {
+        setAllowRoasts(preferences.allowRoasts);
+        setCompactMode(preferences.compactMode);
+        setRememberLastView(preferences.rememberLastView || false);
+        setTileRevealStyle(preferences.tileRevealStyle || 'normal');
+        setEditUsername(profile?.username || '');
+        setCommentsDisabled(profile?.comments_disabled || false);
+        setReceiveEmails(initialReceiveEmails);
+        setIsUsernameEditable(false);
+        setShowConfirmSummary(false);
+        setDraftRestored(false);
+        try {
+            localStorage.removeItem(draftStorageKey);
+        } catch {
+            // Ignore
+        }
+        triggerToast('Draft Cleared');
+    };
+
     const handleSignOut = async () => {
         const confirmed = await ask({
             title: 'Sign Out',
             message: 'Are you sure you want to sign out? Your local game state and statistics will be cleared.',
             confirmLabel: 'Sign Out',
-            type: 'danger'
+            type: 'danger',
         });
 
         if (confirmed) {
@@ -61,105 +334,26 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
         }
     };
 
-    const usernameInputRef = useRef<HTMLInputElement>(null);
-    const [editUsername, setEditUsername] = useState(profile?.username || '');
-    const [isUsernameEditable, setIsUsernameEditable] = useState(false);
-    const [showConfirmSummary, setShowConfirmSummary] = useState(false);
-    const [initialReceiveEmails, setInitialReceiveEmails] = useState(false);
-    const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
-    const [commentsDisabled, setCommentsDisabled] = useState(profile?.comments_disabled || false);
-
-    const [prevProfile, setPrevProfile] = useState(profile);
-    if (profile !== prevProfile) {
-        setPrevProfile(profile);
-        if (profile) {
-            setEditUsername(profile.username || '');
-            setCommentsDisabled(profile.comments_disabled || false);
-        }
-    }
-
-    const handleReset = () => {
-        setAllowRoasts(preferences.allowRoasts);
-        setCompactMode(preferences.compactMode);
-        setRememberLastView(preferences.rememberLastView || false);
-        setEditUsername(profile?.username || '');
-        setIsUsernameEditable(false);
-        setReceiveEmails(initialReceiveEmails);
-        setCommentsDisabled(profile?.comments_disabled || false);
-        triggerToast('Changes Discarded');
-    };
-
-    if (isOpen !== prevIsOpen) {
-        setPrevIsOpen(isOpen);
-        if (isOpen) {
-            setShowConfirmSummary(false);
-            setIsUsernameEditable(false);
-        }
-    }
-
-    useEffect(() => {
-        if (isOpen) {
-            const fetchAuthData = async () => {
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user?.email) setUserEmail(user.email);
-            };
-            const fetchEmailPreferences = async () => {
-                if (profile?.id) {
-                    const { data, error } = await supabase
-                        .from('email_preferences')
-                        .select('receive_emails')
-                        .eq('user_id', profile.id)
-                        .maybeSingle();
-                    if (!error && data) {
-                        setReceiveEmails(data.receive_emails);
-                        setInitialReceiveEmails(data.receive_emails);
-                    }
-                }
-            };
-            const fetchPushStatus = async () => {
-                const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
-                setPushSupported(supported);
-                if (supported) {
-                    setPushPermission(Notification.permission);
-                    try {
-                        const reg = await navigator.serviceWorker.ready;
-                        const sub = await reg.pushManager.getSubscription();
-                        setPushEnabled(!!sub && Notification.permission === 'granted');
-                    } catch (err) {
-                        console.warn("[Settings] Error checking push subscription status:", err);
-                    }
-                }
-            };
-
-            fetchAuthData();
-            fetchEmailPreferences();
-            fetchPushStatus();
-        }
-    }, [isOpen, profile?.id]);
-
     const handlePushToggle = async () => {
         if (!pushSupported) return;
 
         if (pushEnabled) {
-            // Disable
             setLoading(true);
             await unsubscribeFromPush();
             setPushEnabled(false);
             setLoading(false);
         } else {
-            // Enable
             if (pushPermission === 'denied') {
-                triggerToast('Notifications are blocked by your browser settings. Please allow them manually.');
+                triggerToast('Notifications are blocked by your browser settings.');
                 return;
             }
 
-            // 2-Tier Double Opt-in Prompt
             const confirmed = await ask({
                 title: 'Enable Notifications',
-                message: 'Would you like to receive real-time push notifications for word challenges, global chat messages, and updates?',
-                confirmLabel: 'Yes, Enable',
-                cancelLabel: 'Maybe Later',
-                type: 'info'
+                message: 'Receive real-time push notifications for word challenges, chat messages, and updates?',
+                confirmLabel: 'Enable',
+                cancelLabel: 'Not Now',
+                type: 'info',
             });
 
             if (!confirmed) return;
@@ -172,7 +366,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                     setPushPermission('granted');
                 }
             } catch (err) {
-                console.error("[Settings] Push subscription toggle failed:", err);
+                console.error('[Settings] Push subscription toggle failed:', err);
             } finally {
                 setLoading(false);
             }
@@ -182,98 +376,51 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     const handlePurgeCache = async () => {
         const confirmed = await ask({
             title: 'Purge Cache & Reload',
-            message: 'This will unregister the service worker and clear all local application caches. Use this if the app is behaving unexpectedly or not updating. The page will reload immediately.',
+            message: 'This will unregister the service worker and clear all local application caches. The page will reload immediately.',
             confirmLabel: 'Purge & Reload',
-            type: 'danger'
+            type: 'danger',
         });
 
         if (confirmed) {
             setLoading(true);
             try {
-                // 1. Unregister all service workers
                 if ('serviceWorker' in navigator) {
                     const registrations = await navigator.serviceWorker.getRegistrations();
                     for (const registration of registrations) {
                         await registration.unregister();
                     }
                 }
-
-                // 2. Clear all caches
                 if ('caches' in window) {
-                    const keys = await caches.keys();
-                    for (const key of keys) {
-                        await caches.delete(key);
-                    }
+                    const cacheNames = await caches.keys();
+                    await Promise.all(cacheNames.map((name) => caches.delete(name)));
                 }
-
-                // 3. Reload
                 window.location.reload();
             } catch (err) {
-                console.error("[Settings] Cache purge failed:", err);
-                triggerToast('Failed to purge cache');
+                console.error('[Settings] Cache purge failed:', err);
+                triggerToast('Failed to purge cache.');
                 setLoading(false);
             }
         }
     };
 
-
-
-    const getChanges = () => {
-        const changes: { name: string; from: string; to: string }[] = [];
-
-        if (profile?.id) {
-            const usernameClean = editUsername.trim();
-            const originalUsername = profile.username || '';
-            if (usernameClean !== originalUsername) {
-                changes.push({
-                    name: 'Username',
-                    from: originalUsername ? `@${originalUsername}` : 'None',
-                    to: usernameClean ? `@${usernameClean}` : 'None'
-                });
-            }
-        }
-
-        if (allowRoasts !== (preferences.allowRoasts ?? true)) {
-            changes.push({
-                name: 'Allow Roasts',
-                from: (preferences.allowRoasts ?? true) ? 'Enabled' : 'Disabled',
-                to: allowRoasts ? 'Enabled' : 'Disabled'
+    const handleSendLogs = async () => {
+        setSendingLogs(true);
+        try {
+            const logData = JSON.stringify(logger.getLogs(), null, 2);
+            const { error } = await supabase.from('diagnostic_logs').insert({
+                user_id: profile?.id || null,
+                username: profile?.username || 'Anonymous',
+                logs: logData,
+                user_agent: navigator.userAgent,
             });
+            if (error) throw error;
+            triggerToast('Diagnostic logs sent.');
+        } catch (err) {
+            console.error('[Settings] Failed to send logs:', err);
+            triggerToast('Failed to send logs.');
+        } finally {
+            setSendingLogs(false);
         }
-
-        if (compactMode !== (preferences.compactMode ?? false)) {
-            changes.push({
-                name: 'Compact Mode',
-                from: (preferences.compactMode ?? false) ? 'Enabled' : 'Disabled',
-                to: compactMode ? 'Enabled' : 'Disabled'
-            });
-        }
-
-        if (rememberLastView !== (preferences.rememberLastView ?? true)) {
-            changes.push({
-                name: 'Restore Last Tab',
-                from: (preferences.rememberLastView ?? true) ? 'Enabled' : 'Disabled',
-                to: rememberLastView ? 'Enabled' : 'Disabled'
-            });
-        }
-
-        if (receiveEmails !== initialReceiveEmails) {
-            changes.push({
-                name: 'Email Notifications',
-                from: initialReceiveEmails ? 'Subscribed' : 'Unsubscribed',
-                to: receiveEmails ? 'Subscribed' : 'Unsubscribed'
-            });
-        }
-
-        if (commentsDisabled !== (profile?.comments_disabled || false)) {
-            changes.push({
-                name: 'Disable Comments',
-                from: (profile?.comments_disabled || false) ? 'Enabled' : 'Disabled',
-                to: commentsDisabled ? 'Enabled' : 'Disabled'
-            });
-        }
-
-        return changes;
     };
 
     const handleSave = async () => {
@@ -284,9 +431,10 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
             allowRoasts,
             compactMode,
             rememberLastView,
+            tileRevealStyle,
         };
 
-        // Update store directly for immediate effect and anonymous support
+        // Update store immediately (persists to localStorage for Guest & logged-in users)
         useAppStore.getState().setPreferences(newPreferences);
 
         let success = true;
@@ -306,7 +454,6 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                     return;
                 }
 
-                // Check uniqueness
                 const { data: existingUser, error: checkError } = await supabase
                     .from('profiles')
                     .select('id')
@@ -326,7 +473,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                 .update({
                     preferences: newPreferences,
                     username: usernameClean || profile.username,
-                    comments_disabled: commentsDisabled
+                    comments_disabled: commentsDisabled,
                 })
                 .eq('id', profile.id);
 
@@ -340,19 +487,38 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
 
             if (error) {
                 success = false;
-                console.error("[Settings] Failed to sync profile updates to Supabase:", error);
+                console.error('[Settings] Failed to sync profile updates to Supabase:', error);
             } else {
+                try {
+                    const updatedProfile = {
+                        ...profile,
+                        preferences: newPreferences,
+                        username: usernameClean || profile.username,
+                        comments_disabled: commentsDisabled,
+                    };
+                    localStorage.setItem(`cached-profile-${profile.id}`, JSON.stringify(updatedProfile));
+                } catch {
+                    // Ignore storage errors
+                }
                 await supabase.auth.updateUser({
                     data: {
-                        username: usernameClean || profile.username
-                    }
+                        username: usernameClean || profile.username,
+                    },
                 });
                 await refreshProfile();
             }
         }
 
+        try {
+            localStorage.removeItem(draftStorageKey);
+        } catch {
+            // Ignore
+        }
+        setDraftRestored(false);
+        setShowConfirmSummary(false);
+
         if (success) {
-            triggerToast(profile?.id ? 'Preferences Updated' : 'Preferences Saved Locally');
+            triggerToast(profile?.id ? 'Settings Saved' : 'Settings Saved Locally');
             onClose();
         } else {
             triggerToast('Saved locally, but cloud sync failed.');
@@ -362,96 +528,96 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
         setLoading(false);
     };
 
+    const header = (
+        <div className="sticky top-0 z-20 backdrop-blur-md bg-[#121213]/90 flex items-center justify-between px-5 py-4 border-b border-white/10">
+            <div className="flex items-center gap-2.5">
+                <h2 className="text-xl font-bold text-white tracking-tight">Settings</h2>
+                {draftRestored && hasChanges && (
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/25">
+                        Draft
+                    </span>
+                )}
+            </div>
+            <button
+                onClick={onClose}
+                className="p-1.5 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                aria-label="Close settings"
+            >
+                <X className="w-5 h-5" />
+            </button>
+        </div>
+    );
 
-
-    const matchesSearch = (text: string, description?: string) => {
-        if (!searchQuery) return true;
-        const query = searchQuery.toLowerCase();
-        return text.toLowerCase().includes(query) || (description?.toLowerCase().includes(query) ?? false);
-    };
-
-    if (!isOpen) return null;
-
-    const showProfile = !!(profile?.id && (matchesSearch('Profile Settings') || matchesSearch('Username') || matchesSearch('Full Name')));
-    const showSecurity = matchesSearch('Security & Identity') || matchesSearch('Email', userEmail);
-    const showGameplay = matchesSearch('Gameplay Experience') || matchesSearch('Sassy Roasts') || matchesSearch('Compact Mode') || matchesSearch('Remember Last View');
-    const showEmail = matchesSearch('Email Notifications') || matchesSearch('Updates & Reminders');
-    const showPush = matchesSearch('Push Notifications') || matchesSearch('Live Push Updates');
-    const showApp = !isStandalone && (matchesSearch('Application') || matchesSearch('Install Variant'));
-    const showDiagnostics = matchesSearch('Diagnostics') || matchesSearch('Session Logs') || matchesSearch('Purge Cache');
-    const showLegal = matchesSearch('Legal & Policies') || matchesSearch('Privacy') || matchesSearch('Terms') || matchesSearch('Data Deletion');
-
-    const hasResults = showProfile || showSecurity || showGameplay || showEmail || showPush || showApp || showDiagnostics || showLegal;
+    const footer = showConfirmSummary ? (
+        <div className="sticky bottom-0 z-20 backdrop-blur-md bg-[#121213]/90 flex items-center gap-3 p-4 border-t border-white/10">
+            <button
+                type="button"
+                onClick={() => setShowConfirmSummary(false)}
+                disabled={loading}
+                className="flex-1 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-sm transition-colors disabled:opacity-50"
+            >
+                Back
+            </button>
+            <button
+                type="button"
+                onClick={handleSave}
+                disabled={loading}
+                className="flex-[2] py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-sm transition-colors disabled:opacity-50"
+            >
+                {loading ? 'Saving...' : 'Confirm & Save'}
+            </button>
+        </div>
+    ) : hasChanges ? (
+        <div className="sticky bottom-0 z-20 backdrop-blur-md bg-[#121213]/90 flex items-center gap-3 p-4 border-t border-white/10">
+            <button
+                type="button"
+                onClick={handleClearDraft}
+                className="flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 font-semibold text-sm transition-colors"
+            >
+                <RotateCcw className="w-4 h-4" />
+                Clear Draft
+            </button>
+            <button
+                type="button"
+                onClick={() => setShowConfirmSummary(true)}
+                disabled={loading}
+                className="flex-1 py-3 rounded-xl font-bold text-sm bg-white text-black hover:bg-gray-200 transition-all disabled:opacity-50"
+            >
+                {`Save Changes (${changes.length})`}
+            </button>
+        </div>
+    ) : null;
 
     return (
-        <ModalLayout
-            isOpen={isOpen}
-            onClose={onClose}
-            showCloseButton={false}
-            isOverlay={true}
-            zIndex="z-150"
-            maxWidth="full"
-            theme="dark"
-            containerClassName="p-0!"
-        >
-            <div className="flex flex-col h-full w-full max-w-2xl mx-auto text-white select-none overflow-hidden animate-in fade-in duration-200 settings-modal-content">
-                <style dangerouslySetInnerHTML={{
-                    __html: `
-                    .settings-modal-content *:not(svg):not(path) {
-                        color: #ffffff !important;
-                    }
-                    .settings-modal-content input::placeholder {
-                        color: rgba(255, 255, 255, 0.4) !important;
-                    }
-                `}} />
-
-                {/* Header */}
-                <div className="flex flex-col border-b border-gray-900 bg-gray-900/20 shrink-0">
-                    <div className="flex items-center justify-between p-4 pb-2">
-                        <h2 className="text-lg font-black text-white tracking-tight">Settings</h2>
-                        <button onClick={onClose} className="p-1 hover:bg-gray-800 rounded-full transition-colors text-gray-500 hover:text-white cursor-pointer">
-                            <X size={20} />
-                        </button>
-                    </div>
-
-                    {/* Search Bar */}
-                    <div className="px-4 pb-4">
-                        <div className="relative group">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-indigo-400 transition-colors" size={14} />
-                            <input
-                                type="text"
-                                placeholder="Search settings..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-gray-900/50 border border-gray-800 rounded-xl py-2 pl-9 pr-4 text-xs text-white placeholder:text-gray-600 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 transition-all"
-                            />
-                            {searchQuery && (
-                                <button
-                                    onClick={() => setSearchQuery('')}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-white transition-colors cursor-pointer"
-                                >
-                                    <X size={12} />
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="p-6 space-y-8 overflow-y-auto custom-scrollbar flex-1">
+        <>
+            <ModalLayout
+                isOpen={isOpen}
+                onClose={onClose}
+                showCloseButton={false}
+                maxWidth="lg"
+            >
+                {header}
+                <div className="p-5 space-y-7">
                     {showConfirmSummary ? (
-                        <div className="space-y-6 py-4 animate-in fade-in zoom-in-95 duration-200">
-                            <div className="text-center space-y-2">
-                                <h3 className="text-sm font-black uppercase tracking-wider text-indigo-400">Review Changes</h3>
-                                <p className="text-[10px] text-gray-400 leading-relaxed">Please review the modified settings before saving.</p>
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2">
+                                <Sparkles className="w-5 h-5 text-emerald-400" />
+                                <h3 className="text-lg font-bold text-white">Review Changes</h3>
                             </div>
-                            <div className="space-y-2.5 max-h-[40dvh] overflow-y-auto pr-1">
-                                {getChanges().map((change, idx) => (
-                                    <div key={idx} className="bg-gray-900/50 border border-gray-800 rounded-xl p-3 space-y-1.5">
-                                        <span className="text-[9px] font-black uppercase text-gray-500 tracking-wider block">{change.name}</span>
-                                        <div className="flex items-center justify-between text-xs gap-3 font-medium">
-                                            <span className="text-gray-400 line-through truncate max-w-[45%]">{change.from}</span>
-                                            <span className="text-indigo-400 font-bold font-mono">→</span>
-                                            <span className="text-correct font-bold truncate max-w-[45%]">{change.to}</span>
+                            <p className="text-sm text-gray-400">
+                                Confirm the updates below before saving your settings.
+                            </p>
+
+                            <div className="rounded-2xl bg-white/[0.04] border border-white/10 divide-y divide-white/5 overflow-hidden">
+                                {changes.map((change) => (
+                                    <div key={change.name} className="p-4 flex items-center justify-between gap-4">
+                                        <span className="text-sm font-semibold text-white">
+                                            {change.name}
+                                        </span>
+                                        <div className="flex items-center gap-2 text-sm">
+                                            <span className="text-gray-400 line-through">{change.from}</span>
+                                            <ArrowRight className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                                            <span className="font-bold text-emerald-400">{change.to}</span>
                                         </div>
                                     </div>
                                 ))}
@@ -459,568 +625,322 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                         </div>
                     ) : (
                         <>
-                            {!hasResults && (
-                                <div className="flex flex-col items-center justify-center py-12 text-center">
-                                    <div className="w-12 h-12 bg-gray-900 rounded-full flex items-center justify-center mb-4 border border-gray-800">
-                                        <Search size={20} className="text-gray-600" />
-                                    </div>
-                                    <p className="text-sm font-bold text-gray-300">No settings found</p>
-                                    <p className="text-xs text-gray-600 mt-1">Try a different search term</p>
-                                    <button
-                                        onClick={() => setSearchQuery('')}
-                                        className="mt-4 text-[10px] font-black text-indigo-400 uppercase tracking-widest hover:text-indigo-300 transition-colors"
-                                    >
-                                        Clear Search
-                                    </button>
-                                </div>
-                            )}
-
-                            {/* Profile Settings */}
-                            {showProfile && (
-                                <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <ShieldCheck size={14} className="text-indigo-400" />
-                                        <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
-                                            Profile Settings
-                                        </label>
-                                    </div>
-                                    <div className="space-y-3">
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] font-black uppercase text-gray-500 tracking-wider">Username</label>
-                                            <div className="relative group flex items-center">
-                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">@</span>
-                                                <input
-                                                    ref={usernameInputRef}
-                                                    type="text"
-                                                    value={editUsername}
-                                                    readOnly={!isUsernameEditable}
-                                                    onChange={(e) => {
-                                                        const clean = e.target.value.replace(/\s+/g, '');
-                                                        if (clean.length > 0) {
-                                                            setEditUsername(clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase());
-                                                        } else {
-                                                            setEditUsername('');
-                                                        }
-                                                    }}
-                                                    placeholder="Username"
-                                                    className={`w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-8 pr-12 text-xs focus:outline-none focus:border-indigo-500/50 focus:bg-white/10 transition-all text-white placeholder-gray-600 ${!isUsernameEditable ? 'opacity-70 cursor-default select-none' : ''}`}
-                                                />
+                            {/* 1. Account & Profile */}
+                            <section className="space-y-2.5">
+                                <h3 className="text-sm font-bold text-white/90 px-1">
+                                    Account & Profile
+                                </h3>
+                                <div className="rounded-2xl bg-white/[0.04] border border-white/10 divide-y divide-white/5 overflow-hidden">
+                                    {profile?.id ? (
+                                        <>
+                                            <div className="p-4 flex items-center justify-between gap-3">
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="text-sm font-semibold text-white">Username</div>
+                                                    {isUsernameEditable ? (
+                                                        <input
+                                                            ref={usernameInputRef}
+                                                            type="text"
+                                                            value={editUsername}
+                                                            onChange={(e) => {
+                                                                const clean = e.target.value.replace(/[^a-zA-Z0-9_]/g, '');
+                                                                setEditUsername(clean);
+                                                            }}
+                                                            maxLength={15}
+                                                            className="mt-1.5 w-full bg-black/40 border border-white/20 rounded-lg px-3 py-1.5 text-sm font-semibold text-white focus:outline-none focus:border-emerald-400"
+                                                            placeholder="Enter username"
+                                                        />
+                                                    ) : (
+                                                        <div className="text-xs text-gray-400 truncate mt-0.5">
+                                                            {editUsername || 'Not set'}
+                                                        </div>
+                                                    )}
+                                                </div>
                                                 <button
                                                     type="button"
                                                     onClick={() => {
-                                                        const nextEditable = !isUsernameEditable;
-                                                        setIsUsernameEditable(nextEditable);
-                                                        if (nextEditable) {
+                                                        setIsUsernameEditable(!isUsernameEditable);
+                                                        if (!isUsernameEditable) {
                                                             setTimeout(() => usernameInputRef.current?.focus(), 50);
                                                         }
                                                     }}
-                                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-indigo-400 p-1.5 rounded-lg hover:bg-white/5 transition-colors"
-                                                    title={isUsernameEditable ? "Save username" : "Edit username"}
+                                                    className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 transition-colors shrink-0"
+                                                    aria-label="Edit username"
                                                 >
                                                     {isUsernameEditable ? (
-                                                        <Check size={14} className="text-indigo-400 animate-pulse" />
+                                                        <Check className="w-4 h-4 text-emerald-400" />
                                                     ) : (
-                                                        <Pencil size={14} className="text-gray-500" />
+                                                        <Pencil className="w-4 h-4" />
                                                     )}
                                                 </button>
                                             </div>
-                                            <p className="text-[9px] text-gray-600 px-1">
-                                                3-15 characters. Letters, numbers, and underscores only.
-                                            </p>
-                                        </div>
 
-                                        <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
-                                            <div className="flex-1 pr-4">
-                                                <p className="text-sm font-bold text-gray-100">Disable Comments</p>
-                                                <p className="text-[11px] text-gray-500 leading-relaxed">
-                                                    Prevent other users from commenting on your guesses.
-                                                </p>
+                                            <div className="p-4 flex items-center justify-between gap-3">
+                                                <div>
+                                                    <div className="text-sm font-semibold text-white">Email</div>
+                                                    <div className="text-xs text-gray-400 mt-0.5">
+                                                        {userEmail || 'Loading...'}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="p-4 flex items-center justify-between gap-3">
+                                                <div>
+                                                    <div className="text-sm font-semibold text-white">Disable Comments</div>
+                                                    <div className="text-xs text-gray-400 mt-0.5">
+                                                        Hide comments on your profile
+                                                    </div>
+                                                </div>
+                                                <ToggleSwitch
+                                                    checked={commentsDisabled}
+                                                    onChange={setCommentsDisabled}
+                                                />
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={handleSignOut}
+                                                className="w-full p-4 flex items-center justify-between text-left hover:bg-red-500/10 transition-colors"
+                                            >
+                                                <span className="text-sm font-semibold text-red-400">Sign Out</span>
+                                                <LogOut className="w-4 h-4 text-red-400" />
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <div className="p-4">
+                                            <div className="text-sm font-semibold text-white">Guest Mode</div>
+                                            <div className="text-xs text-gray-400 mt-0.5">
+                                                Gameplay settings are saved locally on this device.
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </section>
+
+                            {/* 2. Gameplay & Alerts */}
+                            <section className="space-y-2.5">
+                                <h3 className="text-sm font-bold text-white/90 px-1">
+                                    Gameplay & Alerts
+                                </h3>
+                                <div className="rounded-2xl bg-white/[0.04] border border-white/10 divide-y divide-white/5 overflow-hidden">
+                                    {/* Tile Reveal Style */}
+                                    <div className="p-4 space-y-3">
+                                        <div>
+                                            <div className="text-sm font-semibold text-white">Tile Reveal Style</div>
+                                            <div className="text-xs text-gray-400 mt-0.5">
+                                                Applies to Standard, Challenge, and Guest games
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-black/40 border border-white/5">
+                                            {(['normal', 'slow', 'instant'] as TileRevealStyle[]).map((style) => {
+                                                const active = tileRevealStyle === style;
+                                                return (
+                                                    <button
+                                                        key={style}
+                                                        type="button"
+                                                        onClick={() => setTileRevealStyle(style)}
+                                                        className={`py-2 rounded-lg text-xs font-bold transition-all ${active
+                                                                ? 'bg-white text-black shadow-sm'
+                                                                : 'text-gray-400 hover:text-white'
+                                                            }`}
+                                                    >
+                                                        {REVEAL_STYLE_LABELS[style]}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    <div className="p-4 flex items-center justify-between gap-3">
+                                        <div>
+                                            <div className="text-sm font-semibold text-white">Wordle Roasts</div>
+                                            <div className="text-xs text-gray-400 mt-0.5">
+                                                Show playful post-game commentary
+                                            </div>
+                                        </div>
+                                        <ToggleSwitch checked={allowRoasts} onChange={setAllowRoasts} />
+                                    </div>
+
+                                    <div className="p-4 flex items-center justify-between gap-3">
+                                        <div>
+                                            <div className="text-sm font-semibold text-white">Compact Mode</div>
+                                            <div className="text-xs text-gray-400 mt-0.5">
+                                                Tighter spacing for smaller screens
+                                            </div>
+                                        </div>
+                                        <ToggleSwitch checked={compactMode} onChange={setCompactMode} />
+                                    </div>
+
+                                    <div className="p-4 flex items-center justify-between gap-3">
+                                        <div>
+                                            <div className="text-sm font-semibold text-white">Remember Last View</div>
+                                            <div className="text-xs text-gray-400 mt-0.5">
+                                                Reopen the last tab you visited
+                                            </div>
+                                        </div>
+                                        <ToggleSwitch checked={rememberLastView} onChange={setRememberLastView} />
+                                    </div>
+
+                                    {profile?.id && (
+                                        <div className="p-4 flex items-center justify-between gap-3">
+                                            <div>
+                                                <div className="text-sm font-semibold text-white">Email Updates</div>
+                                                <div className="text-xs text-gray-400 mt-0.5">
+                                                    Daily reminders and challenge alerts
+                                                </div>
+                                            </div>
+                                            <ToggleSwitch checked={receiveEmails} onChange={setReceiveEmails} />
+                                        </div>
+                                    )}
+
+                                    {pushSupported && (
+                                        <div className="p-4 flex items-center justify-between gap-3">
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-semibold text-white">
+                                                        Push Notifications
+                                                    </span>
+                                                    <span
+                                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${pushPermission === 'granted' && pushEnabled
+                                                                ? 'bg-emerald-500/20 text-emerald-400'
+                                                                : 'bg-white/10 text-gray-400'
+                                                            }`}
+                                                    >
+                                                        {pushPermission === 'granted' && pushEnabled ? 'Active' : 'Off'}
+                                                    </span>
+                                                </div>
+                                                <div className="text-xs text-gray-400 mt-0.5">
+                                                    Instant alerts on this device
+                                                </div>
                                             </div>
                                             <button
                                                 type="button"
-                                                onClick={() => setCommentsDisabled(!commentsDisabled)}
-                                                className={`w-12 h-6 rounded-full transition-all duration-300 relative ${commentsDisabled ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]' : 'bg-gray-800'}`}
+                                                onClick={handlePushToggle}
+                                                disabled={loading}
+                                                className="p-2 rounded-xl bg-white/10 hover:bg-white/15 text-white transition-colors disabled:opacity-50"
+                                                aria-label="Toggle push notifications"
                                             >
-                                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${commentsDisabled ? 'left-7' : 'left-1'}`} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </section>
-                            )}
-
-                            {/* Security & Identity (Private Data) */}
-                            {showSecurity && (
-                                <section className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <ShieldCheck size={14} className="text-indigo-400" />
-                                        <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
-                                            Security & Identity
-                                        </label>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <div className="flex items-center justify-between px-4 py-3 bg-gray-900/40 border border-gray-800/50 rounded-xl">
-                                            <span className="text-xs text-gray-400 truncate max-w-50">
-                                                {userEmail || 'Fetching...'}
-                                            </span>
-                                            <span className="text-[9px] font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
-                                                PRIVATE
-                                            </span>
-                                        </div>
-                                        <p className="text-[10px] text-gray-600 px-1 italic">
-                                            Your email is used for recovery and is never shared publicly.
-                                        </p>
-                                    </div>
-                                </section>
-                            )}
-
-                            {/* Gameplay Preferences */}
-                            {showGameplay && (
-                                <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <MessageSquareQuote size={14} className="text-indigo-400" />
-                                        <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
-                                            Gameplay Experience
-                                        </label>
-                                    </div>
-
-                                    <div className="space-y-3">
-                                        {matchesSearch('Sassy Roasts') && (
-                                            <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
-                                                <div className="flex-1 pr-4">
-                                                    <p className="text-sm font-bold text-gray-100">Sassy Roasts</p>
-                                                    <p className="text-[11px] text-gray-500 leading-relaxed">
-                                                        The app will roast you based on your game score.
-                                                    </p>
-                                                </div>
-                                                <button
-                                                    onClick={() => setAllowRoasts(!allowRoasts)}
-                                                    className={`w-12 h-6 rounded-full transition-all duration-300 relative ${allowRoasts ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]' : 'bg-gray-800'
-                                                        }`}
-                                                >
-                                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${allowRoasts ? 'left-7' : 'left-1'
-                                                        }`} />
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {matchesSearch('Compact Mode') && (
-                                            <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
-                                                <div className="flex-1 pr-4">
-                                                    <p className="text-sm font-bold text-gray-100">Compact Mode</p>
-                                                    <p className="text-[11px] text-gray-500 leading-relaxed">
-                                                        Reduce spacing in the game grid for smaller screens.
-                                                    </p>
-                                                </div>
-                                                <button
-                                                    onClick={() => setCompactMode(!compactMode)}
-                                                    className={`w-12 h-6 rounded-full transition-all duration-300 relative ${compactMode ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]' : 'bg-gray-800'
-                                                        }`}
-                                                >
-                                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${compactMode ? 'left-7' : 'left-1'
-                                                        }`} />
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {matchesSearch('Remember Last View') && (
-                                            <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
-                                                <div className="flex-1 pr-4">
-                                                    <p className="text-sm font-bold text-gray-100">Remember Last View Settings</p>
-                                                    <p className="text-[11px] text-gray-500 leading-relaxed">
-                                                        Globally remember your open modals and active tab across exits/reloads.
-                                                    </p>
-                                                </div>
-                                                <button
-                                                    onClick={() => setRememberLastView(!rememberLastView)}
-                                                    className={`w-12 h-6 rounded-full transition-all duration-300 relative ${rememberLastView ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]' : 'bg-gray-800'
-                                                        }`}
-                                                >
-                                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${rememberLastView ? 'left-7' : 'left-1'
-                                                        }`} />
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </section>
-                            )}
-
-                            {/* Email Notifications Preferences */}
-                            {showEmail && (
-                                <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <Mail size={14} className="text-indigo-400" />
-                                        <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
-                                            Email Notifications
-                                        </label>
-                                    </div>
-
-                                    {matchesSearch('Updates & Reminders') && (
-                                        <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
-                                            <div className="flex-1 pr-4">
-                                                <p className="text-sm font-bold text-gray-100">Updates & Reminders</p>
-                                                <p className="text-[11px] text-gray-500 leading-relaxed">
-                                                    Receive streak reminders, inactivity nudges, and weekly leaderboard reports.
-                                                </p>
-                                            </div>
-                                            <button
-                                                onClick={() => setReceiveEmails(!receiveEmails)}
-                                                className={`w-12 h-6 rounded-full transition-all duration-300 relative ${receiveEmails ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]' : 'bg-gray-800'
-                                                    }`}
-                                            >
-                                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${receiveEmails ? 'left-7' : 'left-1'
-                                                    }`} />
+                                                <Bell className="w-4 h-4" />
                                             </button>
                                         </div>
                                     )}
-                                </section>
-                            )}
+                                </div>
+                            </section>
 
-                            {/* Push Notifications Preferences */}
-                            {showPush && (
-                                <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <Bell size={14} className="text-indigo-400" />
-                                        <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
-                                            Push Notifications
-                                        </label>
-                                    </div>
-
-                                    {matchesSearch('Live Push Updates') && (
-                                        <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
-                                            <div className="flex-1 pr-4">
-                                                <div className="flex items-center gap-2">
-                                                    <p className="text-sm font-bold text-gray-100">Live Push Updates</p>
-                                                    {pushSupported && (
-                                                        <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded-full uppercase tracking-wider ${pushPermission === 'granted' && pushEnabled
-                                                            ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                                                            : pushPermission === 'denied'
-                                                                ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-                                                                : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
-                                                            }`}>
-                                                            {pushPermission === 'granted' && pushEnabled
-                                                                ? 'Active'
-                                                                : pushPermission === 'denied'
-                                                                    ? 'Blocked'
-                                                                    : 'Not Active'}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <p className="text-[11px] text-gray-500 leading-relaxed mt-0.5">
-                                                    {!pushSupported
-                                                        ? 'Not supported by this browser/device.'
-                                                        : 'Get instant notifications for challenges, chat messages, and leaderboard news.'}
-                                                </p>
-                                            </div>
-                                            {pushSupported && (
-                                                <button
-                                                    onClick={handlePushToggle}
-                                                    className={`w-12 h-6 rounded-full transition-all duration-300 relative ${pushEnabled && pushPermission === 'granted'
-                                                        ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]'
-                                                        : 'bg-gray-800'
-                                                        }`}
-                                                >
-                                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${pushEnabled && pushPermission === 'granted' ? 'left-7' : 'left-1'
-                                                        }`} />
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
-                                </section>
-                            )}
-
-                            {/* App Installation (PWA) */}
-                            {showApp && (
-                                <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <Download size={14} className="text-indigo-400" />
-                                        <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
-                                            Application
-                                        </label>
-                                    </div>
-
-                                    <div className="p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
-                                        <div className="flex items-start gap-4">
-                                            <div className="flex-1">
-                                                <p className="text-sm font-bold text-gray-100">Install Variant</p>
-                                                <p className="text-[11px] text-gray-500 leading-relaxed mt-0.5">
-                                                    Add Variant to your home screen for quick, fullscreen word challenges.
-                                                </p>
-                                            </div>
-                                            {!isIOS ? (
-                                                <button
-                                                    onClick={handleInstall}
-                                                    disabled={isInstalling}
-                                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-[10px] font-black text-white uppercase tracking-widest rounded-lg shadow-lg shadow-indigo-900/20 transition-all disabled:opacity-50 shrink-0"
-                                                >
-                                                    {isInstalling ? 'INSTALLING...' : 'INSTALL'}
-                                                </button>
-                                            ) : (
-                                                <button
-                                                    onClick={() => setShowIOSInstallInstructions(!showIOSInstallInstructions)}
-                                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-[10px] font-black text-white uppercase tracking-widest rounded-lg shadow-lg shadow-indigo-900/20 transition-all shrink-0"
-                                                >
-                                                    {showIOSInstallInstructions ? 'HIDE' : 'HOW TO'}
-                                                </button>
-                                            )}
-                                        </div>
-                                        {isIOS && showIOSInstallInstructions && (
-                                            <div className="mt-4 p-3 bg-black/40 rounded-lg border border-gray-800/50 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                                                <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">iOS Instructions:</p>
-                                                <ol className="text-[11px] text-gray-500 space-y-1.5 list-decimal pl-4">
-                                                    <li>Tap the <span className="inline-flex align-middle bg-gray-800 p-0.5 rounded text-white">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                                                            <polyline points="16 6 12 2 8 6" />
-                                                            <line x1="12" y1="2" x2="12" y2="15" />
-                                                        </svg>
-                                                    </span> share button in Safari.</li>
-                                                    <li>Scroll and select <span className="text-gray-300 font-bold">"Add to Home Screen"</span>.</li>
-                                                    <li>Tap <span className="text-indigo-400 font-bold">"Add"</span> to finish.</li>
-                                                </ol>
-                                            </div>
-                                        )}
-
-                                        <button
-                                            onClick={() => {
-                                                onClose();
-                                                window.dispatchEvent(new CustomEvent('open-wordgrid-match', { detail: {} }));
-                                            }}
-                                            className="w-full mt-3 flex items-center justify-between p-3 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 rounded-xl transition-all text-left cursor-pointer group"
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-lg bg-indigo-600/30 border border-indigo-500/30 flex items-center justify-center text-base shrink-0 group-hover:scale-105 transition-transform">
-                                                    🔠
-                                                </div>
+                            {/* 3. App & Support */}
+                            <section className="space-y-2.5">
+                                <h3 className="text-sm font-bold text-white/90 px-1">
+                                    App & Support
+                                </h3>
+                                <div className="rounded-2xl bg-white/[0.04] border border-white/10 divide-y divide-white/5 overflow-hidden">
+                                    {!isStandalone && (
+                                        <div className="p-4 space-y-2">
+                                            <div className="flex items-center justify-between gap-3">
                                                 <div>
-                                                    <p className="text-xs font-bold text-indigo-300">WordGrid Mode</p>
-                                                    <p className="text-[10px] text-gray-400">Play asynchronous tactical board matches.</p>
+                                                    <div className="text-sm font-semibold text-white">Install App</div>
+                                                    <div className="text-xs text-gray-400 mt-0.5">
+                                                        Add to home screen for faster access
+                                                    </div>
                                                 </div>
+                                                {isIOS ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowIOSInstallInstructions(!showIOSInstallInstructions)}
+                                                        className="px-3.5 py-1.5 rounded-xl bg-white text-black text-xs font-bold hover:bg-gray-200 transition-colors"
+                                                    >
+                                                        How to Install
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleInstall}
+                                                        disabled={isInstalling}
+                                                        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white text-black text-xs font-bold hover:bg-gray-200 transition-colors disabled:opacity-50"
+                                                    >
+                                                        <Download className="w-3.5 h-3.5" />
+                                                        {isInstalling ? 'Installing...' : 'Install'}
+                                                    </button>
+                                                )}
                                             </div>
-                                            <span className="text-[9px] font-black text-indigo-400 uppercase tracking-wider bg-indigo-500/20 px-2 py-1 rounded-md border border-indigo-500/30">
-                                                Play
-                                            </span>
-                                        </button>
-                                    </div>
-                                </section>
-                            )}
-
-
-
-                            {/* Admin Portal (Only for Admins) */}
-                            {isAdmin && (matchesSearch('Admin') || matchesSearch('Portal') || matchesSearch('Shield') || matchesSearch('Polls') || matchesSearch('Results')) && (
-                                <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <Shield size={14} className="text-correct" />
-                                        <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
-                                            Management
-                                        </label>
-                                    </div>
-
-                                    <a
-                                        href="/admin"
-                                        className="flex items-center justify-between p-4 bg-correct/5 border border-correct/20 rounded-xl hover:bg-correct/10 transition-all group mb-3"
-                                    >
-                                        <div className="flex-1 pr-4">
-                                            <p className="text-sm font-bold text-correct">Admin Vetting Portal</p>
-                                            <p className="text-[11px] text-gray-500 leading-relaxed">
-                                                Access word vetting, user management, and system overrides.
-                                            </p>
+                                            {isIOS && showIOSInstallInstructions && (
+                                                <p className="text-xs text-gray-400 bg-black/30 rounded-xl p-3">
+                                                    Tap the Share button in Safari, then choose &ldquo;Add to Home Screen&rdquo;.
+                                                </p>
+                                            )}
                                         </div>
-                                        <Shield size={20} className="text-correct opacity-40 group-hover:opacity-100 transition-opacity" />
-                                    </a>
+                                    )}
 
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsAdminPollsOpen(true)}
-                                        className="w-full text-left flex items-center justify-between p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl hover:bg-amber-500/10 transition-all group cursor-pointer"
-                                    >
-                                        <div className="flex-1 pr-4">
-                                            <p className="text-sm font-bold text-amber-300">Admin Polls & Results</p>
-                                            <p className="text-[11px] text-gray-500 leading-relaxed">
-                                                View General chat admin polls, inspect live vote breakdowns, and manage pinned polls.
-                                            </p>
-                                        </div>
-                                        <BarChart3 size={20} className="text-amber-300 opacity-50 group-hover:opacity-100 transition-opacity shrink-0" />
-                                    </button>
-
-                                </section>
-                            )}
-
-                            {/* Debugging & Diagnostics */}
-                            {showDiagnostics && (
-                                <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <Terminal size={14} className="text-indigo-400" />
-                                        <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
-                                            Diagnostics
-                                        </label>
-                                    </div>
-
-                                    <div className="flex flex-col gap-3">
-                                        {matchesSearch('Session Logs') && (
-                                            <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
-                                                <div className="flex-1 pr-4">
-                                                    <p className="text-sm font-bold text-gray-100">Session Logs</p>
-                                                    <p className="text-[11px] text-gray-500 leading-relaxed">
-                                                        Send diagnostic logs to admin to help us debug issues.
-                                                    </p>
-                                                </div>
-                                                <button
-                                                    onClick={async () => {
-                                                        setSendingLogs(true);
-                                                        await logger.sendLogsToAdmin();
-                                                        setSendingLogs(false);
-                                                        triggerToast('Logs Sent to Admin');
-                                                    }}
-                                                    disabled={sendingLogs}
-                                                    className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-[10px] font-black text-gray-300 uppercase tracking-widest rounded-lg border border-white/5 transition-all disabled:opacity-50"
-                                                >
-                                                    {sendingLogs ? 'SENDING...' : 'SEND TO ADMIN'}
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {matchesSearch('Purge Cache') && (
-                                            <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
-                                                <div className="flex-1 pr-4">
-                                                    <p className="text-sm font-bold text-gray-100">Purge Cache</p>
-                                                    <p className="text-[11px] text-gray-500 leading-relaxed">
-                                                        Clears all local application cache and reloads the app immediately.
-                                                    </p>
-                                                </div>
-                                                <button
-                                                    onClick={handlePurgeCache}
-                                                    disabled={loading}
-                                                    className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-[10px] font-black text-red-400 uppercase tracking-widest rounded-lg border border-red-500/20 transition-all disabled:opacity-50"
-                                                >
-                                                    PURGE & RELOAD
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </section>
-                            )}
-
-                            {/* Legal Policies */}
-                            {showLegal && (
-                                <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <FileText size={14} className="text-indigo-400" />
-                                        <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
-                                            Legal & Policies
-                                        </label>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-2.5">
-                                        <a
-                                            href="/privacy.html"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="p-3 bg-gray-900/40 border border-gray-800 rounded-xl hover:border-indigo-500/50 hover:bg-gray-900/80 transition-all group"
-                                        >
-                                            <p className="text-xs font-bold text-gray-200 group-hover:text-indigo-300">Privacy Policy</p>
-                                            <p className="text-[9px] text-gray-500 mt-0.5">Data collection & usage</p>
-                                        </a>
-
-                                        <a
-                                            href="/terms.html"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="p-3 bg-gray-900/40 border border-gray-800 rounded-xl hover:border-indigo-500/50 hover:bg-gray-900/80 transition-all group"
-                                        >
-                                            <p className="text-xs font-bold text-gray-200 group-hover:text-indigo-300">Terms of Service</p>
-                                            <p className="text-[9px] text-gray-500 mt-0.5">Rules & guidelines</p>
-                                        </a>
-                                    </div>
-
-                                    <div className="pt-2">
+                                    {isAdmin && (
                                         <button
-                                            onClick={async () => {
-                                                const confirmed = await ask({
-                                                    title: 'Request Data Deletion',
-                                                    message: 'Are you sure you want to request data deletion? Your account data will be marked for removal in compliance with GDPR.',
-                                                    confirmLabel: 'Request Removal',
-                                                    type: 'danger'
-                                                });
-                                                if (confirmed) {
-                                                    triggerToast('Data removal request logged.');
-                                                }
-                                            }}
-                                            className="w-full py-2.5 bg-red-950/20 border border-red-900/30 hover:bg-red-900/30 text-red-400 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                                            type="button"
+                                            onClick={() => setIsAdminPollsOpen(true)}
+                                            className="w-full p-4 flex items-center justify-between text-left hover:bg-white/5 transition-colors"
                                         >
-                                            Request Account Data Removal
+                                            <div className="flex items-center gap-2.5">
+                                                <BarChart3 className="w-4 h-4 text-indigo-400" />
+                                                <span className="text-sm font-semibold text-white">Admin Polls</span>
+                                            </div>
+                                            <span className="text-xs font-semibold text-gray-400">Open</span>
                                         </button>
+                                    )}
+
+                                    <div className="p-4 flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2.5">
+                                            <Terminal className="w-4 h-4 text-gray-400" />
+                                            <div>
+                                                <div className="text-sm font-semibold text-white">Diagnostics</div>
+                                                <div className="text-xs text-gray-400 mt-0.5">
+                                                    Send logs or reset app cache
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={handleSendLogs}
+                                                disabled={sendingLogs}
+                                                className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-semibold text-white transition-colors disabled:opacity-50"
+                                            >
+                                                {sendingLogs ? 'Sending...' : 'Send Logs'}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={handlePurgeCache}
+                                                disabled={loading}
+                                                className="px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-xs font-semibold text-red-400 transition-colors disabled:opacity-50"
+                                            >
+                                                Purge Cache
+                                            </button>
+                                        </div>
                                     </div>
-                                </section>
-                            )}
+
+                                    <div className="p-4 flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2.5">
+                                            <Shield className="w-4 h-4 text-gray-400" />
+                                            <span className="text-sm font-semibold text-white">Legal</span>
+                                        </div>
+                                        <div className="flex items-center gap-3 text-xs font-semibold text-gray-400">
+                                            <a href="/privacy" className="hover:text-white transition-colors">
+                                                Privacy
+                                            </a>
+                                            <a href="/terms" className="hover:text-white transition-colors">
+                                                Terms
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
                         </>
                     )}
                 </div>
-
-                {/* Action Area */}
-                <div className="p-4 bg-gray-900/30 border-t border-gray-900 flex flex-col gap-3 shrink-0">
-                    {showConfirmSummary ? (
-                        <>
-                            <button
-                                onClick={handleSave}
-                                disabled={loading}
-                                className="w-full py-3.5 bg-correct hover:bg-correct/85 active:scale-[0.98] text-black font-black text-sm rounded-xl transition-all shadow-lg shadow-correct/10 disabled:opacity-50"
-                            >
-                                {loading ? 'SYNCING...' : 'CONFIRM & SAVE'}
-                            </button>
-                            <button
-                                onClick={() => setShowConfirmSummary(false)}
-                                disabled={loading}
-                                className="w-full py-3.5 bg-gray-900 border border-white/10 hover:bg-gray-800 text-white font-black text-sm rounded-xl transition-all"
-                            >
-                                BACK TO EDIT
-                            </button>
-                        </>
-                    ) : (
-                        <>
-                            <div className="flex gap-2 w-full">
-                                <button
-                                    onClick={handleReset}
-                                    type="button"
-                                    className="w-1/3 py-3.5 bg-gray-900 border border-white/10 hover:bg-gray-800 text-white font-black text-sm rounded-xl transition-all uppercase tracking-wider"
-                                >
-                                    Reset
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        const changes = getChanges();
-                                        if (changes.length === 0) {
-                                            handleSave();
-                                        } else {
-                                            setShowConfirmSummary(true);
-                                        }
-                                    }}
-                                    disabled={loading}
-                                    className="w-2/3 py-3.5 bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-black text-sm rounded-xl transition-all shadow-lg shadow-indigo-900/20 disabled:opacity-50"
-                                >
-                                    SAVE PREFERENCES
-                                </button>
-                            </div>
-
-                            <button
-                                onClick={handleSignOut}
-                                className="flex items-center justify-center gap-2 w-full py-2.5 text-gray-500 hover:text-red-400 text-[11px] font-bold transition-colors uppercase tracking-widest"
-                            >
-                                <LogOut size={12} />
-                                Sign Out
-                            </button>
-                        </>
-                    )}
-                </div>
-            </div>
+                {footer}
+            </ModalLayout>
 
             {isAdmin && (
                 <AdminPollsModal
                     isOpen={isAdminPollsOpen}
                     onClose={() => setIsAdminPollsOpen(false)}
-                    currentUserId={profile?.id}
                 />
             )}
-        </ModalLayout>
+        </>
     );
 };

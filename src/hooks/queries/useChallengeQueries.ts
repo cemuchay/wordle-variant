@@ -71,6 +71,7 @@ export const usePlayedChallenges = (userId: string | undefined, page: number) =>
       gcTime: 300_000,
       queryFn: async () => {
          if (!userId) return { items: [], total: 0 };
+         console.log(`[NET-LOG][usePlayedChallenges] userId=${userId} page=${page}`, new Error().stack);
 
          const from = (page - 1) * PLAYED_PAGE_SIZE;
          const to = from + PLAYED_PAGE_SIZE - 1;

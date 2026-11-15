@@ -46,7 +46,7 @@ export const useProfile = (userId: string | undefined) => {
          );
          return data;
       },
-      staleTime: 24 * 60 * 60 * 1000,
+      staleTime: 60 * 1000, // 1 minute
       placeholderData: (previousData) => {
          if (previousData) return previousData;
          if (!userId) return null;

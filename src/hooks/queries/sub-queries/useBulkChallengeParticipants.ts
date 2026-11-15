@@ -13,6 +13,7 @@ export const useBulkChallengeParticipantsSub = (challengeIds: string[]) => {
       queryKey: ["bulk-challenge-participants", challengeIds],
       queryFn: async () => {
          if (challengeIds.length === 0) return {};
+         console.log(`[NET-LOG][useBulkChallengeParticipantsSub] count=${challengeIds.length}`, challengeIds, new Error().stack);
 
          const { data, error } = await supabase
             .from("challenge_participants")

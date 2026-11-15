@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { AlertTriangle, Lightbulb, RefreshCw, Eye, X } from 'lucide-react';
 import { memo, useEffect, useRef, useState, useCallback } from 'react';
-import { ANIMATION_DURATION } from '../../constants/ui';
 import { ANIMATION } from '../../constants/game';
 import { useApp } from '../../context/AppContext';
 import { useChallengeContext } from '../../context/ChallengeContext';
 import { useChallengeGameEngine } from '../../hooks/useChallengeGameEngine';
 import { useKeyboard } from '../../hooks/useKeyboard';
 import { getHandicapStarter, parseMarathonGames } from '../../utils/marathon';
+import returnAnimationTime from '../../utils/returnAnimationTime';
 import { NewGrid } from '../NewGrid';
 import { Keyboard } from '../Keyboard';
 import { NetworkLog } from './ChallengeUIElements';
@@ -174,9 +174,10 @@ export const RegularGameplay = memo(function RegularGameplay({
             setKeyboardStatuses(letterStatuses);
             return;
         }
+        const delay = returnAnimationTime(wordLength);
         const timer = setTimeout(() => {
             setKeyboardStatuses(letterStatuses);
-        }, wordLength * ANIMATION_DURATION.TILE_REVEAL + 400);
+        }, delay);
         return () => clearTimeout(timer);
     }, [guesses.length, letterStatuses, wordLength]);
 
@@ -185,7 +186,7 @@ export const RegularGameplay = memo(function RegularGameplay({
             if (wasGameOverOnMount.current) {
                 setHideKeyboard(true);
             } else {
-                const hideDelay = wordLength * ANIMATION_DURATION.TILE_REVEAL + ANIMATION.REVEAL_BUFFER;
+                const hideDelay = returnAnimationTime(wordLength);
                 const timer = setTimeout(() => {
                     setHideKeyboard(true);
                 }, hideDelay);
@@ -268,8 +269,8 @@ export const RegularGameplay = memo(function RegularGameplay({
             </div>
 
             <div ref={containerRef} className="flex-1 flex flex-col items-center justify-center min-h-0 overflow-hidden gap-3">
-                {/* Hint / Recommended Starter — in normal flow above the grid so it never blocks play */}
-                {(showHint || showStarter) && (
+                {/* Hint / Clear Row / Recommended Starter — side by side above the grid */}
+                {(showHint || showStarter || (!isGameOver && !!actions.onClearRow)) && (
                     <div className="w-full max-w-md shrink-0 flex items-center justify-center gap-3 px-2">
                         {showHint && (
                             <button
@@ -284,6 +285,23 @@ export const RegularGameplay = memo(function RegularGameplay({
                                         <div className="w-[80%] h-[2px] bg-red-600/60 rotate-45" />
                                     </div>
                                 )}
+                            </button>
+                        )}
+
+                        {!isGameOver && actions.onClearRow && (
+                            <button
+                                type="button"
+                                onClick={actions.onClearRow}
+                                disabled={currentGuess.trim().length === 0}
+                                className={`px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 transition-all ${
+                                    currentGuess.trim().length > 0
+                                        ? 'bg-white/10 hover:bg-white/15 text-white/80 cursor-pointer active:scale-95'
+                                        : 'bg-white/5 text-white/25 cursor-not-allowed'
+                                }`}
+                                title="Clear current row"
+                            >
+                                <RefreshCw className="w-3.5 h-3.5" />
+                                clear row
                             </button>
                         )}
 
@@ -406,7 +424,6 @@ export const RegularGameplay = memo(function RegularGameplay({
                         gameplayType="challenge"
                         onSetCursor={actions.onSetCursor}
                         onSetEditIndex={actions.onSetEditIndex}
-                        onClearRow={actions.onClearRow}
                         maxGridWidth={gridDimensions.maxWidth}
                         maxGridHeight={gridDimensions.maxHeight}
                     />

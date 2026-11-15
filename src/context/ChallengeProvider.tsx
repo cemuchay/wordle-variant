@@ -410,7 +410,6 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
                 // Add to recent challenges in localStorage
                 addRecentChallenge(challenge.id);
-                queryClient.invalidateQueries({ queryKey: ['my-challenges'] });
 
                 cleanupSubscription();
                 setSelectedChallenge(challenge);
@@ -778,12 +777,14 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     }, [initialChallengeId, handleViewChallenge, setSelectedChallenge, setMyParticipation]);
 
     // Refresh challenge, participants, and user status when finishing/exiting gameplay
+    const wasPlayingRef = useRef(isPlaying);
     useEffect(() => {
-        if (!isPlaying && selectedChallenge) {
+        if (wasPlayingRef.current && !isPlaying && selectedChallenge) {
             queryClient.invalidateQueries({ queryKey: ['challenge', selectedChallenge.id] });
             queryClient.invalidateQueries({ queryKey: ['my-challenges'] });
             retryFetchParticipants();
         }
+        wasPlayingRef.current = isPlaying;
     }, [isPlaying, selectedChallenge, queryClient, retryFetchParticipants]);
 
     const hasSetDefaultTab = useRef(false);

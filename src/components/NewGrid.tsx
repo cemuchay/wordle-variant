@@ -8,7 +8,7 @@ import { useIsResponsive } from '../hooks/useResponsive';
 import { generateShareText } from '../lib/share';
 import { useAppStore } from '../store/useAppStore';
 import type { GuessResult } from '../types/game';
-import returnAnimationTime from '../utils/returnAnimationTime';
+import returnAnimationTime, { SLOW_TILE_REVEAL_MS } from '../utils/returnAnimationTime';
 import { StreakCounter } from './StreakCounter';
 
 interface CellProps {
@@ -59,10 +59,18 @@ const Cell = memo(({
   if (isCursor && wordLength > 5) statusClass += ' ring-2 ring-blue-400 border-blue-400';
   if (isEditMode && wordLength > 5) statusClass += ' ring-2 ring-yellow-400 border-yellow-400 bg-yellow-400/10';
 
-  if (isRevealing) {
-    if (status === 'correct') animationClass = 'animate-reveal-correct';
-    else if (status === 'present') animationClass = 'animate-reveal-present';
-    else if (status === 'absent') animationClass = 'animate-reveal-absent';
+  const tileRevealStyle = useAppStore((s) => s.preferences.tileRevealStyle || 'normal');
+
+  if (isRevealing && tileRevealStyle !== 'instant') {
+    if (tileRevealStyle === 'slow') {
+      if (status === 'correct') animationClass = 'animate-reveal-slow-correct';
+      else if (status === 'present') animationClass = 'animate-reveal-slow-present';
+      else if (status === 'absent') animationClass = 'animate-reveal-slow-absent';
+    } else {
+      if (status === 'correct') animationClass = 'animate-reveal-correct';
+      else if (status === 'present') animationClass = 'animate-reveal-present';
+      else if (status === 'absent') animationClass = 'animate-reveal-absent';
+    }
   } else if (isWinner) {
     animationClass = 'animate-bounce-up-down';
   } else if (isShake) {
@@ -74,13 +82,14 @@ const Cell = memo(({
   }
 
   const finalSize = cellSizePx || 48;
+  const perTileDelay = tileRevealStyle === 'slow' ? SLOW_TILE_REVEAL_MS : ANIMATION_DURATION.TILE_REVEAL;
 
   const style: React.CSSProperties = {
     width: `${finalSize}px`,
     height: `${finalSize}px`,
     fontSize: `${finalSize * 0.45}px`,
-    ...(isRevealing ? {
-      animationDelay: `${revealIndex * ANIMATION_DURATION.TILE_REVEAL}ms`,
+    ...(isRevealing && tileRevealStyle !== 'instant' ? {
+      animationDelay: `${revealIndex * perTileDelay}ms`,
       animationFillMode: 'both'
     } : {})
   };

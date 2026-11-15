@@ -176,6 +176,7 @@ export async function syncSinglePendingChallenge(item: PendingChallengeGame): Pr
         updateData.completed_at = cleanPayload.completed_at || new Date().toISOString();
       }
 
+      console.log(`[NET-LOG][challengeQueueManager.marathonUpsert] participationId=${participationId} challengeId=${challengeId} gameIndex=${resolvedGameIndex}`, updateData, new Error().stack);
       const { error: mError } = await supabase
         .from('challenge_participants_marathon')
         .upsert(updateData, { onConflict: 'participation_id,challenge_id,game_index' });

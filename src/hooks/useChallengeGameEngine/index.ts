@@ -283,7 +283,9 @@ export const useChallengeGameEngine = ({
    // Initialization & State Sync
    useEffect(() => {
       if (isMarathon && (gameIndex === undefined || gameIndex === null)) return;
+      if (!initialTargetWord) return;
       if (initializedRef.current === currentKey) return;
+      initializedRef.current = currentKey;
 
       const initialize = async () => {
          setIsSaving(true);
@@ -365,6 +367,7 @@ export const useChallengeGameEngine = ({
                      serverHintRecord = prog.hint_record;
 
                      if (!Array.isArray(progGuesses)) {
+                        console.log(`[NET-LOG][useChallengeGameEngine.initMarathonGuesses] participationId=${participation.id} challengeId=${challenge.id} gameIndex=${gameIndex}`);
                         const { data, error } = await supabase
                            .from("challenge_participants_marathon")
                            .select("guesses, hint_record")

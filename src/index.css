@@ -205,10 +205,26 @@ code {
     50% { transform: translateY(-15px); }
   }
   
+  @keyframes reveal-slow-correct {
+    0% { background-color: transparent; border-color: #52525b; }
+    100% { background-color: var(--color-correct); border-color: var(--color-correct); }
+  }
+  @keyframes reveal-slow-present {
+    0% { background-color: transparent; border-color: #52525b; }
+    100% { background-color: var(--color-present); border-color: var(--color-present); }
+  }
+  @keyframes reveal-slow-absent {
+    0% { background-color: transparent; border-color: #52525b; }
+    100% { background-color: var(--color-absent); border-color: var(--color-absent); }
+  }
+
   --animate-flip: flip 0.6s ease-in-out;
   --animate-reveal-correct: reveal-correct 0.75s ease-in-out forwards;
   --animate-reveal-present: reveal-present 0.75s ease-in-out forwards;
   --animate-reveal-absent: reveal-absent 0.75s ease-in-out forwards;
+  --animate-reveal-slow-correct: reveal-slow-correct 0.55s ease-out forwards;
+  --animate-reveal-slow-present: reveal-slow-present 0.55s ease-out forwards;
+  --animate-reveal-slow-absent: reveal-slow-absent 0.55s ease-out forwards;
   --animate-reveal-wrapped-correct: reveal-wrapped-correct 0.75s ease-in-out forwards;
   --animate-reveal-wrapped-present: reveal-wrapped-present 0.75s ease-in-out forwards;
   --animate-reveal-wrapped-absent: reveal-wrapped-absent 0.75s ease-in-out forwards;

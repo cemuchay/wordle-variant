@@ -10,6 +10,7 @@ const useChallengeParticipantsSub = (challengeId: string | null) => {
       queryKey: ["challenge-participants", challengeId],
       queryFn: async () => {
          if (!challengeId) return [];
+         console.log(`[NET-LOG][useChallengeParticipantsSub] challengeId=${challengeId}`, new Error().stack);
          const { data, error } = await supabase
             .from("challenge_participants")
             .select(CHALLENGE_PARTICIPANTS_SELECT)

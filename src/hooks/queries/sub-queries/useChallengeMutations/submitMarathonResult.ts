@@ -56,6 +56,7 @@ const useSubmitMarathonResult = () => {
             data.completed_at = new Date().toISOString();
          }
 
+         console.log(`[NET-LOG][submitMarathonResult.upsert] participationId=${participationId} challengeId=${challengeId} gameIndex=${resolvedGameIndex}`, data, new Error().stack);
          const { error } = await supabase
             .from("challenge_participants_marathon")
             .upsert(data, {

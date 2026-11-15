@@ -6,12 +6,15 @@ import { type GameStats } from "../types/game";
 import { safeLocalStorage, asyncStorage } from "../utils/storage";
 import { TOAST_DURATION } from "../constants/ui";
 
+export type TileRevealStyle = "normal" | "slow" | "instant";
+
 interface UserPreferences {
    allowRoasts: boolean;
    theme: "dark" | "light";
    compactMode: boolean;
    navOrder: string[];
    rememberLastView: boolean;
+   tileRevealStyle?: TileRevealStyle;
 }
 
 const defaultPreferences: UserPreferences = {
@@ -20,6 +23,7 @@ const defaultPreferences: UserPreferences = {
    compactMode: false,
    navOrder: ["play", "chat", "leaderboard", "challenges", "wordup"],
    rememberLastView: false,
+   tileRevealStyle: "normal",
 };
 
 const INITIAL_STATS: GameStats = {
