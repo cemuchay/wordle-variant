@@ -162,14 +162,31 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
         await Promise.all([fetchReactionsPromise(), fetchCommentsPromise()]);
     };
 
-    // Fetch comments and reactions (daily games only)
+    // Fetch comments and reactions (daily games only) and listen to shared social events while collapsed
     useEffect(() => {
         if (!isDailyGame) return;
         fetchData();
 
-        // Set up Realtime subscriptions
-        const rxChannel = supabase
-            .channel(`rx_${targetUserId}_${gameDate}_${guessIndex}_${Math.random().toString(36).slice(2, 9)}`)
+        const handleSocialUpdate = (e: Event) => {
+            const updatedUserId = (e as CustomEvent<{ targetUserId?: string }>).detail?.targetUserId;
+            if (!updatedUserId || updatedUserId === targetUserId) {
+                fetchData();
+            }
+        };
+        window.addEventListener('guess-social-updated', handleSocialUpdate);
+
+        return () => {
+            window.removeEventListener('guess-social-updated', handleSocialUpdate);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [targetUserId, gameDate, guessIndex, commentsDisabledByTarget, isDailyGame]);
+
+    // Only open a single consolidated Realtime channel while this row's comment drawer is actively open
+    useEffect(() => {
+        if (!isDailyGame || !showCommentDrawer) return;
+
+        const channel = supabase
+            .channel(`row_social_${targetUserId}_${gameDate}_${guessIndex}`)
             .on(
                 'postgres_changes',
                 {
@@ -178,14 +195,8 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
                     table: 'guess_reactions',
                     filter: `target_user_id=eq.${targetUserId}`,
                 },
-                () => {
-                    fetchData();
-                }
+                () => fetchData()
             )
-            .subscribe();
-
-        const cmChannel = supabase
-            .channel(`cm_${targetUserId}_${gameDate}_${guessIndex}_${Math.random().toString(36).slice(2, 9)}`)
             .on(
                 'postgres_changes',
                 {
@@ -194,14 +205,8 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
                     table: 'guess_comments',
                     filter: `target_user_id=eq.${targetUserId}`,
                 },
-                () => {
-                    fetchData();
-                }
+                () => fetchData()
             )
-            .subscribe();
-
-        const cRxChannel = supabase
-            .channel(`crx_${targetUserId}_${gameDate}_${guessIndex}_${Math.random().toString(36).slice(2, 9)}`)
             .on(
                 'postgres_changes',
                 {
@@ -209,19 +214,15 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
                     schema: 'public',
                     table: 'comment_reactions',
                 },
-                () => {
-                    fetchData();
-                }
+                () => fetchData()
             )
             .subscribe();
 
         return () => {
-            supabase.removeChannel(rxChannel);
-            supabase.removeChannel(cmChannel);
-            supabase.removeChannel(cRxChannel);
+            supabase.removeChannel(channel);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [targetUserId, gameDate, guessIndex, commentsDisabledByTarget, isDailyGame]);
+    }, [isDailyGame, showCommentDrawer, targetUserId, gameDate, guessIndex]);
 
     // Handle custom event to open the comment drawer
     useEffect(() => {

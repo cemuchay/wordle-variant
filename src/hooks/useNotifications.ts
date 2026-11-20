@@ -1,9 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { LIMITS } from '../constants/game';
 import { type AppNotification } from '../types/notifications';
+import { useIsTabVisible } from './useIsTabVisible';
 
 /**
  * Hook to manage private notifications with real-time support.
@@ -11,6 +11,7 @@ import { type AppNotification } from '../types/notifications';
 export const useNotifications = (userId: string | undefined, options: { enableRealtime?: boolean } = {}) => {
     const queryClient = useQueryClient();
     const { enableRealtime = true } = options;
+    const isTabVisible = useIsTabVisible();
 
     // 1. Fetch Notifications
     const { data: notifications = [], isLoading } = useQuery({
@@ -31,56 +32,34 @@ export const useNotifications = (userId: string | undefined, options: { enableRe
         enabled: !!userId,
     });
 
-    // 2. Real-time Subscription
+    // 2. Real-time Subscription (single consolidated listener, paused when tab is hidden in background)
     useEffect(() => {
-        if (!userId || !enableRealtime) return;
+        if (!userId || !enableRealtime || !isTabVisible) return;
 
         const channel = supabase
             .channel(`private_notifications_${userId}`)
             .on(
                 'postgres_changes',
                 {
-                    event: 'INSERT',
+                    event: '*',
                     schema: 'public',
                     table: 'notifications',
                     filter: `user_id=eq.${userId}`,
                 },
                 (payload) => {
-                    const newNotif = payload.new as AppNotification;
-                    if (newNotif.type === 'DM_MESSAGE' || newNotif.type === 'DM_REMINDER') return; // Ignore DM message/reminder in-app bell
-                    
-                    // Optimistically add to query cache
-                    queryClient.setQueryData(['notifications', userId], (old: AppNotification[] = []) => [
-                        newNotif,
-                        ...old,
-                    ]);
+                    if (payload.eventType === 'INSERT') {
+                        const newNotif = payload.new as AppNotification;
+                        if (newNotif.type === 'DM_MESSAGE' || newNotif.type === 'DM_REMINDER') return;
 
-                    // Trigger a custom event for the toast popup
-                    window.dispatchEvent(new CustomEvent('new-notification', { detail: newNotif }));
-                }
-            )
-            .on(
-                'postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'notifications',
-                    filter: `user_id=eq.${userId}`,
-                },
-                () => {
-                    queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
-                }
-            )
-            .on(
-                'postgres_changes',
-                {
-                    event: 'DELETE',
-                    schema: 'public',
-                    table: 'notifications',
-                    filter: `user_id=eq.${userId}`,
-                },
-                () => {
-                    queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
+                        queryClient.setQueryData(['notifications', userId], (old: AppNotification[] = []) => [
+                            newNotif,
+                            ...old,
+                        ]);
+
+                        window.dispatchEvent(new CustomEvent('new-notification', { detail: newNotif }));
+                    } else {
+                        queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
+                    }
                 }
             )
             .subscribe();
@@ -88,7 +67,7 @@ export const useNotifications = (userId: string | undefined, options: { enableRe
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [userId, queryClient, enableRealtime]);
+    }, [userId, queryClient, enableRealtime, isTabVisible]);
 
     // 3. Derived State
     const unreadCount = useMemo(() => 

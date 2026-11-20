@@ -1408,10 +1408,11 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
 
    const activeSelectedGroup = groups.find((g) => g.id === selectedGroupId);
    const isSelectedGroupDM = activeSelectedGroup?.type === "dm";
+   const isChatVisible = isFullMode || isOverlayOpen;
 
    const dmGroupIds = useMemo(
-      () => groups.filter((g) => g.type === "dm").map((g) => g.id as string),
-      [groups],
+      () => (isChatVisible ? groups.filter((g) => g.type === "dm").map((g) => g.id as string) : []),
+      [groups, isChatVisible],
    );
 
    const {
@@ -1419,7 +1420,7 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
       isLoading: isLoadingDmEffects,
       addEffect: addDmWordEffect,
       removeEffect: removeDmWordEffect,
-   } = useDmWordEffects(selectedGroupId, isSelectedGroupDM, user?.id);
+   } = useDmWordEffects(isChatVisible ? selectedGroupId : null, isSelectedGroupDM && isChatVisible, user?.id);
 
    const {
       nicknamesByGroup,
@@ -2123,7 +2124,10 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
            )
          : selectedGroupObject?.name || "Conversation";
    const isGeneralGroup = selectedGroupObject?.type === "general" || selectedGroupId === GENERAL_GROUP_ID;
-   const { pinnedPoll, refreshPinned } = usePinnedPoll(selectedGroupId, isGeneralGroup);
+   const { pinnedPoll, refreshPinned } = usePinnedPoll(
+      isChatVisible ? selectedGroupId : null,
+      isGeneralGroup && isChatVisible,
+   );
 
    const handlePollCreated = (poll: Poll) => {
       if (!user?.id || !selectedGroupId) return;

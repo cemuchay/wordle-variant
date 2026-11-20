@@ -324,7 +324,14 @@ export const SocialStatsModal: React.FC<Props> = ({
       })
       .subscribe();
 
-    // 2. Listen to direct Postgres changes on the scores table for currentDate
+    // 2. Listen to direct Postgres changes on scores, guess_reactions, and guess_comments on 1 shared modal channel
+    const dispatchGuessSocialUpdate = (payload: any) => {
+      const targetUserId = payload?.new?.target_user_id || payload?.old?.target_user_id;
+      window.dispatchEvent(
+        new CustomEvent("guess-social-updated", { detail: { targetUserId } })
+      );
+    };
+
     const pgChannelName = `social_scores_lb_sync_${currentDate}`;
     const pgChannel = supabase
       .channel(pgChannelName)
@@ -335,6 +342,16 @@ export const SocialStatsModal: React.FC<Props> = ({
           const status = payload.new ? payload.new.status : null;
           handleScoreUpdate(status);
         }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "guess_reactions", filter: `game_date=eq.${currentDate}` },
+        dispatchGuessSocialUpdate
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "guess_comments", filter: `game_date=eq.${currentDate}` },
+        dispatchGuessSocialUpdate
       )
       .subscribe();
 

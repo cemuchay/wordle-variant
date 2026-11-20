@@ -26,6 +26,7 @@ import { useGameEngine } from "./hooks/useGameEngine";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useWordleStats } from "./hooks/useStats";
 import { usePageTitleBadge } from "./hooks/usePageTitleBadge";
+import { useIsTabVisible } from "./hooks/useIsTabVisible";
 import { supabase } from "./lib/supabaseClient";
 import { MAX_ATTEMPTS, DEFAULT_WORD_LENGTH } from "./constants/game";
 import { TOAST_DURATION } from "./constants/ui";
@@ -146,6 +147,7 @@ function MainApp() {
   const [wordupUnreadCount, setWordupUnreadCount] = useState(0);
   const [wordgridUnreadCount, setWordgridUnreadCount] = useState(0);
   const moreGamesUnreadCount = wordupUnreadCount + wordgridUnreadCount;
+  const isTabVisible = useIsTabVisible();
 
   usePageTitleBadge(moreGamesUnreadCount);
 
@@ -190,29 +192,25 @@ function MainApp() {
       setWordgridUnreadCount(0);
       return;
     }
+    if (!isTabVisible) return;
     fetchWordupUnreadCount(user.id);
     fetchWordgridUnreadCount(user.id);
-  }, [user?.id, fetchWordupUnreadCount, fetchWordgridUnreadCount]);
+  }, [user?.id, isTabVisible, fetchWordupUnreadCount, fetchWordgridUnreadCount]);
 
   useEffect(() => {
-    if (!user?.id) return;
-    const channel1 = supabase
-      .channel(`wordup_unread_${user.id}`)
+    if (!user?.id || !isTabVisible) return;
+    const channel = supabase
+      .channel(`async_games_unread_${user.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "wordup_async_matches", filter: `player1_id=eq.${user.id}` }, () => fetchWordupUnreadCount(user.id))
       .on("postgres_changes", { event: "*", schema: "public", table: "wordup_async_matches", filter: `player2_id=eq.${user.id}` }, () => fetchWordupUnreadCount(user.id))
-      .subscribe();
-
-    const channel2 = supabase
-      .channel(`wordgrid_unread_${user.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "wordgrid_matches", filter: `player1_id=eq.${user.id}` }, () => fetchWordgridUnreadCount(user.id))
       .on("postgres_changes", { event: "*", schema: "public", table: "wordgrid_matches", filter: `player2_id=eq.${user.id}` }, () => fetchWordgridUnreadCount(user.id))
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel1);
-      supabase.removeChannel(channel2);
+      supabase.removeChannel(channel);
     };
-  }, [user?.id, fetchWordupUnreadCount, fetchWordgridUnreadCount]);
+  }, [user?.id, isTabVisible, fetchWordupUnreadCount, fetchWordgridUnreadCount]);
 
   // Initial Challenges Fetch using TanStack Query
   const { data: myChallenges } = useMyChallenges(user?.id);

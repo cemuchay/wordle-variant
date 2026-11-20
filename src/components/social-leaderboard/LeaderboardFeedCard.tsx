@@ -162,26 +162,16 @@ export const LeaderboardFeedCard: React.FC<LeaderboardFeedCardProps> = ({
 
     if (!targetUserId || !gameDate) return;
 
-    const channel = supabase
-      .channel(`feed_card_${targetUserId}_${gameDate}_${Math.random().toString(36).slice(2, 7)}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "guess_reactions", filter: `target_user_id=eq.${targetUserId}` },
-        () => {
-          void loadSocialData();
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "guess_comments", filter: `target_user_id=eq.${targetUserId}` },
-        () => {
-          void loadSocialData();
-        }
-      )
-      .subscribe();
+    const handleSocialUpdate = (e: Event) => {
+      const updatedUserId = (e as CustomEvent<{ targetUserId?: string }>).detail?.targetUserId;
+      if (!updatedUserId || updatedUserId === targetUserId) {
+        void loadSocialData();
+      }
+    };
+    window.addEventListener("guess-social-updated", handleSocialUpdate);
 
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("guess-social-updated", handleSocialUpdate);
     };
   }, [targetUserId, gameDate, loadSocialData]);
 

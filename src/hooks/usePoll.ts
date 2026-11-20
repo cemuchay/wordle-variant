@@ -62,7 +62,16 @@ export const usePoll = (
       void loadPoll();
    }, [loadPoll]);
 
-   // Subscribe to local & Supabase real-time updates for this poll
+   const isExpired = useMemo(() => {
+      if (!poll) return false;
+      const expired = new Date(poll.expires_at).getTime() <= nowTick;
+      if (expired && poll.is_admin_poll && !poll.notified_expired_at) {
+         void checkAndNotifyAdminPollExpired(poll.id);
+      }
+      return expired;
+   }, [poll, nowTick]);
+
+   // Subscribe to local & Supabase real-time updates for this poll (skip Postgres Realtime if already expired)
    useEffect(() => {
       if (!pollId) return;
 
@@ -72,7 +81,13 @@ export const usePoll = (
          }
       });
 
-      const channelId = `poll_live_${pollId}_${Math.random().toString(36).slice(2, 9)}`;
+      if (isExpired) {
+         return () => {
+            unsubLocal();
+         };
+      }
+
+      const channelId = `poll_live_${pollId}`;
       const channel = supabase
          .channel(channelId)
          .on(
@@ -101,16 +116,7 @@ export const usePoll = (
          void supabase.removeChannel(channel);
          window.clearInterval(timer);
       };
-   }, [pollId, loadPoll]);
-
-   const isExpired = useMemo(() => {
-      if (!poll) return false;
-      const expired = new Date(poll.expires_at).getTime() <= nowTick;
-      if (expired && poll.is_admin_poll && !poll.notified_expired_at) {
-         void checkAndNotifyAdminPollExpired(poll.id);
-      }
-      return expired;
-   }, [poll, nowTick]);
+   }, [pollId, isExpired, loadPoll]);
 
    const timeRemainingText = useMemo(() => {
       if (!poll) return "";

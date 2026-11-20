@@ -21,9 +21,11 @@ import { logger } from '../lib/logger';
 import { TOAST_DURATION } from '../constants/ui';
 import { AppContext, type AppContextType } from './AppContext';
 import { TIMEOUT, LIMITS, MISC } from '../constants/game';
+import { useIsTabVisible } from '../hooks/useIsTabVisible';
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<any>(null);
+    const isTabVisible = useIsTabVisible();
     const [incomingWordUpInvite, setIncomingWordUpInvite] = useState<{ senderId: string; senderName: string; category: string } | null>(null);
     const [incomingAsyncInvite, setIncomingAsyncInvite] = useState<{ senderId: string; senderName: string; category: string; matchId: string } | null>(null);
     const queryClient = useQueryClient();
@@ -699,6 +701,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         window.addEventListener('visibilitychange', handleVisibilityChange);
         window.addEventListener('online', handleOnline);
 
+        if (!isTabVisible) {
+            return () => {
+                window.removeEventListener('visibilitychange', handleVisibilityChange);
+                window.removeEventListener('online', handleOnline);
+                window.removeEventListener('focus', handleOnline);
+            };
+        }
+
         const channel = supabase
             .channel('global_chat_channel')
             .on(
@@ -802,10 +812,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     }
                 }
             )
-            .subscribe();
-
-        const receiptsChannel = supabase
-            .channel('chat_read_receipts_channel')
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'chat_read_receipts', filter: `user_id=eq.${user.id}` },
@@ -820,12 +826,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
         return () => {
             supabase.removeChannel(channel);
-            supabase.removeChannel(receiptsChannel);
             window.removeEventListener('visibilitychange', handleVisibilityChange);
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('focus', handleOnline);
         };
-    }, [user?.id]);
+    }, [user?.id, isTabVisible]);
 
     // Background sync for pending game states when connectivity is restored
     useEffect(() => {

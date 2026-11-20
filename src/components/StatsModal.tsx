@@ -200,6 +200,13 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
       }
     };
 
+    const dispatchGuessSocialUpdate = (payload: any) => {
+      const targetUserId = payload?.new?.target_user_id || payload?.old?.target_user_id;
+      window.dispatchEvent(
+        new CustomEvent("guess-social-updated", { detail: { targetUserId } })
+      );
+    };
+
     const channel = supabase
       .channel(channelName)
       .on(
@@ -214,6 +221,16 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
           const status = payload.new ? payload.new.status : null;
           handleScoreUpdate(status);
         }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "guess_reactions", filter: `game_date=eq.${currentDate}` },
+        dispatchGuessSocialUpdate
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "guess_comments", filter: `game_date=eq.${currentDate}` },
+        dispatchGuessSocialUpdate
       )
       .on(
         "broadcast",
@@ -608,19 +625,17 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex
       return;
     }
 
-    // Subscribe to realtime updates
-    const channel = supabase
-      .channel(`lb_row_${entry.user_id}_${gameDate}_${Math.random().toString(36).slice(2, 9)}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'guess_reactions', filter: `target_user_id=eq.${entry.user_id}` }, () => {
+    // Listen to shared modal channel event instead of opening a per-row Realtime channel
+    const handleSocialUpdate = (e: Event) => {
+      const targetId = (e as CustomEvent<{ targetUserId?: string }>).detail?.targetUserId;
+      if (!targetId || targetId === entry.user_id) {
         fetchData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'guess_comments', filter: `target_user_id=eq.${entry.user_id}` }, () => {
-        fetchData();
-      })
-      .subscribe();
+      }
+    };
+    window.addEventListener('guess-social-updated', handleSocialUpdate);
 
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener('guess-social-updated', handleSocialUpdate);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entry.user_id, gameDate, timeframe]);

@@ -116,33 +116,17 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
 
     loadSocialData();
 
-    const channel = supabase
-      .channel(`act_card_${targetUserId}_${gameDate}_${guessIdx}_${Math.random().toString(36).slice(2, 6)}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'guess_reactions',
-          filter: `target_user_id=eq.${targetUserId}`,
-        },
-        () => loadSocialData()
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'guess_comments',
-          filter: `target_user_id=eq.${targetUserId}`,
-        },
-        () => loadSocialData()
-      )
-      .subscribe();
+    const handleSocialUpdate = (e: Event) => {
+      const updatedUserId = (e as CustomEvent<{ targetUserId?: string }>).detail?.targetUserId;
+      if (!updatedUserId || updatedUserId === targetUserId) {
+        loadSocialData();
+      }
+    };
+    window.addEventListener('guess-social-updated', handleSocialUpdate);
 
     return () => {
       isMounted = false;
-      supabase.removeChannel(channel);
+      window.removeEventListener('guess-social-updated', handleSocialUpdate);
     };
   }, [targetUserId, gameDate, guessIdx]);
 
