@@ -73,6 +73,7 @@ interface AppState {
    statsActiveTab: "stats" | "leaderboard";
    isLoadingDate: boolean;
    isHeaderMenuOpen: boolean;
+   dailyGameFinishedDate: string | null;
 
    // Auth-related Local State
    preferences: UserPreferences;
@@ -147,6 +148,7 @@ interface AppState {
     setWordupMode: (mode: "live" | "async" | null) => void;
     setPendingAsyncMatchId: (id: string | null) => void;
     setHeaderMenuOpen: (val: boolean) => void;
+    setDailyGameFinishedDate: (date: string | null) => void;
     }
 
    export const useAppStore = create<AppState>()(
@@ -197,9 +199,11 @@ interface AppState {
          pendingAsyncMatchId: null,
          hasHydrated: false,
          isHeaderMenuOpen: false,
+         dailyGameFinishedDate: null,
 
          // Actions
          setHeaderMenuOpen: (isHeaderMenuOpen) => set({ isHeaderMenuOpen }),
+         setDailyGameFinishedDate: (dailyGameFinishedDate) => set({ dailyGameFinishedDate }),
          setHasHydrated: (hasHydrated) => set({ hasHydrated }),
          triggerToast: (message, duration = TOAST_DURATION.DEFAULT, isLarge = false) =>
             set({ toast: { show: true, message, duration, isLarge } }),

@@ -1,9 +1,9 @@
 /* eslint-disable react-hooks/refs */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence, useMotionValue, useDragControls } from "framer-motion";
 import type { PanInfo } from "framer-motion";
-import { Search, MessageCircle, X, Send, ArrowLeft, ExternalLink, Edit2, Trash2, Check, CheckCheck, ShieldAlert, Mic, Image as ImageIcon, Smile, Reply, Users, Phone, ChevronDown, Plus, BarChart3 } from "lucide-react";
+import { Search, MessageCircle, X, Send, ArrowLeft, ExternalLink, Edit2, Trash2, Check, CheckCheck, ShieldAlert, Mic, Image as ImageIcon, Smile, Reply, Users, Phone, ChevronDown, Plus, BarChart3, Sparkles } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useAppStore } from "../../store/useAppStore";
 import { TOAST_DURATION } from "../../constants/ui";
@@ -44,6 +44,12 @@ import MessageInfoModal from "./ChatMessage/MessageInfoModal";
 import { getDailyConfig, deobfuscateWord } from "../../lib/game-logic";
 import { getLocalSalt } from "../../hooks/useGameEngine/utils";
 import formatLastSeen from "@/utils/formatLastSeen";
+import { useDmWordEffects } from "../../hooks/useDmWordEffects";
+import { useDmNicknames } from "../../hooks/useDmNicknames";
+import { matchWordEffect } from "../../utils/wordEffects";
+import { resolveDmDisplayName } from "../../utils/dmNicknames";
+import { WordEffectOverlay, type WordEffectBurst } from "./WordEffectOverlay";
+import { DmCustomizationModal } from "./DmCustomizationModal";
 
 const CLOSE_DELAY = 60000; // 1 full minute
 // Desktop docked panel width (anchored beside the bubble)
@@ -171,12 +177,14 @@ function SpoilerWord({
 // Escape special regex characters in a word
 const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const maskSpoilerText = (
+// eslint-disable-next-line react-refresh/only-export-components
+export const maskSpoilerText = (
    text: string,
    spoilerWord?: string | null,
-   isGroup?: boolean
+   isGroup?: boolean,
+   hasFinishedDailyGame = false
 ) => {
-   if (!text || !isGroup) return text;
+   if (!text || !isGroup || hasFinishedDailyGame) return text;
    let result = text;
    const clean = spoilerWord ? spoilerWord.trim() : null;
    if (clean && clean.length >= 3) {
@@ -195,21 +203,22 @@ const maskSpoilerText = (
 // High-performance mention, cross-platform emoji, and spoiler parsing
 const MENTION_REGEX = /(@[a-zA-Z0-9_.-]+)/g;
 
-const renderFormattedMessageText = (
+// eslint-disable-next-line react-refresh/only-export-components
+export const renderFormattedMessageText = (
    text: string,
    currentUsername?: string,
    isMe?: boolean,
    spoilerWord?: string | null,
    isGroupChat?: boolean,
-   canReveal = true,
+   hasFinishedDailyGame = true,
    onBlockedReveal?: () => void
 ): React.ReactNode => {
    if (!text) return null;
 
    const cleanSpoiler = spoilerWord ? spoilerWord.trim() : null;
 
-   // In group chats, detect spoilers: exact word of the day OR potential spoiler words (standalone ALL-CAPS words like SLATER, CRANE)
-   if (isGroupChat) {
+   // In group chats, only blur spoilers for players who have not finished today's game yet
+   if (isGroupChat && !hasFinishedDailyGame) {
       // Build regex pattern for exact word of the day (case-insensitive) and/or uppercase potential guess words (3-8 letters)
       const patterns: string[] = [];
       if (cleanSpoiler && cleanSpoiler.length >= 3) {
@@ -229,7 +238,7 @@ const renderFormattedMessageText = (
                   <SpoilerWord
                      key={`spoiler-${index}`}
                      word={part}
-                     canReveal={canReveal}
+                     canReveal={false}
                      onBlockedReveal={onBlockedReveal}
                   />
                );
@@ -240,7 +249,7 @@ const renderFormattedMessageText = (
                isMe,
                null,
                false,
-               canReveal,
+               hasFinishedDailyGame,
                onBlockedReveal
             );
          });
@@ -518,7 +527,8 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
 
    const [groups, setGroups] = useState<any[]>([]);
    const [groupsRefreshTrigger, setGroupsRefreshTrigger] = useState(0);
-   const [hasPlayedToday, setHasPlayedToday] = useState(false);
+   const dailyGameFinishedDate = useAppStore((s) => s.dailyGameFinishedDate);
+   const hasPlayedToday = Boolean(date && dailyGameFinishedDate === date);
    const [dailyWord, setDailyWord] = useState<string | null>(null);
 
    // In-memory memoization cache for decrypted messages and DM partner IDs to prevent flickers
@@ -1227,22 +1237,6 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
       }
    };
 
-   // Check if user played today (unlock Game Analysis)
-   useEffect(() => {
-      if (!user?.id || !date) return;
-      const checkGameStatus = async () => {
-         const { data } = await supabase
-            .from("scores")
-            .select("status")
-            .eq("user_id", user.id)
-            .eq("game_date", date)
-            .in("status", ["won", "lost"])
-            .maybeSingle();
-         setHasPlayedToday(!!data);
-      };
-      checkGameStatus();
-   }, [user?.id, date]);
-
    // Load word of the day for spoiler blurring in group chats
    useEffect(() => {
       if (!date) return;
@@ -1406,6 +1400,53 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
       }
    }, [selectedGroupId, globalMessages, user?.id, typingNames.length, recordingNames.length]);
 
+   // DM Customization: Word Effects & Custom Nicknames
+   const [isDmCustomizationOpen, setIsDmCustomizationOpen] = useState(false);
+   const [activeWordEffectBursts, setActiveWordEffectBursts] = useState<WordEffectBurst[]>([]);
+   const seenEffectMsgIdsRef = useRef<Set<string>>(new Set());
+   const lastEffectGroupIdRef = useRef<string | null>(null);
+
+   const activeSelectedGroup = groups.find((g) => g.id === selectedGroupId);
+   const isSelectedGroupDM = activeSelectedGroup?.type === "dm";
+
+   const dmGroupIds = useMemo(
+      () => groups.filter((g) => g.type === "dm").map((g) => g.id as string),
+      [groups],
+   );
+
+   const {
+      effects: dmWordEffects,
+      isLoading: isLoadingDmEffects,
+      addEffect: addDmWordEffect,
+      removeEffect: removeDmWordEffect,
+   } = useDmWordEffects(selectedGroupId, isSelectedGroupDM, user?.id);
+
+   const {
+      nicknamesByGroup,
+      saveNickname: saveDmNickname,
+      removeNickname: removeDmNickname,
+   } = useDmNicknames(user?.id, dmGroupIds);
+
+   const triggerWordEffect = useCallback((emoji: string) => {
+      if (!emoji) return;
+      const burst: WordEffectBurst = {
+         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+         emoji,
+      };
+      setActiveWordEffectBursts((prev) => [...prev.slice(-2), burst]);
+   }, []);
+
+   const handleWordEffectBurstComplete = useCallback((id: string) => {
+      setActiveWordEffectBursts((prev) => prev.filter((b) => b.id !== id));
+   }, []);
+
+   // Close DM customization modal when leaving or switching away from a DM
+   useEffect(() => {
+      if (!isSelectedGroupDM) {
+         setIsDmCustomizationOpen(false);
+      }
+   }, [isSelectedGroupDM, selectedGroupId]);
+
    // Re-show bubble on new unread after dismissal
    if (unreadCount !== prevUnreadCount) {
       setPrevUnreadCount(unreadCount);
@@ -1458,13 +1499,17 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
          .sort((a, b) => new Date(b.lastMessage.created_at).getTime() - new Date(a.lastMessage.created_at).getTime());
    })();
 
-   // Filter conversations by search query
+   // Filter conversations by search query (matches group name, partner username, and custom DM nickname)
    const filteredConversations = (() => {
       if (!conversationSearchQuery.trim()) return conversations;
       const q = conversationSearchQuery.toLowerCase();
       return conversations.filter(({ group }) => {
          const name = group?.name || CORE_GROUPS[group.id] || "";
-         return name.toLowerCase().includes(q);
+         const dmNickname =
+            group?.type === "dm" && group?.dm_partner?.id
+               ? resolveDmDisplayName(group.id, group.dm_partner.id, "", nicknamesByGroup)
+               : "";
+         return name.toLowerCase().includes(q) || dmNickname.toLowerCase().includes(q);
       });
    })();
 
@@ -1548,6 +1593,41 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
       return m.content;
    };
 
+   // Trigger DM word effects when a live incoming message matches an active trigger word
+   useEffect(() => {
+      if (!selectedGroupId || !isSelectedGroupDM || !(isFullMode || isOverlayOpen)) {
+         if (lastEffectGroupIdRef.current !== selectedGroupId) {
+            lastEffectGroupIdRef.current = null;
+            seenEffectMsgIdsRef.current.clear();
+         }
+         return;
+      }
+
+      const roomMsgs = globalMessages.filter(
+         (m: any) => m.group_id === selectedGroupId && !m.is_deleted && !isReactionRow(m.content),
+      );
+
+      // First time opening/switching to this DM: seed seen IDs so historical messages don't fire effects
+      if (lastEffectGroupIdRef.current !== selectedGroupId) {
+         lastEffectGroupIdRef.current = selectedGroupId;
+         seenEffectMsgIdsRef.current = new Set(roomMsgs.map((m: any) => m.id));
+         return;
+      }
+
+      for (const msg of roomMsgs) {
+         if (seenEffectMsgIdsRef.current.has(msg.id)) continue;
+         seenEffectMsgIdsRef.current.add(msg.id);
+         if (msg.user_id === user?.id) continue; // Sender already triggered optimistically on send
+         if (msg.voice_url || msg.image_url) continue;
+
+         const plaintext = getDecryptedContent(msg);
+         const matched = matchWordEffect(plaintext, dmWordEffects);
+         if (matched) {
+            triggerWordEffect(matched.emoji);
+         }
+      }
+   }, [selectedGroupId, isSelectedGroupDM, isFullMode, isOverlayOpen, globalMessages, dmWordEffects, user?.id, triggerWordEffect]);
+
    // Send Message
    const handleSendReply = () => {
       if (!replyText.trim() || !user?.id || !selectedGroupId) return;
@@ -1600,6 +1680,13 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
       pendingRetriesRef.current.set(tempId, { kind: "text", payload: messagePayload, fallbackText: replyText });
 
       const sentText = replyText;
+      if (isDM) {
+         const matchedEffect = matchWordEffect(sentText, dmWordEffects);
+         if (matchedEffect) {
+            triggerWordEffect(matchedEffect.emoji);
+         }
+         seenEffectMsgIdsRef.current.add(tempId);
+      }
       setReplyText("");
       replyTextRef.current = "";
       setSelfTyping(false);
@@ -2026,7 +2113,15 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
 
 
    const selectedGroupObject = groups.find(g => g.id === selectedGroupId);
-   const selectedGroupName = selectedGroupObject?.name || "Conversation";
+   const selectedGroupName =
+      selectedGroupObject?.type === "dm" && selectedGroupObject?.dm_partner?.id
+         ? resolveDmDisplayName(
+              selectedGroupObject.id,
+              selectedGroupObject.dm_partner.id,
+              selectedGroupObject.name || selectedGroupObject.dm_partner.username || "Conversation",
+              nicknamesByGroup,
+           )
+         : selectedGroupObject?.name || "Conversation";
    const isGeneralGroup = selectedGroupObject?.type === "general" || selectedGroupId === GENERAL_GROUP_ID;
    const { pinnedPoll, refreshPinned } = usePinnedPoll(selectedGroupId, isGeneralGroup);
 
@@ -2233,10 +2328,55 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                         style={isFullMode ? undefined : { x: panelX, y: panelY }}
                         className={
                            isFullMode
-                              ? "w-full h-full bg-slate-950 text-white rounded-none sm:rounded-2xl border-0 sm:border border-white/10 shadow-2xl flex flex-col pointer-events-auto overflow-hidden"
-                              : "w-full h-full bg-slate-950/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col pointer-events-auto overflow-hidden"
+                              ? "relative w-full h-full bg-slate-950 text-white rounded-none sm:rounded-2xl border-0 sm:border border-white/10 shadow-2xl flex flex-col pointer-events-auto overflow-hidden"
+                              : "relative w-full h-full bg-slate-950/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col pointer-events-auto overflow-hidden"
                         }
                      >
+                        {/* DM Word Effect Overlay (bottom-to-top emoji shower) */}
+                        {isSelectedGroupDM && activeWordEffectBursts.length > 0 && (
+                           <WordEffectOverlay
+                              bursts={activeWordEffectBursts}
+                              onBurstComplete={handleWordEffectBurstComplete}
+                           />
+                        )}
+
+                        {/* DM Customization Modal (Word Effects & Custom Nicknames) */}
+                        {isSelectedGroupDM && selectedGroupObject?.dm_partner && user?.id && (
+                           <DmCustomizationModal
+                              isOpen={isDmCustomizationOpen}
+                              onClose={() => setIsDmCustomizationOpen(false)}
+                              effects={dmWordEffects}
+                              isLoadingEffects={isLoadingDmEffects}
+                              onAddEffect={addDmWordEffect}
+                              onRemoveEffect={removeDmWordEffect}
+                              onPreviewEffect={triggerWordEffect}
+                              currentUser={{
+                                 id: user.id,
+                                 username: profile?.username || "You",
+                                 avatar_url: profile?.avatar_url,
+                              }}
+                              partner={{
+                                 id: selectedGroupObject.dm_partner.id,
+                                 username: selectedGroupObject.dm_partner.username || "User",
+                                 avatar_url: selectedGroupObject.dm_partner.avatar_url,
+                              }}
+                              currentUserNickname={
+                                 selectedGroupId ? (nicknamesByGroup[selectedGroupId]?.[user.id] ?? "") : ""
+                              }
+                              partnerNickname={
+                                 selectedGroupId
+                                    ? (nicknamesByGroup[selectedGroupId]?.[selectedGroupObject.dm_partner.id] ?? "")
+                                    : ""
+                              }
+                              onSaveNickname={(targetUserId, nickname) =>
+                                 selectedGroupId ? saveDmNickname(selectedGroupId, targetUserId, nickname) : Promise.resolve()
+                              }
+                              onClearNickname={(targetUserId) =>
+                                 selectedGroupId ? removeDmNickname(selectedGroupId, targetUserId) : Promise.resolve()
+                              }
+                           />
+                        )}
+
                         {/* Header */}
                         <div
                            onPointerDown={(e) => { if (!isFullMode && isDesktop) panelDragControls.start(e); }}
@@ -2372,6 +2512,22 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                     </button>
                                  );
                               })()}
+                              {selectedGroupId && isSelectedGroupDM && (
+                                 <button
+                                    onClick={() => setIsDmCustomizationOpen(true)}
+                                    className={`relative p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                       isDmCustomizationOpen
+                                          ? "bg-amber-500/20 text-amber-300 border border-amber-400/40"
+                                          : "text-amber-300/80 hover:text-amber-300 hover:bg-amber-500/10"
+                                    }`}
+                                    title="DM Word Effects & Nicknames"
+                                 >
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                    {dmWordEffects.length > 0 && (
+                                       <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
+                                    )}
+                                 </button>
+                              )}
                               {selectedGroupId && (
                                  <button
                                     onClick={() => {
@@ -2426,7 +2582,10 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                  const partner = grp?.dm_partner;
                                  const isSelected = gid === selectedGroupId;
                                  const roomUnread = unreadMessages.filter(m => m.group_id === gid).length;
-                                 const tabName = grp?.name || CORE_GROUPS[gid] || "Chat";
+                                 const tabName =
+                                    isDM && partner?.id
+                                       ? resolveDmDisplayName(gid, partner.id, grp?.name || partner.username || "Chat", nicknamesByGroup)
+                                       : grp?.name || CORE_GROUPS[gid] || "Chat";
 
                                  return (
                                     <div
@@ -2559,9 +2718,13 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                     </div>
                                  ) : (
                                     filteredConversations.map(({ group, lastMessage, unreadCount }) => {
-                                       const name = group?.name || CORE_GROUPS[group.id] || "Room";
+                                       const isDMGroup = group?.type === "dm";
+                                       const name =
+                                          isDMGroup && group?.dm_partner?.id
+                                             ? resolveDmDisplayName(group.id, group.dm_partner.id, group?.name || group.dm_partner.username || "Room", nicknamesByGroup)
+                                             : group?.name || CORE_GROUPS[group.id] || "Room";
                                        const isCore = CORE_GROUPS[group.id] !== undefined;
-                                       const isDM = group?.type === "dm" && !!group?.dm_partner?.avatar_url;
+                                       const isDM = isDMGroup && !!group?.dm_partner?.avatar_url;
                                        const dmUserId = isDM ? group.dm_partner?.id : null;
                                        const isUserOnline = dmUserId ? onlineUsers.some((u: any) => u.id === dmUserId) : false;
                                        const userProfile = dmUserId ? allProfiles.find((p: any) => p.id === dmUserId) : null;
@@ -2651,7 +2814,9 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                                    </div>
                                                 </div>
                                                 <p className="text-[11px] text-gray-400 truncate mt-1">
-                                                   {lastMessage.profiles ? `${lastMessage.profiles.username}: ` : ""}
+                                                   {lastMessage.profiles
+                                                      ? `${isDMGroup ? resolveDmDisplayName(group.id, lastMessage.user_id, lastMessage.profiles.username, nicknamesByGroup) : lastMessage.profiles.username}: `
+                                                      : ""}
                                                    {lastMessage.voice_url ? (
                                                       <span className="text-indigo-400 font-semibold">🎤 Voice note</span>
                                                    ) : lastMessage.image_url ? (
@@ -2659,7 +2824,7 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                                    ) : /^\[poll:[a-zA-Z0-9-_]+\]$/.test(getDecryptedContent(lastMessage) || "") ? (
                                                       <span className="text-indigo-400 font-semibold">📊 Poll</span>
                                                    ) : (
-                                                      maskSpoilerText(getDecryptedContent(lastMessage), dailyWord, !isDM)
+                                                      maskSpoilerText(getDecryptedContent(lastMessage), dailyWord, !isDM, hasPlayedToday)
                                                    )}
                                                 </p>
                                              </div>
@@ -2885,7 +3050,9 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                                             >
                                                                <Reply size={10} className="text-correct shrink-0" />
                                                                <span className="truncate text-gray-400">
-                                                                  {replyToMsg.profiles?.username || 'User'}: {replyToMsg.voice_url ? '🎤 Voice note' : replyToMsg.image_url ? '📷 Image' : maskSpoilerText(getDecryptedContent(replyToMsg), dailyWord, isGroupChat)}
+                                                                  {isGroupChat
+                                                                     ? (replyToMsg.profiles?.username || 'User')
+                                                                     : resolveDmDisplayName(selectedGroupId, replyToMsg.user_id, replyToMsg.profiles?.username || 'User', nicknamesByGroup)}: {replyToMsg.voice_url ? '🎤 Voice note' : replyToMsg.image_url ? '📷 Image' : maskSpoilerText(getDecryptedContent(replyToMsg), dailyWord, isGroupChat, hasPlayedToday)}
                                                                </span>
                                                             </div>
                                                          );
@@ -3086,10 +3253,12 @@ export default function FloatingChatBubble({ mode: propMode, onCloseFull }: Floa
                                     <Reply className="w-3 h-3 text-indigo-400 shrink-0" />
                                     <div className="flex-1 min-w-0">
                                        <span className="text-[9px] font-black uppercase text-indigo-400">
-                                          Replying to {replyingToMsg.profiles?.username || "User"}
+                                          Replying to {isSelectedGroupDM
+                                             ? resolveDmDisplayName(selectedGroupId, replyingToMsg.user_id, replyingToMsg.profiles?.username || "User", nicknamesByGroup)
+                                             : (replyingToMsg.profiles?.username || "User")}
                                        </span>
                                        <p className="text-[10px] text-gray-400 truncate">
-                                          {replyingToMsg.voice_url ? "🎤 Voice note" : replyingToMsg.image_url ? "📷 Image" : maskSpoilerText(getDecryptedContent(replyingToMsg), dailyWord, selectedGroupObject?.type !== "dm")}
+                                          {replyingToMsg.voice_url ? "🎤 Voice note" : replyingToMsg.image_url ? "📷 Image" : maskSpoilerText(getDecryptedContent(replyingToMsg), dailyWord, selectedGroupObject?.type !== "dm", hasPlayedToday)}
                                        </p>
                                     </div>
                                     <button

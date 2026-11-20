@@ -19,6 +19,7 @@ import { usePersistence } from "./usePersistence";
 import { useActions } from "./useActions";
 import { supabase } from "../../lib/supabaseClient";
 import { TOAST_DURATION } from "../../constants/ui";
+import { useAppStore } from "../../store/useAppStore";
 
 export const useGameEngine = (
    date: string,
@@ -523,6 +524,14 @@ export const useGameEngine = (
       isHydrated,
       rehydrateTrigger,
    ]);
+
+   // Sync daily gameplay finish state globally so chat spoiler blur & Game Analysis unlock reactively
+   useEffect(() => {
+      const isFinished = Boolean(
+         date && (state.isGameOver || state.status === "won" || state.status === "lost"),
+      );
+      useAppStore.getState().setDailyGameFinishedDate(isFinished ? date : null);
+   }, [date, state.isGameOver, state.status]);
 
    const letterStatuses = useMemo(
       () => getLetterStatuses(state.guesses),
