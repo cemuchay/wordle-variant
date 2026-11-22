@@ -8,7 +8,7 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
 import { useConfirmation } from '../hooks/useConfirmation';
 import { logger } from '../lib/logger';
-import { subscribeToPush, unsubscribeFromPush } from '../lib/pushService';
+import { subscribeToPush, unsubscribeFromPush, syncPushSubscriptionIfNeeded } from '../lib/pushService';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import { useAppStore, type TileRevealStyle } from '../store/useAppStore';
 import { useAdminStatus } from '../hooks/useAdminStatus';
@@ -180,7 +180,14 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                 setPushPermission(Notification.permission);
                 try {
                     const reg = await navigator.serviceWorker.ready;
-                    const sub = await reg.pushManager.getSubscription();
+                    let sub = await reg.pushManager.getSubscription();
+                    if (Notification.permission === 'granted') {
+                        // Self-heal: ensure browser subscription matches current VAPID key and is synced to Supabase DB
+                        const syncedSub = await syncPushSubscriptionIfNeeded(true);
+                        if (syncedSub) {
+                            sub = syncedSub;
+                        }
+                    }
                     setPushEnabled(!!sub && Notification.permission === 'granted');
                 } catch (err) {
                     console.warn('[Settings] Error checking push subscription status:', err);

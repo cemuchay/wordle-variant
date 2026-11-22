@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
 
    try {
       const body = await req.json();
-      let payload: { user_id: string; notification_id?: string; title: string; body: string; url: string };
+      let payload: { user_id: string; notification_id?: string; title: string; body: string; url: string; tag?: string };
 
       // Handle Supabase Webhook format
       if (body.record && body.table === "notifications") {
@@ -44,16 +44,22 @@ Deno.serve(async (req) => {
          if (['CHALLENGE_INVITE', 'CHALLENGE_STARTED', 'CHALLENGE_COMPLETED', 'MARATHON_GAME_COMPLETED', 'BOT_MARATHON_NEW', 'BOT_MARATHON_OVERTAKEN', 'BOT_MARATHON_FINALE'].includes(record.type)) {
             if (record.data?.challenge_id) {
                targetUrl = `/?challenge=${record.data.challenge_id}`;
+            } else if (record.data?.mode === "wordgrid") {
+               targetUrl = "/wordgrid";
+            } else if (record.data?.mode === "wordup" || record.data?.mode === "wordup_async") {
+               targetUrl = "/wordup";
             }
          } else if (record.type === 'DM_MESSAGE' || record.type === 'DM_REMINDER') {
             if (record.data?.group_id) {
                targetUrl = `/?open=chat&group_id=${record.data.group_id}`;
             }
-         } else if (record.type === 'LEADERBOARD_OVERTAKEN') {
+         } else if (record.type === 'LEADERBOARD_OVERTAKEN' || record.type === 'NEW_COMMENT' || record.type === 'FOLLOWEE_STARTED_PLAYING' || record.type === 'FOLLOWEE_FINISHED_PLAYING') {
             targetUrl = '/?open=leaderboard';
-         } else if (record.type === 'NEW_COMMENT') {
-            targetUrl = '/?open=leaderboard';
-         } else if (record.type === 'ADMIN_BROADCAST') {
+         } else if (record.type === 'NEW_FOLLOWER') {
+            if (record.data?.follower_id) {
+               targetUrl = `/?open=profile&user_id=${record.data.follower_id}`;
+            }
+         } else if (record.type === 'ADMIN_BROADCAST' || record.type === 'SYSTEM') {
             targetUrl = record.data?.url || record.data?.action_url || '/';
          }
 
@@ -62,7 +68,8 @@ Deno.serve(async (req) => {
             notification_id: record.id,
             title: record.title || "New Notification",
             body: record.message || "You have a new update.",
-            url: targetUrl
+            url: targetUrl,
+            tag: record.data?.tag || undefined,
          };
       } else {
          // Handle manual/legacy format
@@ -71,7 +78,8 @@ Deno.serve(async (req) => {
             notification_id: body.notification_id,
             title: body.title || "New Notification",
             body: body.body || "You have a new update.",
-            url: body.url || "/"
+            url: body.url || "/",
+            tag: body.tag || undefined,
          };
       }
 
@@ -110,7 +118,8 @@ Deno.serve(async (req) => {
                JSON.stringify({ 
                   title: payload.title, 
                   body: payload.body, 
-                  url: payload.url 
+                  url: payload.url,
+                  ...(payload.tag ? { tag: payload.tag } : {}),
                }),
             )
          )

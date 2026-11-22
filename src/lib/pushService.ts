@@ -16,8 +16,25 @@ function urlBase64ToUint8Array(base64String: string) {
    return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
 }
 
-const MAX_SUBSCRIPTIONS_PER_USER = 3;
+const MAX_SUBSCRIPTIONS_PER_USER = 5;
 let isSubscribing = false;
+
+function hasMatchingVapidKey(subscription: PushSubscription): boolean {
+   if (!VAPID_PUBLIC_KEY || !subscription.options?.applicationServerKey) {
+      return true;
+   }
+   try {
+      const expected = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+      const actual = new Uint8Array(subscription.options.applicationServerKey);
+      if (expected.length !== actual.length) return false;
+      for (let i = 0; i < expected.length; i++) {
+         if (expected[i] !== actual[i]) return false;
+      }
+      return true;
+   } catch {
+      return true;
+   }
+}
 
 /**
  * Ensures the user doesn't exceed the maximum number of push subscriptions.
@@ -180,20 +197,31 @@ export async function unsubscribeFromPush() {
    }
 }
 
-export async function syncPushSubscriptionIfNeeded() {
+export async function syncPushSubscriptionIfNeeded(forceUpsert = false) {
    try {
       const {
          data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) return null;
 
       // Check if notification permission is granted
       if ("Notification" in window && Notification.permission === "granted") {
          const registration = await navigator.serviceWorker.ready;
-         const subscription = await registration.pushManager.getSubscription();
+         let subscription = await registration.pushManager.getSubscription();
+
+         // If existing subscription uses an outdated VAPID key, unsubscribe so it can be recreated
+         if (subscription && !hasMatchingVapidKey(subscription)) {
+            try {
+               await subscription.unsubscribe();
+               subscription = null;
+            } catch {
+               // Ignore unsubscribe errors
+            }
+         }
 
          if (subscription) {
             const endpoint = subscription.endpoint;
+            const subData = subscription.toJSON();
 
             // Check if THIS specific subscription exists and its last activity
             const { data, error } = await supabase
@@ -203,12 +231,10 @@ export async function syncPushSubscriptionIfNeeded() {
                .eq("endpoint", endpoint)
                .maybeSingle();
 
-            if (!error && !data) {
-               // Subscription exists in browser but not in DB, so upsert it
-
+            if (!error && (!data || forceUpsert)) {
+               // Subscription exists in browser but not in DB (or forced refresh), so upsert it
                await enforceSubscriptionLimit(user.id, endpoint);
 
-               const subData = subscription.toJSON();
                await supabase.from("push_subscriptions").upsert(
                   {
                      subscription: subData,
@@ -227,13 +253,17 @@ export async function syncPushSubscriptionIfNeeded() {
                if (hoursSinceLastSeen > MISC.PUSH_THROTTLE_HOURS) {
                   await supabase
                      .from("push_subscriptions")
-                     .update({ last_seen_at: new Date().toISOString() })
+                     .update({
+                        subscription: subData,
+                        last_seen_at: new Date().toISOString(),
+                     })
                      .eq("endpoint", endpoint);
                }
             }
+            return subscription;
          } else {
             // Permission is granted but browser doesn't have a subscription yet!
-            // We can automatically generate one in the background
+            // Attempt to generate one in the background (works on desktop; iOS requires user gesture via Settings)
             const newSub = await registration.pushManager.subscribe({
                userVisibleOnly: true,
                applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
@@ -251,9 +281,12 @@ export async function syncPushSubscriptionIfNeeded() {
                },
                { onConflict: "endpoint" },
             );
+            return newSub;
          }
       }
+      return null;
    } catch (e) {
       console.warn("[Push Service] Background auto-subscribe sync failed:", e);
+      return null;
    }
 }

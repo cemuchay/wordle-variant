@@ -553,7 +553,29 @@ export async function sendAdminPollCreatedPush({
    if (typeof window === "undefined" || !pollId) return 0;
 
    try {
-      // 1. Fetch user IDs of all registered push subscribers
+      let cleanQuestion = (question || "").trim();
+      if (cleanQuestion.length > 70) {
+         cleanQuestion = cleanQuestion.slice(0, 67) + "...";
+      }
+
+      const title = "New Community Poll! 📊";
+      const message = `"${cleanQuestion}" • Tap to cast your vote!`;
+      const actionUrl = "/?open=chat&group_id=00000000-0000-0000-0000-000000000001";
+
+      if (typeof (supabase as any).rpc === "function") {
+         const { data: rpcRes, error: rpcError } = await supabase.rpc("send_admin_custom_notification", {
+            p_title: title,
+            p_message: message,
+            p_url: actionUrl,
+            p_delivery_mode: "hybrid",
+            p_target_audience: "active",
+         });
+         if (!rpcError && rpcRes) {
+            return Number(rpcRes.push_users ?? rpcRes.total_recipients ?? 1);
+         }
+      }
+
+      // Fallback: direct query & insert
       const { data: subs, error } = await supabase
          .from("push_subscriptions")
          .select("user_id");
@@ -562,7 +584,6 @@ export async function sendAdminPollCreatedPush({
          return 0;
       }
 
-      // 2. Deduplicate user IDs & exclude the creating admin
       const recipientIds = Array.from(
          new Set(
             subs
@@ -573,24 +594,19 @@ export async function sendAdminPollCreatedPush({
 
       if (recipientIds.length === 0) return 0;
 
-      let cleanQuestion = (question || "").trim();
-      if (cleanQuestion.length > 70) {
-         cleanQuestion = cleanQuestion.slice(0, 67) + "...";
-      }
-
       const promises = recipientIds.map((userId) => {
          const notifId = generateDeterministicUUID(`admin_poll_created_${pollId}_${userId}`);
          return sendClientNotification({
             id: notifId,
             user_id: userId,
             type: "ADMIN_BROADCAST",
-            title: "New Community Poll! 📊",
-            message: `"${cleanQuestion}" • Tap to cast your vote!`,
+            title,
+            message,
             data: {
                mode: "admin_poll",
                poll_id: pollId,
                group_id: "00000000-0000-0000-0000-000000000001",
-               action_url: "/?open=chat&group_id=00000000-0000-0000-0000-000000000001",
+               action_url: actionUrl,
             },
          });
       });
@@ -623,6 +639,31 @@ export async function sendAdminPollExpiredPush({
    if (typeof window === "undefined" || !pollId) return 0;
 
    try {
+      let cleanQuestion = (question || "").trim();
+      if (cleanQuestion.length > 50) {
+         cleanQuestion = cleanQuestion.slice(0, 47) + "...";
+      }
+
+      const title = "Poll Results are In! 🏆";
+      const message =
+         totalVotes > 0 && winningOptionText
+            ? `Poll closed: "${cleanQuestion}" — Winner: ${winningOptionText} (${winningPercentage || 0}%).`
+            : `Poll closed: "${cleanQuestion}" — Final voting concluded.`;
+      const actionUrl = "/?open=chat&group_id=00000000-0000-0000-0000-000000000001";
+
+      if (typeof (supabase as any).rpc === "function") {
+         const { data: rpcRes, error: rpcError } = await supabase.rpc("send_admin_custom_notification", {
+            p_title: title,
+            p_message: message,
+            p_url: actionUrl,
+            p_delivery_mode: "hybrid",
+            p_target_audience: "active",
+         });
+         if (!rpcError && rpcRes) {
+            return Number(rpcRes.push_users ?? rpcRes.total_recipients ?? 1);
+         }
+      }
+
       const { data: subs, error } = await supabase
          .from("push_subscriptions")
          .select("user_id");
@@ -641,29 +682,19 @@ export async function sendAdminPollExpiredPush({
 
       if (recipientIds.length === 0) return 0;
 
-      let cleanQuestion = (question || "").trim();
-      if (cleanQuestion.length > 50) {
-         cleanQuestion = cleanQuestion.slice(0, 47) + "...";
-      }
-
-      const message =
-         totalVotes > 0 && winningOptionText
-            ? `Poll closed: "${cleanQuestion}" — Winner: ${winningOptionText} (${winningPercentage || 0}%).`
-            : `Poll closed: "${cleanQuestion}" — Final voting concluded.`;
-
       const promises = recipientIds.map((userId) => {
          const notifId = generateDeterministicUUID(`admin_poll_expired_${pollId}_${userId}`);
          return sendClientNotification({
             id: notifId,
             user_id: userId,
             type: "ADMIN_BROADCAST",
-            title: "Poll Results are In! 🏆",
+            title,
             message,
             data: {
                mode: "admin_poll_result",
                poll_id: pollId,
                group_id: "00000000-0000-0000-0000-000000000001",
-               action_url: "/?open=chat&group_id=00000000-0000-0000-0000-000000000001",
+               action_url: actionUrl,
             },
          });
       });

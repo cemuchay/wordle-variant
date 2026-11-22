@@ -59,9 +59,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Only handle public group chat messages (skip DMs where group_id is set)
-    if (record.group_id) {
-      return new Response(JSON.stringify({ sent: 0, reason: "Skipped DM message" }), {
+    // Skip reaction signal rows
+    if (record.content?.startsWith("[reaction:")) {
+      return new Response(JSON.stringify({ sent: 0, reason: "Skipped reaction signal" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -70,6 +70,27 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
+
+    const PUBLIC_DEFAULT_GROUPS = new Set([
+      "00000000-0000-0000-0000-000000000001",
+      "00000000-0000-0000-0000-000000000002",
+      "00000000-0000-0000-0000-000000000003",
+    ]);
+
+    // Skip private DM messages (only process public/group chat channels)
+    if (record.group_id && !PUBLIC_DEFAULT_GROUPS.has(record.group_id)) {
+      const { data: groupRow } = await supabaseAdmin
+        .from("chat_groups")
+        .select("type")
+        .eq("id", record.group_id)
+        .maybeSingle();
+
+      if (groupRow?.type === "dm") {
+        return new Response(JSON.stringify({ sent: 0, reason: "Skipped DM message" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
 
     webpush.setVapidDetails(
       Deno.env.get("VAPID_SUBJECT")!,
@@ -96,13 +117,20 @@ Deno.serve(async (req) => {
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0)
     ).toISOString();
 
-    const { data: earlierMessages } = await supabaseAdmin
+    let earlierQuery = supabaseAdmin
       .from("messages")
       .select("id")
-      .is("group_id", null)
       .gte("created_at", startOfDayUtc)
       .neq("id", record.id)
       .limit(1);
+
+    if (record.group_id) {
+      earlierQuery = earlierQuery.eq("group_id", record.group_id);
+    } else {
+      earlierQuery = earlierQuery.is("group_id", null);
+    }
+
+    const { data: earlierMessages } = await earlierQuery;
 
     const isFirstOfDay = !earlierMessages || earlierMessages.length === 0;
 
@@ -183,24 +211,29 @@ Deno.serve(async (req) => {
             ? `${senderName} mentioned you`
             : "Group Chat is active today";
 
+        const targetChatUrl = record.group_id
+          ? `/?open=chat&group_id=${record.group_id}`
+          : "/?open=chat";
+
         const pushPayload = JSON.stringify({
           title,
           body: reason === "daily_first" ? `${senderName}: ${preview}` : preview,
-          url: "/?open=chat",
+          url: targetChatUrl,
           tag: `group-msg-${record.id}`,
         });
 
         try {
-          await webpush.sendNotification(
-            {
-              endpoint: sub.endpoint,
-              keys: {
-                p256dh: sub.p256dh,
-                auth: sub.auth,
-              },
-            },
-            pushPayload
-          );
+          const subTarget = sub.subscription?.endpoint
+            ? sub.subscription
+            : {
+                endpoint: sub.endpoint,
+                keys: {
+                  p256dh: sub.p256dh || sub.subscription?.keys?.p256dh,
+                  auth: sub.auth || sub.subscription?.keys?.auth,
+                },
+              };
+
+          await webpush.sendNotification(subTarget, pushPayload);
           sentCount++;
         } catch (err: any) {
           if (err?.statusCode === 410 || err?.statusCode === 404) {
