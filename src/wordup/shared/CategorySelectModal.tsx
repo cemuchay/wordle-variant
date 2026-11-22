@@ -114,7 +114,7 @@ export const CategorySelectModal = ({
             <div className="flex items-center justify-between p-5 border-b border-white/5">
                <div>
                   <h3 className="text-sm font-black uppercase tracking-wider text-white">Select Arena Category</h3>
-                  <p className="text-[10px] text-white/40 mt-0.5">Choose an arena mode to matchmake or play bots</p>
+                  <p className="text-[10px] text-white/40 mt-0.5">Choose an arena category to start a live battle</p>
                </div>
                <button
                   onClick={onClose}

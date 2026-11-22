@@ -49,6 +49,7 @@ interface UnifiedLobbyProps {
    onBackToClassic?: () => void;
    onTutorial?: () => void;
    restoreCategory?: string | null;
+   onSelectCategory?: (catId: string | null) => void;
    onPlayMarathon?: (catId: string) => void;
 }
 
@@ -78,17 +79,19 @@ export const UnifiedLobby = ({
    onBackToClassic,
    onTutorial,
    restoreCategory,
+   onSelectCategory,
    onRefreshPending,
    onPlayMarathon,
 }: UnifiedLobbyProps) => {
    const [activeTab, setActiveTab] = useState<TabId>("home");
-   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(restoreCategory || null);
+   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
+      () => restoreCategory ?? safeLocalStorage.getItem("wordup_last_category") ?? null
+   );
 
    useEffect(() => {
-      if (restoreCategory) {
+      if (restoreCategory !== undefined) {
+         // eslint-disable-next-line react-hooks/set-state-in-effect
          setSelectedCategoryId(restoreCategory);
-      } else if (restoreCategory === null) {
-         setSelectedCategoryId(null);
       }
    }, [restoreCategory]);
    const [liveCategory, setLiveCategory] = useState("mixed");
@@ -140,7 +143,9 @@ export const UnifiedLobby = ({
       const data = recordClick(catId);
       setFrequentCategoryIds(getTopFrequentCategories(data, 6));
       setSelectedCategoryId(catId);
-   }, []);
+      safeLocalStorage.setItem("wordup_last_category", catId);
+      onSelectCategory?.(catId);
+   }, [onSelectCategory]);
 
    const fetchHistory = useCallback(async () => {
       if (!currentUser) {
@@ -211,6 +216,7 @@ export const UnifiedLobby = ({
             onBack={() => {
                setSelectedCategoryId(null);
                safeLocalStorage.removeItem("wordup_last_category");
+               onSelectCategory?.(null);
             }}
             currentUser={currentUser}
             userStats={userStats}

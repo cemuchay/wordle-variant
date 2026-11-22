@@ -26,12 +26,13 @@ import { safeLocalStorage } from "../../utils/storage";
 import { savePausedGame, removePausedGame } from "../shared/pauseStorage";
 import { cleanBotMatchId } from "../shared/botUtils";
 import { updateBotStatsAfterMatch } from "../shared/botService";
+import { recordHumanTopicTelemetry } from "../shared/topicTelemetryService";
 
 import { RATING, XP, WORDUP_TIMEOUT, WORDUP_LIMITS, BOT_PROFILES_RATINGS } from "../../constants/wordup";
 import { useLiveStore } from "./store/useLiveStore";
 
 interface LiveViewProps {
-   onBack?: (goHome?: boolean) => void;
+   onBack?: (goHome?: boolean, categoryToRestore?: string) => void;
    onSwitchMode?: (mode: "live" | "async") => void;
    onTutorial?: () => void;
    onBackToClassic?: () => void;
@@ -76,11 +77,14 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
       wordupAudio.setEnabled(newVal);
    }, [soundEnabled]);
 
+   const manualExitRef = useRef(false);
+
    useEffect(() => {
-      if (view === "menu") {
-         onBack?.();
+      if (view === "menu" && !manualExitRef.current) {
+         const activeCat = useLiveStore.getState().category || category;
+         onBack?.(false, activeCat);
       }
-   }, [view, onBack]);
+   }, [view, onBack, category]);
 
    const matchDataFromStore = useLiveStore((s) => s.matchData);
    const gameType = !matchDataFromStore ? null
@@ -205,6 +209,9 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
 
       try { await updateStats(eloGain, xpReward, netWon, netTied, match.category, isMarathon ? { gamesWon: totalGamesWon, gamesLost: totalGamesLost, gamesTied: totalGamesTied } : undefined); }
       catch { triggerToast("Rating update delayed. Syncing in background...", WORDUP_TIMEOUT.TOAST_DURATION); }
+
+      // Fire-and-forget: record human response-time telemetry per topic for realistic bot speed calibration
+      void recordHumanTopicTelemetry(match.category || "mixed", myAnswers || []);
 
       // Fire-and-forget: record handcrafted question answers for difficulty tracking
       try {
@@ -575,7 +582,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
                   onAbort={abortMatch} lastRoundPopup={lastRoundPopup}
                   waitingForOpponent={waitingForOpponent}
                   playerSignalLevel={playerSignalLevel}
-                  opponentSignalLevel={matchDataFromStore?.is_bot_match ? playerSignalLevel : engine.opponentSignalLevel}
+                  opponentSignalLevel={engine.opponentSignalLevel}
                   onPause={async () => {
                      const state = useLiveStore.getState();
                      if (state.matchId && state.questions && state.questions.length > 0) {
@@ -632,26 +639,30 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
                <GameOverView
                   matchData={matchData}
                   setView={(newView) => {
-                     if (newView === ("home" as any)) {
+                     if (newView === "home") {
+                        manualExitRef.current = true;
+                        engineCleanupRef.current?.();
                         resetGame();
                         onBack?.(true);
                      } else if (newView === "menu") {
-                        const targetCat = matchData?.category || category;
+                        manualExitRef.current = true;
+                        const targetCat = matchData?.category || useLiveStore.getState().category || category;
                         if (targetCat) {
                            setCategory(targetCat);
+                           safeLocalStorage.setItem("wordup_last_category", targetCat);
                         }
+                        engineCleanupRef.current?.();
                         resetGame();
-                        setTimeout(() => {
-                           onBack?.(false);
-                        }, 50);
-                     } else if (newView === "matchmaking" || newView === "playbot") {
+                        onBack?.(false, targetCat);
+                     } else if (newView === "matchmaking") {
+                        manualExitRef.current = false;
                         engineCleanupRef.current?.();
                         if (matchData?.category) {
                            setCategory(matchData.category);
                         }
                         resetGame();
                         setView("connecting");
-                        startMatchmaking(newView === "playbot");
+                        startMatchmaking(false);
                      }
                   }}
                   role={role} rematchState={rematchState} rematchCountdown={rematchCountdown}

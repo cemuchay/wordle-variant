@@ -11,7 +11,7 @@ import { calculateMatchRewards } from "../../shared/xpCalculator";
 
 interface GameOverViewProps {
    matchData: any;
-   setView: (view: "menu" | "matchmaking" | "playbot") => void;
+   setView: (view: "menu" | "matchmaking" | "home") => void;
    role: "player1" | "player2" | null;
    rematchState: "idle" | "sent" | "received" | "declined" | "expired";
    rematchCountdown: number;
@@ -179,25 +179,21 @@ export const GameOverView = ({
          )}
 
          {/* Play Again / Lobby */}
-         <div className="grid grid-cols-2 gap-3">
-            <button
-               onClick={() => setView("matchmaking")}
-               className="bg-[#E85151] hover:bg-[#d44343] text-white font-black uppercase py-4 rounded-xl tracking-widest shadow-[0_4px_20px_rgba(232,81,81,0.3)] cursor-pointer hover:scale-102 active:scale-98 transition-all animate-pulse"
-            >
-               Play Again
-            </button>
-            {/* <button
-               onClick={() => setView("playbot")}
-               className="bg-white/10 hover:bg-white/15 text-white font-black uppercase py-4 px-2 rounded-xl flex items-center justify-center gap-2 tracking-widest shadow-lg cursor-pointer hover:scale-102 active:scale-98 transition-all border border-white/10"
-            >
-               <span>Play vs Bot</span>
-            </button> */}
-         </div>
+         <button
+            onClick={() => setView("matchmaking")}
+            className={`w-full font-black uppercase py-4 rounded-xl tracking-widest cursor-pointer hover:scale-102 active:scale-98 transition-all ${
+               showRematchButton && (rematchState === "idle" || rematchState === "received")
+                  ? "bg-white/10 hover:bg-white/15 border border-white/15 text-white shadow-lg"
+                  : "bg-[#E85151] hover:bg-[#d44343] text-white shadow-[0_4px_20px_rgba(232,81,81,0.3)] animate-pulse"
+            }`}
+         >
+            Play Again
+         </button>
          <div className="grid grid-cols-2 gap-3">
             <button
                onClick={async () => {
                   setIsNavigatingToTopic(true);
-                  await new Promise((r) => setTimeout(r, 150));
+                  await new Promise((r) => setTimeout(r, 120));
                   setView("menu");
                }}
                disabled={isNavigatingToTopic}
@@ -211,7 +207,7 @@ export const GameOverView = ({
                <span>{isNavigatingToTopic ? "Loading..." : "Topic Lobby"}</span>
             </button>
             <button
-               onClick={() => setView("home" as any)}
+               onClick={() => setView("home")}
                className="bg-[#E85151] hover:bg-[#d44343] text-white font-black uppercase py-3.5 px-2 rounded-xl flex items-center justify-center gap-1.5 tracking-wider shadow-lg cursor-pointer hover:scale-102 active:scale-98 transition-all border border-red-500/30 text-xs"
             >
                <Home size={16} />

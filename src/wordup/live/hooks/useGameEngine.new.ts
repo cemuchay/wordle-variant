@@ -44,6 +44,11 @@ import {
     evaluateBotResponseToUserRematch,
     type BotPersonality,
 } from "../../shared/botPersonality";
+import {
+    fetchTopicTelemetry,
+    getCachedTopicTelemetry,
+    type TopicResponseTelemetry,
+} from "../../shared/topicTelemetryService";
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -144,8 +149,12 @@ export function useGameEngine(props: EngineProps) {
     const opponentStatsRef = useRef<ProfileStats | null>(null);
     const botProfileRef = useRef<string>("average");
     const botPersonalityRef = useRef<BotPersonality | null>(null);
+    const topicTelemetryRef = useRef<TopicResponseTelemetry | null>(null);
     const consecutiveRematchesRef = useRef<number>(0);
     const isBotRematchPendingRef = useRef<boolean>(false);
+    const gameOverAtRef = useRef<number>(0);
+    const botBaseSignalRef = useRef<number>(3);
+    const botSignalIntervalRef = useRef<number | null>(null);
 
     // Pending bot response for the current round
     const pendingBotRoundResultRef = useRef<{
@@ -307,6 +316,13 @@ export function useGameEngine(props: EngineProps) {
         }
     }, []);
 
+    const stopBotSignalInterval = useCallback(() => {
+        if (botSignalIntervalRef.current !== null) {
+            clearInterval(botSignalIntervalRef.current);
+            botSignalIntervalRef.current = null;
+        }
+    }, []);
+
     const stopAllTimers = useCallback(() => {
         stopCountdown();
         stopRoundTick();
@@ -315,6 +331,7 @@ export function useGameEngine(props: EngineProps) {
         stopBotTimer();
         stopBotRematchTimer();
         stopRematchInterval();
+        stopBotSignalInterval();
         wordupAudio.stopFinalRoundBeat();
     }, [
         stopCountdown,
@@ -324,6 +341,7 @@ export function useGameEngine(props: EngineProps) {
         stopBotTimer,
         stopBotRematchTimer,
         stopRematchInterval,
+        stopBotSignalInterval,
     ]);
 
     // ══════════════════════════════════════════════════════════════════
@@ -468,6 +486,7 @@ export function useGameEngine(props: EngineProps) {
         );
 
         // Start rematch countdown for BOTH live PvP and synthetic bot matches
+        gameOverAtRef.current = Date.now();
         setRematchState("idle");
         rematchStateRef.current = "idle";
         setShowRematchButton(true);
@@ -657,11 +676,15 @@ export function useGameEngine(props: EngineProps) {
             }
         }, 50);
 
-        // ── Independent personality-driven bot answer timer ──
+        // ── Independent personality & telemetry-driven bot answer timer ──
         if (gameTypeRef.current === "live-bot" && opponentChoiceRef.current === null) {
             const bq = questionsRef.current[currentRound];
             if (bq) {
                 const bDur = getQuestionDuration(bq.type);
+                const activeCat =
+                    (matchDataRef.current?.category as string | undefined) ||
+                    useLiveStore.getState().category ||
+                    "mixed";
                 const br = simulatePersonalityBotResponse(
                     bq,
                     botPersonalityRef.current,
@@ -669,10 +692,21 @@ export function useGameEngine(props: EngineProps) {
                     currentRound,
                     myScoreRef.current,
                     opponentScoreRef.current,
+                    topicTelemetryRef.current,
+                    activeCat,
                 );
 
-                // Subtle signal bar fluctuation (3 or 4 bars) for realism
-                setOpponentSignalLevel(Math.random() < 0.8 ? 4 : 3);
+                // Independent bot network signal simulation (never mirrors the player's network!)
+                if (botSignalIntervalRef.current === null) {
+                    const base = botBaseSignalRef.current;
+                    setOpponentSignalLevel(base);
+                    botSignalIntervalRef.current = window.setInterval(() => {
+                        const r = Math.random();
+                        const delta = r < 0.25 ? -1 : r > 0.8 ? 1 : 0;
+                        const nextLevel = Math.min(4, Math.max(1, botBaseSignalRef.current + delta));
+                        setOpponentSignalLevel(nextLevel);
+                    }, 3800);
+                }
 
                 if (br.gaveUp) {
                     pendingBotRoundResultRef.current = {
@@ -839,17 +873,16 @@ export function useGameEngine(props: EngineProps) {
             });
         }
 
-        // Live-bot: If the bot hasn't answered yet, avoid 0ms robotic snap when real timer is active,
-        // or resolve if no timer was active (e.g. unit test dispatch).
+        // Live-bot: Let the bot's independent telemetry timer run naturally so it doesn't feel reactive to the user's click.
+        // Only cap extreme outlier waits (> 2.6s after user click) or resolve immediately in headless unit tests where no timer was started.
         if (gameTypeRef.current === "live-bot" && opponentChoiceRef.current === null) {
             const pending = pendingBotRoundResultRef.current;
             if (botTimerRef.current !== null && pending && !pending.gaveUp) {
                 const remainingBotMs = Math.max(0, pending.timeTaken * 1000 - elapsed * 1000);
-                // If bot was going to take > 1.8s more, pace it to 0.45s - 1.35s so it feels human yet responsive
-                if (remainingBotMs > 1800) {
+                if (remainingBotMs > 2600) {
                     stopBotTimer();
-                    const pacedWaitMs = Math.round(450 + Math.random() * 900);
-                    const adjustedTimeTaken = parseFloat((elapsed + pacedWaitMs / 1000).toFixed(2));
+                    const cappedWaitMs = Math.round(1400 + Math.random() * 1000);
+                    const adjustedTimeTaken = parseFloat((elapsed + cappedWaitMs / 1000).toFixed(2));
                     const adjustedPts = calcPoints(
                         pending.choice === q.answer,
                         adjustedTimeTaken,
@@ -864,10 +897,14 @@ export function useGameEngine(props: EngineProps) {
                         opponentCurrentPointsRef.current = adjustedPts;
                         setOpponentChoice(pending.choice);
                         setOpponentCurrentPoints(adjustedPts);
-                    }, pacedWaitMs);
+                    }, cappedWaitMs);
                 }
             } else if (botTimerRef.current === null && (!pending || !pending.gaveUp)) {
                 // Fallback when timer wasn't running (e.g. headless E2E SET_INITIAL)
+                const activeCat =
+                    (matchDataRef.current?.category as string | undefined) ||
+                    useLiveStore.getState().category ||
+                    "mixed";
                 const br = simulatePersonalityBotResponse(
                     q,
                     botPersonalityRef.current,
@@ -875,6 +912,8 @@ export function useGameEngine(props: EngineProps) {
                     currentRoundRef.current,
                     myScoreRef.current,
                     opponentScoreRef.current,
+                    topicTelemetryRef.current,
+                    activeCat,
                 );
                 const botChoice = pickBotChoice(q, br.correct);
                 const botPts = calcPoints(
@@ -927,12 +966,15 @@ export function useGameEngine(props: EngineProps) {
             const finalOpp = opponentScoreRef.current;
             const botWon = finalOpp > finalMy;
             const isDraw = finalOpp === finalMy;
+            const elapsedSinceGameOverSec =
+                gameOverAtRef.current > 0 ? (Date.now() - gameOverAtRef.current) / 1000 : 1.0;
 
             const decision = evaluateBotResponseToUserRematch(
                 botPersonalityRef.current,
                 botWon,
                 isDraw,
                 consecutiveRematchesRef.current,
+                elapsedSinceGameOverSec,
             );
 
             botRematchTimerRef.current = window.setTimeout(() => {
@@ -1143,6 +1185,15 @@ export function useGameEngine(props: EngineProps) {
             const isRematchWithSameBot = isBotRematchPendingRef.current && opponentStatsRef.current;
             isBotRematchPendingRef.current = false;
 
+            const activeCategory =
+                (storeMatchData?.category as string | undefined) ||
+                useLiveStore.getState().category ||
+                "mixed";
+            topicTelemetryRef.current = getCachedTopicTelemetry(activeCategory);
+            void fetchTopicTelemetry(activeCategory).then((t) => {
+                topicTelemetryRef.current = t;
+            });
+
             if (storeQuestions && storeQuestions.length > 0 && storeMatchData && storeMatchData.status !== "completed" && !isRematchWithSameBot) {
                 questions = storeQuestions;
                 matchData = storeMatchData;
@@ -1233,6 +1284,12 @@ export function useGameEngine(props: EngineProps) {
                     botPersonalityRef.current = syntheticBot.bot_personality;
                     botProfileRef.current = syntheticBot.bot_personality.archetype || "average";
                     oppStats = botToProfileStats(syntheticBot);
+
+                    // Assign an independent baseline network signal (2, 3, or 4 bars) seeded by bot ID
+                    const idCode = (syntheticBot.id || "a").charCodeAt(0) % 10;
+                    const baseSig = idCode < 2 ? 2 : idCode < 6 ? 3 : 4;
+                    botBaseSignalRef.current = baseSig;
+                    setOpponentSignalLevel(baseSig);
                 }
 
                 matchData = {

@@ -15,6 +15,7 @@ import { useWordUpStore } from "../store/useWordUpStore";
 import { TOAST_DURATION } from "../constants/ui";
 import { MarathonConfigModal } from "./shared/MarathonConfigModal";
 import { type PausedMatch, getPausedGames, removePausedGame } from "./shared/pauseStorage";
+import { safeLocalStorage } from "../utils/storage";
 
 import { useTheme } from "../hooks/useTheme";
 
@@ -52,9 +53,20 @@ export const WordUpContainer = ({
    const [soundEnabled, setSoundEnabled] = useState(() => wordupAudio.isEnabled());
    const [showSoundPrompt, setShowSoundPrompt] = useState(false);
    const [dontAskAgain, setDontAskAgain] = useState(false);
-   const [lastCategory, setLastCategory] = useState<string | null>(null);
+   const [lastCategory, setLastCategory] = useState<string | null>(
+      () => safeLocalStorage.getItem("wordup_last_category") || null
+   );
    const [marathonConfigModalOpen, setMarathonConfigModalOpen] = useState(false);
    const [marathonConfigCategory, setMarathonConfigCategory] = useState<string>("mixed");
+
+   const updateLastCategory = useCallback((catId: string | null) => {
+      setLastCategory(catId);
+      if (catId) {
+         safeLocalStorage.setItem("wordup_last_category", catId);
+      } else {
+         safeLocalStorage.removeItem("wordup_last_category");
+      }
+   }, []);
 
    const refreshPausedMatches = useCallback(() => {
       setPausedMatches(getPausedGames());
@@ -67,6 +79,7 @@ export const WordUpContainer = ({
    }, [wordupMode, refreshPausedMatches]);
 
    const handleResumePausedMatch = useCallback((paused: PausedMatch) => {
+      updateLastCategory(paused.categoryId);
       const liveStore = useLiveStore.getState();
       liveStore.resetGame();
       liveStore.setCategory(paused.categoryId);
@@ -77,7 +90,7 @@ export const WordUpContainer = ({
       liveStore.setCurrentIdx(paused.currentIdx);
       liveStore.setView("countdown");
       setWordupMode("live");
-   }, [setWordupMode]);
+   }, [setWordupMode, updateLastCategory]);
 
    const handleDiscardPausedMatch = useCallback((matchId: string) => {
       removePausedGame(matchId);
@@ -94,6 +107,7 @@ export const WordUpContainer = ({
       setMarathonConfigModalOpen(false);
 
       const cat = marathonConfigCategory || "mixed";
+      updateLastCategory(cat);
       const totalRounds = config.totalGames * 7;
 
       // Instantly switch view to connecting/loading VS preview transition screen
@@ -256,7 +270,7 @@ export const WordUpContainer = ({
          console.error("Failed to start marathon:", err);
          triggerToast("Error launching marathon match", TOAST_DURATION.DEFAULT);
       }
-   }, [effectiveUser, marathonConfigCategory, setWordupMode, triggerToast, userStats?.rating]);
+   }, [effectiveUser, marathonConfigCategory, setWordupMode, triggerToast, updateLastCategory, userStats?.rating]);
 
    useEffect(() => {
       const neverAsk = localStorage.getItem("wordup_sound_prompt_never_ask") === "true";
@@ -290,24 +304,24 @@ export const WordUpContainer = ({
 
    // Bridge: Play Live Match from Unified Lobby
    const handlePlayLive = useCallback((catId: string, vsBot = false) => {
-      setLastCategory(catId);
+      updateLastCategory(catId);
       useLiveStore.getState().setCategory(catId);
       useLiveStore.getState().resetGame();
       useLiveStore.getState().setView("connecting");
       useLiveStore.getState().setAutoStartMatchmaking(!vsBot);
       useLiveStore.getState().setVsBotOnly(vsBot);
       setWordupMode("live");
-   }, [setWordupMode]);
+   }, [setWordupMode, updateLastCategory]);
 
    // Bridge: Play Async Challenge from Unified Lobby
    const handlePlayAsync = useCallback((targetUser: any, catId: string) => {
-      setLastCategory(catId);
+      updateLastCategory(catId);
       useAsyncStore.getState().setCategory(catId);
       useAsyncStore.getState().resetGame();
       useAsyncStore.getState().setView("menu");
       useAsyncStore.getState().setPendingChallengePlayer(targetUser);
       setWordupMode("async");
-   }, [setWordupMode]);
+   }, [setWordupMode, updateLastCategory]);
 
    // Bridge: Play Async Turn from Unified Lobby
    const handlePlayAsyncTurn = useCallback((match: any) => {
@@ -403,6 +417,7 @@ export const WordUpContainer = ({
                onBackToClassic={onBackToClassic}
                onTutorial={onTutorial}
                restoreCategory={lastCategory}
+               onSelectCategory={updateLastCategory}
                onPlayMarathon={(catId) => {
                   setMarathonConfigCategory(catId);
                   setMarathonConfigModalOpen(true);
@@ -420,21 +435,22 @@ export const WordUpContainer = ({
 
          {wordupMode === "live" && (
             <LiveView
-               onBack={(goHome) => {
+               onBack={(goHome, categoryToRestore) => {
                   refreshPausedMatches();
                   if (goHome) {
-                     setLastCategory(null);
+                     updateLastCategory(null);
                      setWordupMode(null);
                   } else {
-                     // Async sequence: exit to lobby and ensure topic details opens smoothly
-                     const targetCategory = lastCategory || useLiveStore.getState().category;
+                     const targetCategory =
+                        categoryToRestore ||
+                        useLiveStore.getState().matchData?.category ||
+                        useLiveStore.getState().category ||
+                        lastCategory ||
+                        safeLocalStorage.getItem("wordup_last_category");
+                     if (targetCategory) {
+                        updateLastCategory(targetCategory);
+                     }
                      setWordupMode(null);
-                     setTimeout(() => {
-                        refreshPausedMatches();
-                        if (targetCategory) {
-                           setLastCategory(targetCategory);
-                        }
-                     }, 50);
                   }
                }}
                onSwitchMode={setWordupMode}

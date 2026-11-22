@@ -120,7 +120,7 @@ export const WordupTutorialModal = ({ onComplete, onSkip }: WordupTutorialModalP
               Live Mode
             </h3>
             <p className="text-xs text-gray-400 mb-4 max-w-xs">
-              Jump into real-time 1v1 battles against real opponents or bots.
+              Jump into real-time 1v1 battles against live opponents.
             </p>
 
             <div className="space-y-2 w-full max-w-[260px] text-left mb-4">
@@ -144,7 +144,7 @@ export const WordupTutorialModal = ({ onComplete, onSkip }: WordupTutorialModalP
 
             <div className="flex gap-2">
               <span className="text-[9px] font-black uppercase bg-correct/10 text-correct border border-correct/20 px-2 py-0.5 rounded-lg">vs Players</span>
-              <span className="text-[9px] font-black uppercase bg-pink-500/10 text-pink-400 border border-pink-500/20 px-2 py-0.5 rounded-lg">vs Bots</span>
+              <span className="text-[9px] font-black uppercase bg-pink-500/10 text-pink-400 border border-pink-500/20 px-2 py-0.5 rounded-lg">Ranked 1v1</span>
             </div>
           </div>
         );

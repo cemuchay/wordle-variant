@@ -154,7 +154,7 @@ export const MarathonConfigModal = ({
                               : "bg-white/5 hover:bg-white/10 text-white/60 border-white/10"
                            }`}
                      >
-                        <span>🤖 vs Bot</span>
+                        <span>⚡ Live Marathon</span>
                      </button>
                      <button
                         type="button"

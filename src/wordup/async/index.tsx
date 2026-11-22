@@ -24,6 +24,7 @@ import { RATING, XP } from "../../constants/wordup";
 import { safeLocalStorage } from "../../utils/storage";
 import formatUsername from '../../utils/formatUsername';
 import { TOAST_DURATION } from '../../constants/ui';
+import { recordHumanTopicTelemetry } from "../shared/topicTelemetryService";
 
 interface AsyncViewProps {
    onBack?: () => void;
@@ -188,6 +189,9 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
 
          try { await updateStats(eloGain, xpReward, netWon, netTied, match.category, isMarathon ? { gamesWon: totalGamesWon, gamesLost: totalGamesLost, gamesTied: totalGamesTied } : undefined); }
          catch { triggerToast("Rating update delayed. Syncing...", WORDUP_TIMEOUT.TOAST_DURATION); }
+
+         // Fire-and-forget: record human response-time telemetry per topic
+         void recordHumanTopicTelemetry(match.category || "mixed", myAnswers || []);
 
          // Fire-and-forget: record handcrafted question answers for difficulty tracking
          try {
