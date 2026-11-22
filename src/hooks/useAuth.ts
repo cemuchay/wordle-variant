@@ -9,15 +9,23 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const updateUserIfChanged = (nextUser: User | null) => {
+      setUser((prev) =>
+        prev?.id === nextUser?.id && prev?.updated_at === nextUser?.updated_at
+          ? (prev ?? nextUser)
+          : nextUser,
+      );
+    };
+
     // 1. Check active sessions on load
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+      updateUserIfChanged(session?.user ?? null);
       setLoading(false);
     });
 
     // 2. Listen for auth changes (login, logout, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      updateUserIfChanged(session?.user ?? null);
       setLoading(false);
     });
 

@@ -1,5 +1,5 @@
 import { Check, Clock, Copy, Loader2, Share2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { TOAST_DURATION } from "../../constants/ui";
 import { useApp } from "../../context/AppContext";
 import { generateShareText } from "../../lib/share";
@@ -34,6 +34,22 @@ export const ShareCard: React.FC<ShareCardProps> = ({
   const { triggerToast } = useApp();
   const [copied, setCopied] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+
+  // Ensure button state recovers on iOS if WebKit doesn't settle navigator.share() after app-switching
+  useEffect(() => {
+    if (!isSharing) return;
+    const handleResume = () => {
+      if (document.visibilityState === "visible") {
+        setIsSharing(false);
+      }
+    };
+    document.addEventListener("visibilitychange", handleResume);
+    window.addEventListener("focus", handleResume);
+    return () => {
+      document.removeEventListener("visibilitychange", handleResume);
+      window.removeEventListener("focus", handleResume);
+    };
+  }, [isSharing]);
 
   // Generate visual emoji grid representation
   const emojiRows = useMemo(() => {

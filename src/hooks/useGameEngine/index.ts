@@ -134,13 +134,22 @@ export const useGameEngine = (
       }
    }, [date, isAuthLoading, user]);
 
+   const isAuthenticated = Boolean(user);
+
    useEffect(() => {
       if (!date) return;
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsConfigLoading(true);
-      getDailyConfig(!!user, date)
+      getDailyConfig(isAuthenticated, date)
          .then((cfg) => {
-            setConfig(cfg);
+            setConfig((prev) =>
+               prev &&
+               prev.word === cfg.word &&
+               prev.length === cfg.length &&
+               prev.maxAttempts === cfg.maxAttempts
+                  ? prev
+                  : cfg,
+            );
          })
          .catch((err) => {
             console.error("Failed to fetch daily config:", err);
@@ -152,7 +161,7 @@ export const useGameEngine = (
          .finally(() => {
             setIsConfigLoading(false);
          });
-   }, [date, user, triggerToast]);
+   }, [date, isAuthenticated, triggerToast]);
 
    const { refresh, updateOptimistically } = useWordleStats(user, false, date);
    const isSyncInFlightRef = useRef(false);
@@ -194,24 +203,29 @@ export const useGameEngine = (
    }, []);
 
    useEffect(() => {
+      const isDateChanged =
+         hydratedDateRef.current !== null && hydratedDateRef.current !== date;
+      const isUserOrConfigChanged =
+         hydratedUserRef.current !== user?.id ||
+         (Boolean(config?.word) &&
+            hydratedConfigWordRef.current !== config?.word);
+      const isUserOrDateChanged = isDateChanged || isUserOrConfigChanged;
+
       if (
          !date ||
          (!config && !cachedHydrationDoneRef.current) ||
          isAuthLoading ||
          isConfigLoading
       ) {
-         if (!cachedHydrationDoneRef.current) {
+         if (
+            !cachedHydrationDoneRef.current &&
+            (!isHydrated || isUserOrDateChanged)
+         ) {
             setIsHydrated(false);
          }
          return;
       }
 
-      const isDateChanged =
-         hydratedDateRef.current !== null && hydratedDateRef.current !== date;
-      const isUserOrConfigChanged =
-         hydratedUserRef.current !== user?.id ||
-         hydratedConfigWordRef.current !== config?.word;
-      const isUserOrDateChanged = isDateChanged || isUserOrConfigChanged;
       const isTriggeredByVisibility =
          rehydrateTrigger !== lastProcessedTriggerRef.current;
       lastProcessedTriggerRef.current = rehydrateTrigger;
@@ -226,7 +240,9 @@ export const useGameEngine = (
          (isUserOrConfigChanged && !cachedHydrationDoneRef.current) ||
          !isHydrated
       ) {
-         setIsHydrated(false);
+         if (!isSyncInFlightRef.current && !(state.isGameOver && state.status !== "playing" && !isUserOrDateChanged)) {
+            setIsHydrated(false);
+         }
       }
 
       hydratedUserRef.current = user?.id;
@@ -237,7 +253,12 @@ export const useGameEngine = (
       const hydrate = async () => {
          // GUARD: If a sync is currently in flight or local state has already concluded for today,
          // do not let visibility-change or background rehydration overwrite recent progress.
-         if (isSyncInFlightRef.current || (state.isGameOver && state.status !== "playing")) {
+         if (
+            !isUserOrDateChanged &&
+            (isSyncInFlightRef.current ||
+               (state.isGameOver && state.status !== "playing"))
+         ) {
+            setIsHydrated(true);
             return;
          }
 
@@ -328,6 +349,11 @@ export const useGameEngine = (
                      // Never downgrade a completed local game to an unfinished or shorter cloud state.
                      if (isLocalFinished && !isCloudFinished) {
                         dispatch({ type: "LOAD_STATE", payload });
+                        setIsHydrated(true);
+                        safeLocalStorage.setItem(
+                           "wordle_last_hydrated_timestamp",
+                           `${date}_${Date.now()}`,
+                        );
                         performSync(payload);
                         return;
                      }
