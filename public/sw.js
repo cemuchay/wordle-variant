@@ -1,4 +1,4 @@
-const CACHE_NAME = "variant-cache-v1";
+const CACHE_NAME = "variant-cache-v2";
 const STATIC_ASSETS = [
    "/",
    "/index.html",
@@ -33,21 +33,46 @@ self.addEventListener("fetch", (event) => {
    const { request } = event;
    const url = new URL(request.url);
 
-   // Skip non-GET requests and Supabase/External API calls
-   if (request.method !== "GET" || url.origin !== self.location.origin || url.pathname.includes("/functions/v1/")) {
+   // Skip non-GET requests, range requests (iOS audio/video), service worker script, and Supabase/External API calls
+   if (
+      request.method !== "GET" ||
+      url.origin !== self.location.origin ||
+      url.pathname === "/sw.js" ||
+      url.pathname.includes("/functions/v1/") ||
+      request.headers.has("range")
+   ) {
       return;
    }
 
    // For HTML: Network First (ensures we get the latest JS bundle hashes)
+   // Never allow respondWith to resolve to undefined/null (causes iOS WebKit "Returned response is null" error)
    if (request.mode === "navigate") {
       event.respondWith(
          fetch(request)
             .then((response) => {
-               const copy = response.clone();
-               caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+               if (response && response.ok) {
+                  const copy = response.clone();
+                  caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+               }
                return response;
             })
-            .catch(() => caches.match(request))
+            .catch(async () => {
+               const cached =
+                  (await caches.match(request)) ||
+                  (await caches.match("/index.html")) ||
+                  (await caches.match("/"));
+               return (
+                  cached ||
+                  new Response(
+                     "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Variant</title></head><body style='background:#121213;color:#fff;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:20px'><div><h3>Connection Interrupted</h3><p>Please check your connection and tap to reload.</p><button onclick='location.reload()' style='margin-top:12px;padding:10px 20px;border-radius:8px;border:none;background:#10b981;color:#000;font-weight:700;cursor:pointer'>Reload</button></div></body></html>",
+                     {
+                        status: 503,
+                        statusText: "Service Unavailable",
+                        headers: { "Content-Type": "text/html; charset=utf-8" },
+                     }
+                  )
+               );
+            })
       );
       return;
    }
@@ -55,13 +80,18 @@ self.addEventListener("fetch", (event) => {
    // For Assets: Stale-While-Revalidate
    event.respondWith(
       caches.match(request).then((cachedResponse) => {
-         const fetchPromise = fetch(request).then((networkResponse) => {
-            if (networkResponse.ok) {
-               const copy = networkResponse.clone();
-               caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-            }
-            return networkResponse;
-         });
+         const fetchPromise = fetch(request)
+            .then((networkResponse) => {
+               if (networkResponse && networkResponse.ok && networkResponse.status === 200) {
+                  const copy = networkResponse.clone();
+                  caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+               }
+               return networkResponse;
+            })
+            .catch((err) => {
+               if (cachedResponse) return cachedResponse;
+               throw err;
+            });
 
          return cachedResponse || fetchPromise;
       })

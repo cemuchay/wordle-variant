@@ -203,11 +203,13 @@ createRoot(document.getElementById('root')!).render(
 // 🧹 LEGACY CACHE PURGE & SERVICE WORKER REGISTRATION
 // ==========================================
 try {
-  // Clear any legacy Workbox/PWA caches to ensure no asset caching is active
+  // Clear any legacy Workbox/PWA caches while preserving the active service worker cache
   if ('caches' in window) {
     caches.keys().then((names) => {
       names.forEach((name) => {
-        caches.delete(name);
+        if (name !== 'variant-cache-v2') {
+          caches.delete(name);
+        }
       });
     }).catch((err) => {
       console.warn('[Cache Cleanup] Failed to clear legacy caches:', err);
