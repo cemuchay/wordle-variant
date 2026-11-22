@@ -1,4 +1,10 @@
 import type { WordUpQuestion } from "./types";
+import {
+   generateBotPersonality,
+   simulatePersonalityBotResponse,
+   type BotPersonality,
+} from "../../wordup/shared/botPersonality";
+import { estimateUserLocation } from "../../wordup/shared/locationEstimator";
 
 export interface BotProfile {
    name: string;
@@ -7,58 +13,16 @@ export interface BotProfile {
    maxDelay: number;
 }
 
+/**
+ * Legacy compatibility map for external simulator scripts and fallback lookups.
+ * Hardcoded bot nicknames have been replaced by dynamic Faker.js synthetic user profiles.
+ */
 export const BOT_PROFILES: Record<string, BotProfile> = {
-   slow_thinker: {
-      name: "Sloths",
-      accuracy: 0.67,
-      minDelay: 6.0,
-      maxDelay: 9.0,
-   },
-   average: { name: "Player", accuracy: 0.75, minDelay: 4.0, maxDelay: 7.5 },
-   fast: { name: "Speedy", accuracy: 0.85, minDelay: 1.5, maxDelay: 2 },
-   master: { name: "Zinny", accuracy: 0.97, minDelay: 1, maxDelay: 2 },
-   impossible: { name: "Variant", accuracy: 1.0, minDelay: 0.5, maxDelay: 1.8 },
-   lagos_boy: {
-      name: "LagosBoy",
-      accuracy: 0.78,
-      minDelay: 3.5,
-      maxDelay: 6.5,
-   },
-   jollof_brain: {
-      name: "Jollof",
-      accuracy: 0.8,
-      minDelay: 3.0,
-      maxDelay: 6.0,
-   },
-   okada_rider: { name: "Okada", accuracy: 0.8, minDelay: 2.5, maxDelay: 5.5 },
-   naija_flash: { name: "Flash", accuracy: 0.8, minDelay: 0.1, maxDelay: 1 },
-   suya_thinker: { name: "Suya", accuracy: 0.74, minDelay: 4.0, maxDelay: 7.0 },
-   pepper_soup: {
-      name: "PepperSoup",
-      accuracy: 0.79,
-      minDelay: 3.2,
-      maxDelay: 6.2,
-   },
-   agbada_mode: { name: "Agidi", accuracy: 0.83, minDelay: 2.8, maxDelay: 5.8 },
-   street_king: {
-      name: "Marlians",
-      accuracy: 0.67,
-      minDelay: 3.0,
-      maxDelay: 5.5,
-   },
-   teddy: {
-      name: "Teddy",
-      accuracy: 0.7,
-      minDelay: 2.0,
-      maxDelay: 3,
-   },
-   ogbonge_mind: {
-      name: "Shelly",
-      accuracy: 0.9,
-      minDelay: 1.8,
-      maxDelay: 4.0,
-   },
-   eko_flash: { name: "Eko", accuracy: 0.86, minDelay: 2.2, maxDelay: 4.8 },
+   slow_thinker: { name: "Player", accuracy: 0.67, minDelay: 5.0, maxDelay: 8.2 },
+   average: { name: "Player", accuracy: 0.75, minDelay: 3.0, maxDelay: 6.5 },
+   fast: { name: "Player", accuracy: 0.85, minDelay: 1.5, maxDelay: 3.2 },
+   master: { name: "Player", accuracy: 0.94, minDelay: 1.0, maxDelay: 2.5 },
+   impossible: { name: "Player", accuracy: 0.98, minDelay: 0.8, maxDelay: 2.0 },
 };
 
 export const getRandomBotProfile = (): string => {
@@ -67,26 +31,48 @@ export const getRandomBotProfile = (): string => {
 };
 
 export const simulateBotResponse = (
-   _question: WordUpQuestion,
-   profileKey: string,
+   question: WordUpQuestion,
+   profileOrPersonality?: string | BotPersonality | null,
    duration: number = 10.0,
-): { correct: boolean; time_taken: number; points: number } => {
-   const profile = BOT_PROFILES[profileKey] || BOT_PROFILES.average;
-   const correct = Math.random() < profile.accuracy;
-   const time_taken = parseFloat(
-      (
-         Math.random() * (profile.maxDelay - profile.minDelay) +
-         profile.minDelay
-      ).toFixed(2),
-   );
-   let points = 0;
-   if (correct) {
-      const eff = Math.max(0, time_taken - 1.5);
-      const denom = duration - 1.5;
-      points = Math.max(
-         11,
-         Math.round(20 * (1 - eff / (denom > 0 ? denom : duration))),
+   roundIdx: number = 0,
+   playerScore: number = 0,
+   botScore: number = 0,
+): { correct: boolean; time_taken: number; points: number; gaveUp?: boolean } => {
+   if (profileOrPersonality && typeof profileOrPersonality === "object") {
+      return simulatePersonalityBotResponse(
+         question,
+         profileOrPersonality,
+         duration,
+         roundIdx,
+         playerScore,
+         botScore,
       );
    }
-   return { correct, time_taken, points };
+
+   const preset =
+      typeof profileOrPersonality === "string" && BOT_PROFILES[profileOrPersonality]
+         ? BOT_PROFILES[profileOrPersonality]
+         : null;
+
+   const syntheticPersonality: BotPersonality = preset
+      ? {
+           archetype: "steady_competitor",
+           rematchPreference: "random",
+           persistence: "steady",
+           accuracy: preset.accuracy,
+           minDelay: preset.minDelay,
+           maxDelay: preset.maxDelay,
+           clutchModifier: 0,
+           region: estimateUserLocation().countryCode,
+        }
+      : generateBotPersonality(1000, estimateUserLocation().countryCode);
+
+   return simulatePersonalityBotResponse(
+      question,
+      syntheticPersonality,
+      duration,
+      roundIdx,
+      playerScore,
+      botScore,
+   );
 };

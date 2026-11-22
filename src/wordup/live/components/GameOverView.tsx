@@ -13,7 +13,7 @@ interface GameOverViewProps {
    matchData: any;
    setView: (view: "menu" | "matchmaking" | "playbot") => void;
    role: "player1" | "player2" | null;
-   rematchState: "idle" | "sent" | "received" | "expired";
+   rematchState: "idle" | "sent" | "received" | "declined" | "expired";
    rematchCountdown: number;
    showRematchButton: boolean;
    sendRematch: () => void;
@@ -41,9 +41,7 @@ export const GameOverView = ({
    const myAvatarUrl = myProfile?.avatar_url || (guestId ? `https://api.dicebear.com/7.x/bottts/svg?seed=${guestId}` : undefined);
    const myUsername = myProfile?.username || localStorage.getItem("wordle_anon_username") || "You";
 
-   const opponentAvatarUrl = (matchData.is_bot_match
-      ? `https://api.dicebear.com/7.x/bottts/svg?seed=${matchData.bot_profile || "average"}`
-      : opponentStats?.avatar_url) ?? undefined;
+   const opponentAvatarUrl = opponentStats?.avatar_url ?? undefined;
 
    const isP1 = role === "player1";
    const myScore = isP1 ? matchData.p1_score : matchData.p2_score;
@@ -53,7 +51,7 @@ export const GameOverView = ({
    const isDraw = myScore === oppScore;
 
    const opponentName = opponentStats?.username || (matchData.is_bot_match
-      ? (BOT_PROFILES[matchData.bot_profile]?.name || "Word Bot")
+      ? (BOT_PROFILES[matchData.bot_profile]?.name || "Opponent")
       : "Opponent");
 
    const statusColor = isWinner
@@ -136,9 +134,9 @@ export const GameOverView = ({
          })()}
 
          {/* Rematch Actions */}
-         {!matchData.is_bot_match && showRematchButton && (
+         {(showRematchButton || rematchState === "declined" || rematchState === "expired") && (
             <div className="space-y-3">
-               {rematchState === "idle" && (
+               {rematchState === "idle" && showRematchButton && (
                   <button
                      onClick={sendRematch}
                      className="w-full bg-[#E85151] hover:bg-[#d44343] text-white font-black uppercase py-4 rounded-xl flex items-center justify-center gap-2 tracking-widest shadow-[0_4px_20px_rgba(232,81,81,0.3)] cursor-pointer hover:scale-102 active:scale-98 transition-all"
@@ -148,7 +146,7 @@ export const GameOverView = ({
                )}
                {rematchState === "sent" && (
                   <div className="w-full bg-white/5 border border-white/10 text-white/40 font-black uppercase py-4 rounded-xl flex flex-col items-center justify-center gap-1 tracking-widest animate-pulse relative overflow-hidden">
-                     <span className="flex items-center gap-2">⏳ Waiting for Opponent ({rematchCountdown}s)</span>
+                     <span className="flex items-center gap-2">⏳ Waiting for {opponentName} ({rematchCountdown}s)</span>
                      <div
                         className="absolute bottom-0 left-0 h-1 bg-[#E85151]/40 transition-all duration-1000 ease-linear"
                         style={{ width: `${(rematchCountdown / 10) * 100}%` }}
@@ -160,12 +158,17 @@ export const GameOverView = ({
                      onClick={acceptRematch}
                      className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-black uppercase py-4 rounded-xl flex flex-col items-center justify-center gap-1 tracking-widest shadow-lg cursor-pointer animate-bounce hover:scale-102 active:scale-98 transition-all relative overflow-hidden"
                   >
-                     <span className="flex items-center gap-2">🔥 Accept Rematch! ({rematchCountdown}s)</span>
+                     <span className="flex items-center gap-2">🔥 Accept Rematch from {opponentName}! ({rematchCountdown}s)</span>
                      <div
                         className="absolute bottom-0 left-0 h-1 bg-black/20 transition-all duration-1000 ease-linear"
                         style={{ width: `${(rematchCountdown / 10) * 100}%` }}
                      />
                   </button>
+               )}
+               {rematchState === "declined" && (
+                  <div className="w-full bg-red-500/10 border border-red-500/20 text-red-400 font-black uppercase py-4 rounded-xl flex items-center justify-center gap-2 tracking-widest">
+                     ❌ {opponentName} Declined Rematch
+                  </div>
                )}
                {rematchState === "expired" && (
                   <div className="w-full bg-red-500/10 border border-red-500/20 text-red-500 font-black uppercase py-4 rounded-xl flex items-center justify-center gap-2 tracking-widest">

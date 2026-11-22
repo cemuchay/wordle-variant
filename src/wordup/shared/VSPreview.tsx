@@ -61,26 +61,22 @@ export const VSPreview = ({
             console.warn("Failed to fetch category stats for current user:", e);
          }
 
-         // 2. Fetch category-specific stats for Opponent
-         if (matchData?.is_bot_match) {
-            setOppCategoryStats({
-               rating: 800,
-               rank_name: "Gold"
-            });
-         } else if (opponentStats?.id) {
+         // 2. Fetch category-specific stats for Opponent (real or synthetic bot profile)
+         const oppUserId = opponentStats?.id || matchData?.player2_id;
+         if (oppUserId && oppUserId !== "00000000-0000-0000-0000-000000000b0b") {
             try {
                if (categoryId === "mixed") {
                   const { data: globalOpp } = await supabase
                      .from("wordup_profiles")
                      .select("rating, rank_name")
-                     .eq("id", opponentStats.id)
+                     .eq("id", oppUserId)
                      .maybeSingle();
                   if (globalOpp && active) setOppCategoryStats(globalOpp);
                } else {
                   const { data: catOpp } = await supabase
                      .from("wordup_category_profiles")
                      .select("rating, rank_name")
-                     .eq("user_id", opponentStats.id)
+                     .eq("user_id", oppUserId)
                      .eq("category", categoryId)
                      .maybeSingle();
                   if (catOpp && active) setOppCategoryStats(catOpp);
@@ -91,6 +87,17 @@ export const VSPreview = ({
          }
 
          // 3. Fetch recent matches for form (last 5 games)
+         const buildSeededForm = (seedStr: string) => {
+            const outcomes = ["W", "L", "W", "W", "D", "L", "W"];
+            const res: string[] = [];
+            let acc = 0;
+            for (let i = 0; i < seedStr.length; i++) acc += seedStr.charCodeAt(i);
+            for (let i = 0; i < 5; i++) {
+               res.push(outcomes[(acc + i * 3) % outcomes.length]);
+            }
+            return res;
+         };
+
          const getForm = async (uid: string) => {
             try {
                const { data } = await supabase
@@ -101,9 +108,9 @@ export const VSPreview = ({
                   .order("completed_at", { ascending: false })
                   .limit(5);
 
-               if (!data || data.length === 0) return ["W", "W", "D", "L", "W"];
+               if (!data || data.length === 0) return buildSeededForm(uid);
 
-               return data.map((m) => {
+               const actual = data.map((m) => {
                   const isP1 = m.player1_id === uid;
                   const myScore = isP1 ? m.p1_score || 0 : m.p2_score || 0;
                   const oppScore = isP1 ? m.p2_score || 0 : m.p1_score || 0;
@@ -111,19 +118,24 @@ export const VSPreview = ({
                   if (myScore < oppScore) return "L";
                   return "D";
                });
+               if (actual.length < 5) {
+                  const seeded = buildSeededForm(uid);
+                  return [...actual, ...seeded.slice(0, 5 - actual.length)];
+               }
+               return actual;
             } catch {
-               return ["W", "W", "D", "L", "W"];
+               return buildSeededForm(uid);
             }
          };
 
          const myRecentForm = await getForm(currentUser.id);
          if (active) setMyForm(myRecentForm);
 
-         if (matchData?.is_bot_match) {
-            if (active) setOppForm(["W", "L", "W", "W", "L"]);
-         } else if (opponentStats?.id) {
-            const oppRecentForm = await getForm(opponentStats.id);
+         if (oppUserId && oppUserId !== "00000000-0000-0000-0000-000000000b0b") {
+            const oppRecentForm = await getForm(oppUserId);
             if (active) setOppForm(oppRecentForm);
+         } else if (matchData?.is_bot_match) {
+            if (active) setOppForm(["W", "L", "W", "W", "L"]);
          }
       };
 
@@ -132,7 +144,7 @@ export const VSPreview = ({
       return () => {
          active = false;
       };
-   }, [currentUser, opponentStats?.id, matchData?.is_bot_match, categoryId]);
+   }, [currentUser, opponentStats?.id, matchData?.player2_id, matchData?.is_bot_match, categoryId]);
 
    const myName = currentUser?.user_metadata?.username || currentUser?.user_metadata?.full_name || "You";
    const myRating = myCategoryStats?.rating ?? 600;
@@ -141,26 +153,28 @@ export const VSPreview = ({
    const isBot = matchData?.is_bot_match;
    const botProfileKey = matchData?.bot_profile;
 
-   const oppName = isBot
-      ? (BOT_PROFILES[botProfileKey]?.name || "Word Bot")
-      : opponentStats?.username || "Opponent";
+   const oppName =
+      opponentStats?.username ||
+      (isBot ? (BOT_PROFILES[botProfileKey]?.name || "Opponent") : "Opponent");
 
    const getBotRank = (rating: number) => {
       return rating >= 1700 ? "Master" : rating >= 1400 ? "Diamond" : rating >= 1100 ? "Gold" : rating >= 800 ? "Silver" : "Bronze";
    };
 
-   const oppRating = isBot
-      ? (BOT_PROFILES_RATINGS[botProfileKey] || 1000)
-      : oppCategoryStats?.rating ?? (opponentStats?.rating || 600);
+   const oppRating =
+      oppCategoryStats?.rating ??
+      opponentStats?.rating ??
+      (isBot ? (BOT_PROFILES_RATINGS[botProfileKey] || 1000) : 600);
 
-   const oppRank = isBot
-      ? getBotRank(oppRating)
-      : oppCategoryStats?.rank_name ?? (opponentStats?.rank_name || "Bronze");
+   const oppRank =
+      oppCategoryStats?.rank_name ??
+      opponentStats?.rank_name ??
+      getBotRank(oppRating);
 
    const myAvatarUrl = currentUser?.user_metadata?.avatar_url;
-   const oppAvatarUrl = matchData?.is_bot_match
-      ? `https://api.dicebear.com/7.x/bottts/svg?seed=${matchData.bot_profile || "average"}`
-      : opponentStats?.avatar_url;
+   const oppAvatarUrl =
+      opponentStats?.avatar_url ||
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(oppName)}`;
 
    const getFormColor = (f: string) => {
       if (f === "W") return "bg-correct text-black";

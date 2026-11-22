@@ -29,9 +29,7 @@ export const GameOverView = ({
    const myAvatarUrl = myProfile?.avatar_url || (guestId ? `https://api.dicebear.com/7.x/bottts/svg?seed=${guestId}` : undefined);
    const myUsername = myProfile?.username || localStorage.getItem("wordle_anon_username") || "You";
 
-   const opponentAvatarUrl = (matchData.is_bot_match
-      ? `https://api.dicebear.com/7.x/bottts/svg?seed=${matchData.bot_profile || "average"}`
-      : opponentStats?.avatar_url) ?? undefined;
+   const opponentAvatarUrl = opponentStats?.avatar_url ?? undefined;
 
    const isP1 = role === "player1";
    const myScore = isP1 ? matchData.p1_score : matchData.p2_score;
@@ -45,7 +43,7 @@ export const GameOverView = ({
    const formattedElo = rewards.totalEloChange >= 0 ? `+${rewards.totalEloChange}` : `${rewards.totalEloChange}`;
 
    const opponentName = opponentStats?.username || (matchData.is_bot_match
-      ? (BOT_PROFILES[matchData.bot_profile]?.name || "Word Bot")
+      ? (BOT_PROFILES[matchData.bot_profile]?.name || "Opponent")
       : "Opponent");
 
    const statusColor = !isCompleted

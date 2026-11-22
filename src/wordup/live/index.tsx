@@ -25,6 +25,7 @@ import { ConnectingView } from "./components/ConnectingView";
 import { safeLocalStorage } from "../../utils/storage";
 import { savePausedGame, removePausedGame } from "../shared/pauseStorage";
 import { cleanBotMatchId } from "../shared/botUtils";
+import { updateBotStatsAfterMatch } from "../shared/botService";
 
 import { RATING, XP, WORDUP_TIMEOUT, WORDUP_LIMITS, BOT_PROFILES_RATINGS } from "../../constants/wordup";
 import { useLiveStore } from "./store/useLiveStore";
@@ -151,12 +152,12 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
             // Individual 7-question game ELO
             const myRating = userStats?.rating || RATING.DEFAULT;
             let oppRating: number = RATING.DEFAULT_OPPONENT;
-            if (match?.is_bot_match) {
+            const storeOppStats = useLiveStore.getState().opponentStats;
+            if (storeOppStats?.rating) {
+               oppRating = storeOppStats.rating;
+            } else if (match?.is_bot_match) {
                const prof = match.bot_profile || "average";
                oppRating = BOT_PROFILES_RATINGS[prof] || RATING.DEFAULT_OPPONENT;
-            } else {
-               const storeOppStats = useLiveStore.getState().opponentStats;
-               if (storeOppStats?.rating) oppRating = storeOppStats.rating;
             }
 
             const expected = 1 / (1 + Math.pow(10, (oppRating - myRating) / RATING.DIVISOR));
@@ -180,12 +181,12 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
 
          const myRating = userStats?.rating || RATING.DEFAULT;
          let oppRating: number = RATING.DEFAULT_OPPONENT;
-         if (match?.is_bot_match) {
+         const storeOppStats = useLiveStore.getState().opponentStats;
+         if (storeOppStats?.rating) {
+            oppRating = storeOppStats.rating;
+         } else if (match?.is_bot_match) {
             const prof = match.bot_profile || "average";
             oppRating = BOT_PROFILES_RATINGS[prof] || RATING.DEFAULT_OPPONENT;
-         } else {
-            const storeOppStats = useLiveStore.getState().opponentStats;
-            if (storeOppStats?.rating) oppRating = storeOppStats.rating;
          }
 
          const expected = 1 / (1 + Math.pow(10, (oppRating - myRating) / RATING.DIVISOR));
@@ -234,14 +235,16 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
          }
       } catch { /* best-effort difficulty tracking */ }
 
-      // Save bot match record to DB with retry queue
+      // Save bot match record to DB with retry queue and update synthetic bot's profile stats
       if (match.is_bot_match) {
+         const storeOpp = useLiveStore.getState().opponentStats;
+         const botId = match.player2_id || storeOpp?.id || "00000000-0000-0000-0000-000000000b0b";
          const dbMatchId = cleanBotMatchId(match.id);
          const record = {
             id: dbMatchId,
             category: match.category,
             player1_id: (effectiveUser.id || "").startsWith("guest-") ? null : effectiveUser.id,
-            player2_id: "00000000-0000-0000-0000-000000000b0b",
+            player2_id: botId,
             is_bot_match: true,
             bot_profile: match.bot_profile,
             status: "completed",
@@ -268,6 +271,20 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
          } catch (e) {
             console.warn("[LiveView] Bot match DB save failed, queued for retry:", e);
          }
+
+         // Update the synthetic bot's ELO, XP, W/L/T history, and leaderboard rankings
+         void updateBotStatsAfterMatch({
+            botId,
+            botCurrentRating: storeOpp?.rating || RATING.DEFAULT_OPPONENT,
+            playerRating: userStats?.rating || RATING.DEFAULT,
+            category: match.category || "mixed",
+            botScore: oppScore,
+            playerScore: myScore,
+            botAnswers: oppAnswers || [],
+            playerAnswers: myAnswers || [],
+            isMarathon,
+            totalRounds,
+         });
       }
    }, [effectiveUser, updateStats, triggerToast, role, userStats, setView]);
 

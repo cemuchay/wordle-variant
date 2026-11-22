@@ -251,7 +251,7 @@ export const LobbyView = ({
                            const oppProfile = isP1 ? match.player2 : match.player1;
                            const myScore = isP1 ? match.p1_score || 0 : match.p2_score || 0;
                            const oppScore = isP1 ? match.p2_score || 0 : match.p1_score || 0;
-                           const oppName = match.is_bot_match ? "Word Bot" : (oppProfile?.username || "Opponent");
+                           const oppName = oppProfile?.username || "Opponent";
 
                            let outcome = "DRAW";
                            let outcomeColor = "text-white/60 bg-white/5 border-white/10";

@@ -149,14 +149,19 @@ export const WordUpContainer = ({
          }
 
          if (config.mode === "live_bot") {
+            const { getOrSpawnBotOpponent, botToProfileStats } = await import("./shared/botService");
+            const syntheticBot = await getOrSpawnBotOpponent({
+               userRating: userStats?.rating || 600,
+               category: cat,
+            });
             const localMatchId = `bot-marathon-${rawMatchId}`;
             const matchData = {
                id: localMatchId,
                category: cat,
                player1_id: effectiveUser.id,
-               player2_id: "00000000-0000-0000-0000-000000000b0b",
+               player2_id: syntheticBot.id,
                is_bot_match: true,
-               bot_profile: "average",
+               bot_profile: syntheticBot.bot_personality.archetype || "average",
                status: "active",
                game_type: "live-bot",
                current_question_index: 0,
@@ -174,9 +179,9 @@ export const WordUpContainer = ({
                id: rawMatchId,
                category: cat,
                player1_id: (effectiveUser.id || "").startsWith("guest-") ? null : effectiveUser.id,
-               player2_id: "00000000-0000-0000-0000-000000000b0b",
+               player2_id: syntheticBot.id,
                is_bot_match: true,
-               bot_profile: "average",
+               bot_profile: syntheticBot.bot_personality.archetype || "average",
                status: "active",
                game_type: "live-bot",
                questions: encryptedQ,
@@ -198,6 +203,7 @@ export const WordUpContainer = ({
             liveStore.setMatchId(localMatchId);
             liveStore.setRole("player1");
             liveStore.setMatchData(matchData);
+            liveStore.setOpponentStats(botToProfileStats(syntheticBot));
             liveStore.setQuestions(rawQuestions);
             liveStore.setView("connecting");
             setWordupMode("live");
@@ -250,7 +256,7 @@ export const WordUpContainer = ({
          console.error("Failed to start marathon:", err);
          triggerToast("Error launching marathon match", TOAST_DURATION.DEFAULT);
       }
-   }, [effectiveUser, marathonConfigCategory, setWordupMode, triggerToast]);
+   }, [effectiveUser, marathonConfigCategory, setWordupMode, triggerToast, userStats?.rating]);
 
    useEffect(() => {
       const neverAsk = localStorage.getItem("wordup_sound_prompt_never_ask") === "true";

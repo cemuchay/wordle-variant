@@ -271,7 +271,7 @@ export const UnifiedLobby = ({
       historyMatches.slice(0, 5).forEach((match) => {
          const isP1 = match.player1_id === currentUser?.id;
          const oppProfile = isP1 ? match.player2 : match.player1;
-         const oppName = match.is_bot_match ? "Word Bot" : (oppProfile?.username || "Opponent");
+         const oppName = oppProfile?.username || "Opponent";
          const myScore = isP1 ? match.p1_score || 0 : match.p2_score || 0;
          const oppScore = isP1 ? match.p2_score || 0 : match.p1_score || 0;
          const won = myScore > oppScore;
@@ -848,7 +848,7 @@ export const UnifiedLobby = ({
                               const oppProfile = isP1 ? match.player2 : match.player1;
                               const myScore = isP1 ? match.p1_score || 0 : match.p2_score || 0;
                               const oppScore = isP1 ? match.p2_score || 0 : match.p1_score || 0;
-                              const oppName = match.is_bot_match ? "Word Bot" : (oppProfile?.username || "Opponent");
+                              const oppName = oppProfile?.username || "Opponent";
 
                               let outcome = "DRAW";
                               let outcomeStyle = "text-white border-white/10 bg-white/5";

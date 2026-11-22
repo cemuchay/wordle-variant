@@ -9,6 +9,10 @@ export interface ProfileStats {
    username?: string;
    avatar_url?: string | null;
    id?: string;
+   is_bot?: boolean;
+   country_code?: string;
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   bot_personality?: any;
 }
 
 export type WordUpGameState =

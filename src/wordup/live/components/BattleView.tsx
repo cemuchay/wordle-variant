@@ -159,7 +159,7 @@ export const BattleView = ({
    if (!activeQuestion) return null;
 
    const categoryName = CATEGORIES.find(c => c.id === matchData?.category)?.name || matchData?.category?.replace(/_/g, " ") || "Trivia";
-   const opponentName = opponentStats?.username || (matchData?.is_bot_match ? ((matchData.bot_profile && BOT_PROFILES[matchData.bot_profile]?.name) || "Word Bot") : "Opponent");
+   const opponentName = opponentStats?.username || (matchData?.is_bot_match ? ((matchData.bot_profile && BOT_PROFILES[matchData.bot_profile]?.name) || "Opponent") : "Opponent");
 
 
    // Resolve opponent choice
@@ -319,7 +319,7 @@ export const BattleView = ({
                ))}
                <ProtectedAvatar
                   userId={matchData?.is_bot_match ? undefined : ((isP1 ? matchData?.player2_id : matchData?.player1_id) || undefined)}
-                  src={matchData?.is_bot_match ? `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(opponentName)}` : (opponentStats?.avatar_url || undefined)}
+                  src={opponentStats?.avatar_url || undefined}
                   username={opponentName}
                   className="w-10 h-10 rounded-full border border-[#E85151]/30 shrink-0"
                />

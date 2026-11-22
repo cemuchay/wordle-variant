@@ -18,13 +18,24 @@ export const useGlobalPresence = (userId: string | undefined, currentVoiceRoomId
     const channelRef = useRef<any>(null);
 
     const fetchProfiles = useCallback(async () => {
-        const { data } = await supabase
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url, last_seen_at')
+            .eq('is_bot', false)
+            .order('last_seen_at', { ascending: false, nullsFirst: false })
+            .limit(LIMITS.PRESENCE);
+        if (!error && data) {
+            setAllProfiles(data as PresenceUser[]);
+            return;
+        }
+        // Fallback if is_bot column migration is not yet applied
+        const { data: fallbackData } = await supabase
             .from('profiles')
             .select('id, username, avatar_url, last_seen_at')
             .order('last_seen_at', { ascending: false, nullsFirst: false })
             .limit(LIMITS.PRESENCE);
-        if (data) {
-            setAllProfiles(data as PresenceUser[]);
+        if (fallbackData) {
+            setAllProfiles(fallbackData as PresenceUser[]);
         }
     }, []);
 

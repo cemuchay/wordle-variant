@@ -124,7 +124,7 @@ describe('Bot game flow', () => {
     expect(screen.getByText('Victory!')).toBeInTheDocument();
   });
 
-  it('shows rematch button on gameover', () => {
+  it('shows rematch button on gameover for synthetic bot matches', () => {
     const match = makeBotMatch({
       status: 'completed',
       bot_profile: 'average',
@@ -137,9 +137,23 @@ describe('Bot game flow', () => {
       matchId: null,
       role: 'player1',
       matchData: match,
+      opponentStats: {
+        id: 'bot-uuid-1',
+        username: 'Chidi_O',
+        avatar_url: 'https://images.unsplash.com/photo-1506277886164-e25aa3f4ef7f?auto=format&fit=crop&w=256&q=80',
+        rating: 980,
+        xp: 450,
+        games_played: 6,
+        games_won: 4,
+        games_lost: 2,
+        games_tied: 0,
+        rank_name: 'Silver',
+        is_bot: true,
+      },
       questions: makeQuestionSet(1),
     });
     renderWordUp();
     expect(screen.getByText('Draw!')).toBeInTheDocument();
+    expect(screen.getByText(/Request Rematch/i)).toBeInTheDocument();
   });
 });
