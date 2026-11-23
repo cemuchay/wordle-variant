@@ -7,6 +7,10 @@ import {
    getRankNameForRating,
    type GeneratedBotIdentity,
 } from "./botIdentityGenerator";
+import {
+   USE_INITIAL_AVATARS_TEMPORARILY,
+   generateInitialAvatarUrl,
+} from "./botAvatarGenerator";
 import type { BotPersonality } from "./botPersonality";
 import type { ProfileStats } from "./types";
 
@@ -100,10 +104,14 @@ export async function getOrSpawnBotOpponent(options: {
 
       if (!error && data) {
          const parsed = typeof data === "string" ? JSON.parse(data) : data;
+         const botId = parsed.id || candidate.id;
+         const botUsername = parsed.username || candidate.username;
          const bot: ActiveBotOpponent = {
-            id: parsed.id || candidate.id,
-            username: parsed.username || candidate.username,
-            avatar_url: parsed.avatar_url || candidate.avatar_url,
+            id: botId,
+            username: botUsername,
+            avatar_url: USE_INITIAL_AVATARS_TEMPORARILY
+               ? generateInitialAvatarUrl(botUsername, botId)
+               : parsed.avatar_url || candidate.avatar_url,
             country_code: parsed.country_code || candidate.country_code,
             rating: parsed.rating ?? candidate.rating,
             xp: parsed.xp ?? candidate.xp,
@@ -134,10 +142,15 @@ export async function getOrSpawnBotOpponent(options: {
             const prof = (pick.profiles as Record<string, unknown> | null) ?? null;
             if (typeof prof?.username === "string") {
                const ratingVal = typeof pick.rating === "number" ? pick.rating : targetRating;
+               const botId = String(pick.id);
                const bot: ActiveBotOpponent = {
-                  id: String(pick.id),
+                  id: botId,
                   username: prof.username,
-                  avatar_url: typeof prof.avatar_url === "string" ? prof.avatar_url : candidate.avatar_url,
+                  avatar_url: USE_INITIAL_AVATARS_TEMPORARILY
+                     ? generateInitialAvatarUrl(prof.username, botId)
+                     : typeof prof.avatar_url === "string"
+                        ? prof.avatar_url
+                        : candidate.avatar_url,
                   country_code: typeof prof.country_code === "string" ? prof.country_code : location.countryCode,
                   rating: ratingVal,
                   xp: typeof pick.xp === "number" ? pick.xp : 0,
@@ -163,7 +176,14 @@ export async function getOrSpawnBotOpponent(options: {
    if (!shouldForceSpawn && localPool.length > 0) {
       const closeBots = localPool.filter((b) => Math.abs(b.rating - targetRating) <= 300);
       const poolToUse = closeBots.length > 0 ? closeBots : localPool;
-      return poolToUse[Math.floor(Math.random() * poolToUse.length)];
+      const picked = poolToUse[Math.floor(Math.random() * poolToUse.length)];
+      if (USE_INITIAL_AVATARS_TEMPORARILY) {
+         return {
+            ...picked,
+            avatar_url: generateInitialAvatarUrl(picked.username, picked.id),
+         };
+      }
+      return picked;
    }
 
    const localBot: ActiveBotOpponent = {

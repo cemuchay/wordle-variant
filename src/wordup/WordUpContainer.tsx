@@ -358,12 +358,29 @@ export const WordUpContainer = ({
       if (!effectiveUser) return;
       const isAsync = match.game_type === "async" || !!match.encrypted_questions;
       const myRole = match.player1_id === effectiveUser.id ? "player1" : "player2";
+      const oppProfile = myRole === "player1" ? match.player2 : match.player1;
+      const oppId = myRole === "player1" ? match.player2_id : match.player1_id;
+      const resolvedOppStats = oppProfile
+         ? {
+              id: oppId || undefined,
+              username: oppProfile.username || "Opponent",
+              avatar_url: oppProfile.avatar_url || null,
+              rating: oppProfile.rating || 600,
+              rank_name: oppProfile.rank_name || "Bronze",
+              xp: oppProfile.xp || 0,
+              games_played: oppProfile.games_played || 0,
+              games_won: oppProfile.games_won || 0,
+              games_lost: oppProfile.games_lost || 0,
+              games_tied: oppProfile.games_tied || 0,
+           }
+         : null;
 
       if (isAsync) {
          useAsyncStore.getState().setMatchId(match.id);
          useAsyncStore.getState().setRole(myRole);
          useAsyncStore.getState().setCategory(match.category);
          useAsyncStore.getState().setMatchData(match);
+         useAsyncStore.getState().setOpponentStats(resolvedOppStats);
          try {
             const decrypted = await decryptMatchQuestions(match);
             useAsyncStore.getState().setQuestions(decrypted);
@@ -377,6 +394,7 @@ export const WordUpContainer = ({
          useLiveStore.getState().setRole(myRole);
          useLiveStore.getState().setCategory(match.category);
          useLiveStore.getState().setMatchData(match);
+         useLiveStore.getState().setOpponentStats(resolvedOppStats);
          try {
             const decrypted = await decryptMatchQuestions(match);
             useLiveStore.getState().setQuestions(decrypted);

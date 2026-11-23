@@ -20,6 +20,7 @@ import {
    getCachedTopicTelemetry,
    recordHumanTopicTelemetry,
 } from "../wordup/shared/topicTelemetryService";
+import { wordupAudio } from "../utils/wordupAudio";
 import type { WordUpQuestion } from "../utils/wordupQuestionGenerator/types";
 
 const SAMPLE_QUESTION: WordUpQuestion = {
@@ -42,16 +43,22 @@ describe("WordUp Realistic Synthetic Bot System", () => {
    });
 
    describe("Faker.js Identity & Realistic Avatar Generation", () => {
-      it("formats realistic human handles within WordUp nickname limits (3-15 chars)", () => {
-         for (let i = 0; i < 30; i++) {
+      it("formats realistic human handles within WordUp nickname limits (3-15 chars) and favors first name", () => {
+         let pureFirstNameCount = 0;
+         const trials = 100;
+         for (let i = 0; i < trials; i++) {
             const handle = buildRealisticUsername("Oluwaseun", "Adeyemi");
             expect(handle.length).toBeGreaterThanOrEqual(3);
             expect(handle.length).toBeLessThanOrEqual(15);
             expect(handle).toMatch(/^[A-Za-z0-9_]+$/);
+            if (handle.toLowerCase() === "oluwaseun") {
+               pureFirstNameCount++;
+            }
          }
+         expect(pureFirstNameCount).toBeGreaterThan(45);
       });
 
-      it("spawns complete synthetic bot identities with realistic human avatars (never robot bottts)", () => {
+      it("spawns complete synthetic bot identities with first-letter initial avatars (never robot bottts)", () => {
          const regions = ["NG", "GB", "US", "GH", "KE", "ZA"] as const;
          for (const region of regions) {
             const bot = generateSyntheticBotIdentity(1150, region);
@@ -64,16 +71,19 @@ describe("WordUp Realistic Synthetic Bot System", () => {
             expect(bot.rating).toBeGreaterThanOrEqual(600);
             expect(bot.games_played).toBeGreaterThanOrEqual(2);
             expect(bot.rank_name).toBe(getRankNameForRating(bot.rating));
-            expect(bot.avatar_url).toMatch(/^https:\/\//);
+            expect(bot.avatar_url).toMatch(/^https:\/\/ui-avatars\.com\/api\//);
+            expect(bot.avatar_url).toContain(`name=${encodeURIComponent(bot.username[0].toUpperCase())}`);
+            expect(bot.avatar_url).toContain("length=1");
             expect(bot.avatar_url).not.toContain("bottts");
             expect(bot.bot_personality).toBeDefined();
          }
       });
 
       it("generates deterministic avatars from seed without using robot sprites", () => {
-         const url1 = generateRealisticBotAvatar("seed-alpha-1", "NG", "male");
-         const url2 = generateRealisticBotAvatar("seed-alpha-1", "NG", "male");
+         const url1 = generateRealisticBotAvatar("seed-alpha-1", "NG", "male", "Chidi");
+         const url2 = generateRealisticBotAvatar("seed-alpha-1", "NG", "male", "Chidi");
          expect(url1).toBe(url2);
+         expect(url1).toContain("name=C");
          expect(url1).not.toContain("bottts");
       });
    });
@@ -174,6 +184,54 @@ describe("WordUp Realistic Synthetic Bot System", () => {
          const after = getCachedTopicTelemetry("football");
          expect(after.sampleCount).toBeGreaterThan(before.sampleCount);
          expect(after.medianTime).toBeLessThanOrEqual(before.medianTime);
+      });
+
+      it("runs down the clock and occasionally times out more frequently on long questions and long options", () => {
+         const bot: BotPersonality = {
+            archetype: "casual_challenger",
+            rematchPreference: "random",
+            persistence: "steady",
+            accuracy: 0.76,
+            minDelay: 1.1,
+            maxDelay: 3.1,
+            clutchModifier: 0,
+            region: "NG",
+         };
+
+         const longQuestion: WordUpQuestion = {
+            type: "definition",
+            prompt:
+               "Which historical treaty formally ended the Thirty Years' War in Europe and established the modern principle of Westphalian state sovereignty?",
+            choices: [
+               "The Peace of Westphalia signed in 1648 across Munster and Osnabruck",
+               "The Treaty of Utrecht negotiated after the War of the Spanish Succession",
+               "The Congress of Vienna following the defeat of Napoleon Bonaparte",
+               "The Treaty of Tordesillas dividing the newly discovered lands outside Europe",
+            ],
+            answer: "The Peace of Westphalia signed in 1648 across Munster and Osnabruck",
+         };
+
+         let shortClockRundowns = 0;
+         let longClockRundowns = 0;
+         let longTimeouts = 0;
+         const trials = 160;
+
+         for (let i = 0; i < trials; i++) {
+            const shortRes = simulatePersonalityBotResponse(SAMPLE_QUESTION, bot, 10, 1, 20, 20, null, "mixed");
+            const longRes = simulatePersonalityBotResponse(longQuestion, bot, 10, 1, 20, 20, null, "mixed");
+            if (shortRes.runDownClock || shortRes.timedOut) shortClockRundowns++;
+            if (longRes.runDownClock || longRes.timedOut) longClockRundowns++;
+            if (longRes.timedOut) {
+               longTimeouts++;
+               expect(longRes.points).toBe(0);
+               expect(longRes.time_taken).toBe(10);
+            }
+         }
+
+         expect(longClockRundowns).toBeGreaterThan(shortClockRundowns);
+         expect(longTimeouts).toBeGreaterThan(0);
+         expect(typeof wordupAudio.playOpponentCorrect).toBe("function");
+         expect(typeof wordupAudio.playOpponentIncorrect).toBe("function");
       });
    });
 

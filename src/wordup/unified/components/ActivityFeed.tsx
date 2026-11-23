@@ -77,10 +77,10 @@ const ActivityFeed = ({ isLoadingHistory, buildActivityFeed, CATEGORIES, CATEGOR
                             let outcomeStyle = "text-white border-white/10 bg-white/5";
                             if (item.won) {
                                 outcome = "WIN";
-                                outcomeStyle = "text-[#E85151] border-[#E85151]/20 bg-[#E85151]/10";
+                                outcomeStyle = "text-white border-correct bg-correct";
                             } else if (!item.draw) {
                                 outcome = "LOSS";
-                                outcomeStyle = "text-red-400 border-red-500/10 bg-red-500/10";
+                                outcomeStyle = "text-white border-[#E85151] bg-[#E85151]";
                             }
 
                             return (

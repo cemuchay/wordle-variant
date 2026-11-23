@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Swords, HelpCircle, ChevronDown, ChevronUp, Loader2, Volume2, VolumeX, RotateCcw, Search, UserPlus, Shuffle, GraduationCap, LayoutGrid, ChevronRight, Radio } from "lucide-react";
 import { CATEGORIES } from "../../shared/constants";
 import { type ProfileStats } from "../../shared/types";
-import { ProtectedAvatar } from "../../../components/chat/ProtectedAvatar";
+import { WordUpAvatar } from "../../shared/WordUpAvatar";
 import { CategorySelectModal } from "../../shared/CategorySelectModal";
 import { CATEGORY_STYLE_MAP } from "../../shared/categorySelectConstants";
 import { useAsyncStore } from "../store/useAsyncStore";
@@ -231,7 +231,7 @@ export const LobbyView = ({
                                  className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl p-2.5 hover:bg-white/10 transition-all"
                               >
                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <ProtectedAvatar
+                                    <WordUpAvatar
                                        userId={profile.id}
                                        src={profile.avatar_url}
                                        username={profile.username}
@@ -356,10 +356,10 @@ export const LobbyView = ({
                            let outcomeColor = "text-white/60 bg-white/5 border-white/10";
                            if (myScore > oppScore) {
                               outcome = "WIN";
-                              outcomeColor = "text-[#E85151] bg-[#E85151]/10 border-[#E85151]/20";
+                              outcomeColor = "text-white bg-correct border-correct";
                            } else if (oppScore > myScore) {
                               outcome = "LOSS";
-                              outcomeColor = "text-red-400 bg-red-500/10 border-red-500/20";
+                              outcomeColor = "text-white bg-[#E85151] border-[#E85151]";
                            }
 
                            const dateStr = new Date(match.completed_at || match.created_at).toLocaleDateString(undefined, {

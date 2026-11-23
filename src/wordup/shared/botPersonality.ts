@@ -151,7 +151,14 @@ export function simulatePersonalityBotResponse(
    botScore: number = 0,
    topicTelemetry?: TopicResponseTelemetry | null,
    category: string = "mixed",
-): { correct: boolean; time_taken: number; points: number; gaveUp?: boolean } {
+): {
+   correct: boolean;
+   time_taken: number;
+   points: number;
+   gaveUp?: boolean;
+   timedOut?: boolean;
+   runDownClock?: boolean;
+} {
    const p: BotPersonality = personality || {
       archetype: "casual_challenger",
       rematchPreference: "random",
@@ -205,13 +212,81 @@ export function simulatePersonalityBotResponse(
       speedFactor *= 0.92; // Extra urgency in Double Points round
    }
 
-   // Subtle prompt length adjustment (kept tight so bots don't lag behind fast readers)
-   const promptLen = question?.prompt?.length || 0;
-   const promptOffset = promptLen > 95 ? 0.3 : promptLen > 60 ? 0.14 : 0;
+   // Analyze question & option reading complexity so bots realistically slow down or run down the clock on dense prompts/options
+   const promptLen = (question?.prompt?.length || 0) + (question?.subPrompt?.length || 0);
+   const choices = Array.isArray(question?.choices) ? question.choices : [];
+   const totalChoiceChars = choices.reduce((sum, c) => sum + (c?.length || 0), 0);
+   const avgChoiceLen = choices.length > 0 ? totalChoiceChars / choices.length : 0;
+   const maxChoiceLen = choices.length > 0 ? Math.max(...choices.map((c) => c?.length || 0)) : 0;
+
+   const isLongQuestion = promptLen >= 85;
+   const isVeryLongQuestion = promptLen >= 130;
+   const hasLongOptions = maxChoiceLen >= 24 || avgChoiceLen >= 16 || totalChoiceChars >= 68;
+   const hasVeryLongOptions = maxChoiceLen >= 38 || avgChoiceLen >= 25 || totalChoiceChars >= 100;
+
+   let promptOffset = 0;
+   if (isVeryLongQuestion) promptOffset += 0.75;
+   else if (isLongQuestion) promptOffset += 0.35;
+   else if (promptLen > 60) promptOffset += 0.14;
+
+   if (hasVeryLongOptions) promptOffset += 0.65;
+   else if (hasLongOptions) promptOffset += 0.32;
+
+   // Realistic chance the bot runs out of time completely (especially on long questions or long options)
+   let timeoutChance = 0.025;
+   if (isVeryLongQuestion && hasVeryLongOptions) timeoutChance = 0.15;
+   else if (isVeryLongQuestion || hasVeryLongOptions) timeoutChance = 0.11;
+   else if (isLongQuestion && hasLongOptions) timeoutChance = 0.1;
+   else if (isLongQuestion || hasLongOptions) timeoutChance = 0.075;
+
+   // Higher-accuracy bots time out less often; final round urgency also reduces timeouts
+   const skillScale = Math.max(0.55, Math.min(1.25, 1.45 - effectiveAccuracy));
+   timeoutChance *= skillScale * (isFinalRound ? 0.5 : 1.0);
+
+   if (Math.random() < timeoutChance) {
+      return {
+         correct: false,
+         time_taken: duration,
+         points: 0,
+         timedOut: true,
+         runDownClock: true,
+      };
+   }
+
+   // Realistic chance the bot deliberates late and runs the clock down to the last 1.0s - 2.8s before answering
+   let lateClockChance = 0.05;
+   if (isVeryLongQuestion || hasVeryLongOptions) lateClockChance = 0.22;
+   else if (isLongQuestion || hasLongOptions) lateClockChance = 0.15;
+
+   if (Math.random() < lateClockChance) {
+      const lateFloor = Math.max(duration * 0.72, duration - 2.8);
+      const lateCeil = Math.max(lateFloor + 0.3, duration - 0.65);
+      const lateTime = parseFloat(
+         Math.min(duration - 0.4, lateFloor + Math.random() * (lateCeil - lateFloor)).toFixed(2),
+      );
+      // Late deliberation slightly lowers accuracy (bot was unsure)
+      const lateCorrect = Math.random() < Math.max(0.35, effectiveAccuracy - 0.12);
+      let latePoints = 0;
+      if (lateCorrect) {
+         const eff = Math.max(0, lateTime - 1.5);
+         const denom = duration - 1.5;
+         const basePts = Math.max(
+            11,
+            Math.round(20 * (1 - eff / (denom > 0 ? denom : duration))),
+         );
+         latePoints = isFinalRound ? basePts * 2 : basePts;
+      }
+      return {
+         correct: lateCorrect,
+         time_taken: lateTime,
+         points: latePoints,
+         runDownClock: true,
+      };
+   }
 
    // Anchor distribution tiers to the topic's real human percentiles scaled by bot's speedFactor
-   const fastFloor = Math.max(0.78, Math.min(normMinDelay, telemetry.p25Time * 0.72) * speedFactor);
-   const p25Target = Math.max(fastFloor + 0.35, telemetry.p25Time * speedFactor + promptOffset * 0.5);
+   const fastFloor = Math.max(0.78, Math.min(normMinDelay, telemetry.p25Time * 0.72) * speedFactor + promptOffset * 0.25);
+   const p25Target = Math.max(fastFloor + 0.35, telemetry.p25Time * speedFactor + promptOffset * 0.55);
    const medianTarget = Math.max(p25Target + 0.45, telemetry.medianTime * speedFactor + promptOffset);
    const p75Target = Math.min(
       duration - 0.6,

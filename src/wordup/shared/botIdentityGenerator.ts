@@ -62,8 +62,8 @@ const REGIONAL_NAMES: Partial<
       male: [
          "Chidi", "Tunde", "Emeka", "Damilola", "Oluwaseun", "Femi", "Kelechi",
          "Tobi", "Chinedu", "Ibrahim", "Sadiq", "Bolu", "Segun", "Uche", "Yinka",
-         "Nnamdi", "Obinna", "Mayowa", "Kunle", "Ebuka", "somto", "Chuka", "Ayo",
-         "nonso", "Ifeanyi", "Gbenga", "Korede", "Musa", "Dayo", "Dare",
+         "Nnamdi", "Obinna", "Mayowa", "Kunle", "Ebuka", "Somto", "Chuka", "Ayo",
+         "Nonso", "Ifeanyi", "Gbenga", "Korede", "Musa", "Dayo", "Dare",
       ],
       female: [
          "Amaka", "Ngozi", "Zainab", "Temi", "Chioma", "Funke", "Aisha", "Adaeze",
@@ -78,12 +78,12 @@ const REGIONAL_NAMES: Partial<
       ],
    },
    GH: {
-      male: ["Kwame", "Kofi", "Kojo", "Yaw", "Kwesi", "Nana", "Fiifi", "Ebo", "Selorm", "mensah"],
+      male: ["Kwame", "Kofi", "Kojo", "Yaw", "Kwesi", "Nana", "Fiifi", "Ebo", "Selorm", "Mensah"],
       female: ["Ama", "Akosua", "Abena", "Efua", "Adwoa", "Yaa", "Esi", "Dzifa", "Naa", "Serwaa"],
       last: ["Mensah", "Owusu", "Osei", "Boateng", "Appiah", "Asante", "Tetteh", "Quaye", "Annan"],
    },
    KE: {
-      male: ["Brian", "Kevin", "Kamau", "Otieno", "Mwangi", "Kiprop", "Baraka", "Juma", "collins"],
+      male: ["Brian", "Kevin", "Kamau", "Otieno", "Mwangi", "Kiprop", "Baraka", "Juma", "Collins"],
       female: ["Wanjiku", "Achieng", "Njeri", "Faith", "Mercy", "Zawadi", "Neema", "Muthoni", "Brenda"],
       last: ["Ochieng", "Njoroge", "Kariuki", "Mutua", "Omondi", "Koech", "Maina", "Kimani"],
    },
@@ -139,7 +139,8 @@ function pickNameForRegion(region: RegionCode, gender: BotGender): { first: stri
 }
 
 /**
- * Formats a first and last name into a natural human username handle (3–15 chars).
+ * Formats a first and last name into a natural human username handle (3–15 chars),
+ * favoring the plain first name for the majority of generated profiles.
  */
 export function buildRealisticUsername(first: string, last: string): string {
    const fClean = first.replace(/[^A-Za-z]/g, "");
@@ -148,41 +149,34 @@ export function buildRealisticUsername(first: string, last: string): string {
    const patternRoll = Math.random();
    let candidate: string;
 
-   if (patternRoll < 0.25) {
-      // Pattern 1: FirstName + LastInitial (e.g. "TundeB", "Amaka_O", "chidi_e")
-      const sep = Math.random() < 0.45 ? "_" : "";
+   if (patternRoll < 0.65) {
+      // Pattern 1 (65%): Pure first name (e.g. "Chidi", "Amaka", "tunde", "Oluwaseun")
+      candidate = Math.random() < 0.25 ? fClean.toLowerCase() : fClean;
+   } else if (patternRoll < 0.8) {
+      // Pattern 2 (15%): FirstName + 2-digit number (e.g. "kemi24", "Damilola99", "Tobi_07")
+      const num = Math.floor(Math.random() * 89) + 10;
+      const sep = Math.random() < 0.25 ? "_" : "";
+      const base = Math.random() < 0.4 ? fClean.toLowerCase() : fClean;
+      candidate = `${base.slice(0, 11)}${sep}${num}`;
+   } else if (patternRoll < 0.92) {
+      // Pattern 3 (12%): FirstName + LastInitial (e.g. "TundeB", "Amaka_O", "chidi_e")
+      const sep = Math.random() < 0.4 ? "_" : "";
       const initial = lClean[0] || "X";
       candidate = `${fClean}${sep}${initial}`;
-      if (Math.random() < 0.35) candidate = candidate.toLowerCase();
-   } else if (patternRoll < 0.5) {
-      // Pattern 2: FirstName + 2-digit number (e.g. "kemi24", "Damilola99", "Tobi_07")
-      const num = Math.floor(Math.random() * 89) + 10;
-      const sep = Math.random() < 0.3 ? "_" : "";
-      const base = Math.random() < 0.5 ? fClean.toLowerCase() : fClean;
-      candidate = `${base.slice(0, 11)}${sep}${num}`;
-   } else if (patternRoll < 0.72) {
-      // Pattern 3: FirstName + short LastName prefix (e.g. "ChidiOka", "zainab_bal")
-      const sep = Math.random() < 0.4 ? "_" : "";
-      const lPart = lClean.slice(0, 4);
-      candidate = `${fClean.slice(0, 9)}${sep}${lPart}`;
-      if (Math.random() < 0.4) candidate = candidate.toLowerCase();
-   } else if (patternRoll < 0.88) {
-      // Pattern 4: Pure first name or casual handle (e.g. "Oluwaseun", "Chioma", "iam_femi")
-      const prefixRoll = Math.random();
-      if (prefixRoll < 0.25 && fClean.length <= 10) {
+      if (Math.random() < 0.3) candidate = candidate.toLowerCase();
+   } else {
+      // Pattern 4 (8%): Casual first-name handle or FirstName + short LastName prefix
+      const subRoll = Math.random();
+      if (subRoll < 0.35 && fClean.length <= 10) {
          candidate = `iam_${fClean.toLowerCase()}`;
-      } else if (prefixRoll < 0.45 && fClean.length <= 11) {
+      } else if (subRoll < 0.65 && fClean.length <= 11) {
          candidate = `real_${fClean.toLowerCase()}`;
       } else {
-         candidate = fClean;
+         const sep = Math.random() < 0.4 ? "_" : "";
+         const lPart = lClean.slice(0, 3);
+         candidate = `${fClean.slice(0, 10)}${sep}${lPart}`;
+         if (Math.random() < 0.35) candidate = candidate.toLowerCase();
       }
-   } else {
-      // Pattern 5: LastName + FirstInitial or numbers (e.g. "Balogun_T", "okafor10")
-      const num = Math.floor(Math.random() * 90) + 10;
-      candidate =
-         Math.random() < 0.5
-            ? `${lClean.slice(0, 11)}_${(fClean[0] || "A").toUpperCase()}`
-            : `${lClean.toLowerCase().slice(0, 12)}${num}`;
    }
 
    return sanitizeHandle(candidate);
@@ -210,7 +204,7 @@ export function generateSyntheticBotIdentity(
 
    const { first, last } = pickNameForRegion(region, gender);
    const username = buildRealisticUsername(first, last);
-   const avatar_url = generateRealisticBotAvatar(`${id}-${username}`, region, gender);
+   const avatar_url = generateRealisticBotAvatar(`${id}-${username}`, region, gender, username);
 
    // Initial rating within ±140 of targetUserRating (clamped >= 600)
    const ratingOffset = Math.round((Math.random() - 0.48) * 260);

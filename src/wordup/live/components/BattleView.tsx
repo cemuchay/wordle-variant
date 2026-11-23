@@ -10,7 +10,7 @@ import { PreloadedImage } from "../../shared/PreloadedImage";
 import { type ProfileStats } from "../../shared/types";
 
 
-import { ProtectedAvatar } from "../../../components/chat/ProtectedAvatar";
+import { WordUpAvatar } from "../../shared/WordUpAvatar";
 import { CHOICE_FONT_SIZE, CONFETTI, PROMPT_FONT_SIZE, WORDUP_GAME } from "../../../constants/wordup";
 import { CircularTimer } from "../../shared/CircularTimer";
 import { GameStatusToast } from "../../shared/GameStatusToast";
@@ -274,7 +274,7 @@ export const BattleView = ({
          {/* Top Bar: Player | Timer | Opponent */}
          <div className="flex items-center justify-between gap-1 sm:gap-2 px-1 shrink-0 z-40 pt-3">
             <div className="flex items-center gap-2 min-w-0 relative">
-               <ProtectedAvatar
+               <WordUpAvatar
                   userId={playerProfile?.id || undefined}
                   src={playerProfile?.avatar_url || undefined}
                   username={playerProfile?.username || "You"}
@@ -317,7 +317,7 @@ export const BattleView = ({
                      +{p.points}
                   </motion.span>
                ))}
-               <ProtectedAvatar
+               <WordUpAvatar
                   userId={matchData?.is_bot_match ? undefined : ((isP1 ? matchData?.player2_id : matchData?.player1_id) || undefined)}
                   src={opponentStats?.avatar_url || undefined}
                   username={opponentName}

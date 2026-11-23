@@ -522,6 +522,61 @@ class WordUpAudioManager {
       osc.stop(now + 0.45);
    }
 
+   /**
+    * Distinct tense double-ping played when the opponent locks in a CORRECT answer.
+    * Uses a higher triangle+sine interval (F#5 -> B5) to create competitive urgency
+    * without clashing with the player's own C-major correct chime.
+    */
+   public playOpponentCorrect() {
+      if (!this.enabled) return;
+      this.ensureContext();
+      if (!this.ctx) return;
+
+      const now = this.ctx.currentTime;
+      const notes = [739.99, 987.77]; // F#5 -> B5 sharp competitive ping
+      notes.forEach((freq, idx) => {
+         if (!this.ctx) return;
+         const t = now + idx * 0.065;
+         const gain = this.ctx.createGain();
+         gain.gain.setValueAtTime(0, t);
+         gain.gain.linearRampToValueAtTime(0.11, t + 0.01);
+         gain.gain.exponentialRampToValueAtTime(0.001, t + 0.19);
+         gain.connect(this.ctx.destination);
+
+         const osc = this.ctx.createOscillator();
+         osc.type = "triangle";
+         osc.frequency.setValueAtTime(freq, t);
+         osc.connect(gain);
+         osc.start(t);
+         osc.stop(t + 0.21);
+      });
+   }
+
+   /**
+    * Distinct muted low drop played when the opponent locks in an INCORRECT answer.
+    * Clearly different from the player's sawtooth buzzer so the user hears the opponent slip up.
+    */
+   public playOpponentIncorrect() {
+      if (!this.enabled) return;
+      this.ensureContext();
+      if (!this.ctx) return;
+
+      const now = this.ctx.currentTime;
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.11, now + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+      gain.connect(this.ctx.destination);
+
+      const osc = this.ctx.createOscillator();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(250.0, now);
+      osc.frequency.exponentialRampToValueAtTime(145.0, now + 0.18);
+      osc.connect(gain);
+      osc.start(now);
+      osc.stop(now + 0.24);
+   }
+
    public playTicking() {
       if (!this.enabled) return;
       this.ensureContext();

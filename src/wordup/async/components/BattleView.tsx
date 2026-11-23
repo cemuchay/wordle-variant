@@ -7,7 +7,7 @@ import { getCachedFlagUrl } from "../../../utils/wordupQuestionPostProcessor";
 import { type ProfileStats } from "../../shared/types";
 import FormulaRenderer from "../../shared/FormulaRenderer";
 import { PreloadedImage } from "../../shared/PreloadedImage";
-import { ProtectedAvatar } from "../../../components/chat/ProtectedAvatar";
+import { WordUpAvatar } from "../../shared/WordUpAvatar";
 import { ScoreBar } from "../../shared/ScoreBar";
 import { CATEGORIES } from "../../shared/constants";
 import { WORDUP_GAME, CONFETTI, PROMPT_FONT_SIZE, CHOICE_FONT_SIZE } from "../../../constants/wordup";
@@ -218,7 +218,7 @@ export const BattleView = ({
          {/* Top Bar: Player | Round/Category | Opponent */}
          <div className="flex items-center justify-between gap-1 sm:gap-2 px-1 shrink-0 z-40">
             <div className="flex items-center gap-2 min-w-0 relative">
-               <ProtectedAvatar
+               <WordUpAvatar
                   userId={playerProfile?.id || undefined}
                   src={playerProfile?.avatar_url || undefined}
                   username={playerProfile?.username || "You"}
@@ -267,7 +267,7 @@ export const BattleView = ({
                      +{p.points}
                   </motion.span>
                ))}
-               <ProtectedAvatar
+               <WordUpAvatar
                   userId={matchData?.is_bot_match ? undefined : ((isP1 ? matchData?.player2_id : matchData?.player1_id) || undefined)}
                   src={opponentStats?.avatar_url || undefined}
                   username={opponentName}

@@ -4,7 +4,7 @@ import { Award } from "lucide-react";
 import { useAsyncStore } from "../store/useAsyncStore";
 import { BOT_PROFILES } from "../../../utils/wordupQuestionGenerator";
 import { getCachedFlagUrl } from "../../../utils/wordupQuestionPostProcessor";
-import { ProtectedAvatar } from "../../../components/chat/ProtectedAvatar";
+import { WordUpAvatar } from "../../shared/WordUpAvatar";
 import { useApp } from "../../../context/AppContext";
 import { calculateMatchRewards } from "../../shared/xpCalculator";
 
@@ -29,9 +29,10 @@ export const GameOverView = ({
    const myAvatarUrl = myProfile?.avatar_url || (guestId ? `https://api.dicebear.com/7.x/bottts/svg?seed=${guestId}` : undefined);
    const myUsername = myProfile?.username || localStorage.getItem("wordle_anon_username") || "You";
 
-   const opponentAvatarUrl = opponentStats?.avatar_url ?? undefined;
-
    const isP1 = role === "player1";
+   const oppProfileFromMatch = isP1 ? matchData.player2 : matchData.player1;
+   const opponentAvatarUrl = opponentStats?.avatar_url ?? oppProfileFromMatch?.avatar_url ?? undefined;
+
    const myScore = isP1 ? matchData.p1_score : matchData.p2_score;
    const oppScore = isP1 ? matchData.p2_score : matchData.p1_score;
 
@@ -42,9 +43,12 @@ export const GameOverView = ({
    const rewards = calculateMatchRewards(matchData, role, questions?.length);
    const formattedElo = rewards.totalEloChange >= 0 ? `+${rewards.totalEloChange}` : `${rewards.totalEloChange}`;
 
-   const opponentName = opponentStats?.username || (matchData.is_bot_match
-      ? (BOT_PROFILES[matchData.bot_profile]?.name || "Opponent")
-      : "Opponent");
+   const opponentName =
+      opponentStats?.username ||
+      oppProfileFromMatch?.username ||
+      (matchData.is_bot_match
+         ? (BOT_PROFILES[matchData.bot_profile]?.name || "Opponent")
+         : "Opponent");
 
    const statusColor = !isCompleted
       ? "text-yellow-500 border-yellow-500/20 bg-yellow-500/10 shadow-[0_0_15px_rgba(234,179,8,0.1)]"
@@ -75,7 +79,7 @@ export const GameOverView = ({
          {/* Side-by-Side Scores */}
          <div className="grid grid-cols-2 gap-4 bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
             <div className="flex flex-col items-center justify-center gap-1.5">
-               <ProtectedAvatar
+               <WordUpAvatar
                   src={myAvatarUrl}
                   username={myUsername}
                   className="w-10 h-10 rounded-full"
@@ -84,7 +88,7 @@ export const GameOverView = ({
                <p className="text-2xl font-black text-white">{myScore} pts</p>
             </div>
             <div className="border-l border-white/10 flex flex-col items-center justify-center gap-1.5">
-               <ProtectedAvatar
+               <WordUpAvatar
                   src={opponentAvatarUrl}
                   username={opponentName}
                   className="w-10 h-10 rounded-full"

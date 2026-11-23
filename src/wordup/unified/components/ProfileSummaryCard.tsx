@@ -1,4 +1,4 @@
-import { ProtectedAvatar } from "@/components/chat/ProtectedAvatar"
+import { WordUpAvatar } from "../../shared/WordUpAvatar"
 import formatUsername from "@/utils/formatUsername"
 import { Flame } from "lucide-react"
 
@@ -10,7 +10,7 @@ const ProfileSummaryCard = ({ userStats, currentUser, getRankColor }: any) => {
                 <div className="relative overflow-hidden bg-linear-to-r from-[#E85151]/15 to-[#E85151]/5 border border-[#E85151]/20 rounded-2xl p-4 flex items-center justify-between shadow-md">
                     <div className="flex items-center gap-3">
                         <div className="w-11 h-11 rounded-full border-2 border-[#E85151] overflow-hidden flex items-center justify-center bg-black/40">
-                            <ProtectedAvatar
+                            <WordUpAvatar
                                 userId={currentUser?.id}
                                 src={currentUser?.user_metadata?.avatar_url}
                                 username={formatUsername(currentUser?.user_metadata?.full_name)}

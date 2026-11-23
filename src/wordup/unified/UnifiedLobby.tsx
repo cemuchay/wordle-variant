@@ -14,7 +14,7 @@ import {
    Volume2, VolumeX
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ProtectedAvatar } from "../../components/chat/ProtectedAvatar";
+import { WordUpAvatar } from "../shared/WordUpAvatar";
 import { supabase } from "../../lib/supabaseClient";
 import { CATEGORY_STYLE_MAP, DEFAULT_STYLE, getTopFrequentCategories, loadClickData, recordClick } from "../shared/categorySelectConstants";
 import { CategorySelectModal } from "../shared/CategorySelectModal";
@@ -721,7 +721,7 @@ export const UnifiedLobby = ({
                                     className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl p-2.5 hover:bg-white/5 transition-all"
                                  >
                                     <div className="flex items-center gap-2.5 min-w-0">
-                                       <ProtectedAvatar
+                                       <WordUpAvatar
                                           userId={profile.id}
                                           src={profile.avatar_url}
                                           username={profile.username}
@@ -860,10 +860,10 @@ export const UnifiedLobby = ({
                               let outcomeStyle = "text-white border-white/10 bg-white/5";
                               if (myScore > oppScore) {
                                  outcome = "WIN";
-                                 outcomeStyle = "text-[#E85151] border-[#E85151]/20 bg-[#E85151]/10";
+                                 outcomeStyle = "text-white border-correct bg-correct";
                               } else if (oppScore > myScore) {
                                  outcome = "LOSS";
-                                 outcomeStyle = "text-red-400 border-red-500/10 bg-red-500/10";
+                                 outcomeStyle = "text-white border-[#E85151] bg-[#E85151]";
                               }
 
                               const dateStr = new Date(match.completed_at || match.created_at).toLocaleDateString(undefined, {

@@ -7,7 +7,7 @@ import { CATEGORY_STYLE_MAP, DEFAULT_STYLE } from "../shared/categorySelectConst
 import { type ProfileStats } from "../shared/types";
 import { type PausedMatch } from "../shared/pauseStorage";
 import { RankingView } from "../shared/RankingView";
-import { ProtectedAvatar } from "../../components/chat/ProtectedAvatar";
+import { WordUpAvatar } from "../shared/WordUpAvatar";
 import { supabase } from "../../lib/supabaseClient";
 import { Z_INDEX } from "../../constants/ui";
 import { useApp } from "../../context/AppContext";
@@ -426,7 +426,7 @@ export const TopicDetailsView = ({
                                              className="flex items-center justify-between bg-black/25 border border-white/10 rounded-xl p-2.5 hover:bg-white/5 transition-all"
                                           >
                                              <div className="flex items-center gap-2.5 min-w-0">
-                                                <ProtectedAvatar
+                                                <WordUpAvatar
                                                    userId={profile.id}
                                                    src={profile.avatar_url}
                                                    username={profile.username}

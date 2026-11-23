@@ -162,6 +162,8 @@ export function useGameEngine(props: EngineProps) {
         points: number;
         timeTaken: number;
         gaveUp?: boolean;
+        timedOut?: boolean;
+        runDownClock?: boolean;
     } | null>(null);
 
     // Per-round anchor (used by the 50 ms tick interval)
@@ -654,7 +656,7 @@ export function useGameEngine(props: EngineProps) {
 
                 if (opponentChoiceRef.current === null) {
                     const pending = pendingBotRoundResultRef.current;
-                    if (gameTypeRef.current === "live-bot" && pending && !pending.gaveUp) {
+                    if (gameTypeRef.current === "live-bot" && pending && !pending.gaveUp && !pending.timedOut) {
                         opponentTimeTakenRef.current = pending.timeTaken;
                         opponentChoiceRef.current = pending.choice;
                         opponentCurrentPointsRef.current = pending.points;
@@ -708,12 +710,14 @@ export function useGameEngine(props: EngineProps) {
                     }, 3800);
                 }
 
-                if (br.gaveUp) {
+                if (br.gaveUp || br.timedOut) {
                     pendingBotRoundResultRef.current = {
                         choice: "",
                         points: 0,
                         timeTaken: bDur,
-                        gaveUp: true,
+                        gaveUp: Boolean(br.gaveUp),
+                        timedOut: Boolean(br.timedOut),
+                        runDownClock: true,
                     };
                 } else {
                     const botChoice = pickBotChoice(bq, br.correct);
@@ -728,6 +732,8 @@ export function useGameEngine(props: EngineProps) {
                         points: pts,
                         timeTaken: br.time_taken,
                         gaveUp: false,
+                        timedOut: false,
+                        runDownClock: Boolean(br.runDownClock),
                     };
 
                     const botMs = Math.max(350, br.time_taken * 1000);
@@ -739,6 +745,10 @@ export function useGameEngine(props: EngineProps) {
                         opponentCurrentPointsRef.current = pts;
                         setOpponentChoice(botChoice);
                         setOpponentCurrentPoints(pts);
+                        if (botChoice !== "") {
+                            if (botChoice === bq.answer) wordupAudio.playOpponentCorrect();
+                            else wordupAudio.playOpponentIncorrect();
+                        }
                     }, botMs);
                 }
             }
@@ -874,17 +884,20 @@ export function useGameEngine(props: EngineProps) {
         }
 
         // Live-bot: Let the bot's independent telemetry timer run naturally so it doesn't feel reactive to the user's click.
-        // Only cap extreme outlier waits (> 2.6s after user click) or resolve immediately in headless unit tests where no timer was started.
+        // If the bot is running down the clock (timedOut, gaveUp, or late deliberation), let the real clock play out.
+        // Only cap extreme non-rundown waits (> 2.6s after user click) or resolve immediately in headless unit tests where no timer was started.
         if (gameTypeRef.current === "live-bot" && opponentChoiceRef.current === null) {
             const pending = pendingBotRoundResultRef.current;
-            if (botTimerRef.current !== null && pending && !pending.gaveUp) {
+            const botRunningClockDown = Boolean(pending?.gaveUp || pending?.timedOut || pending?.runDownClock);
+            if (botTimerRef.current !== null && pending && !botRunningClockDown) {
                 const remainingBotMs = Math.max(0, pending.timeTaken * 1000 - elapsed * 1000);
                 if (remainingBotMs > 2600) {
                     stopBotTimer();
                     const cappedWaitMs = Math.round(1400 + Math.random() * 1000);
                     const adjustedTimeTaken = parseFloat((elapsed + cappedWaitMs / 1000).toFixed(2));
+                    const adjustedCorrect = pending.choice === q.answer;
                     const adjustedPts = calcPoints(
-                        pending.choice === q.answer,
+                        adjustedCorrect,
                         adjustedTimeTaken,
                         duration,
                         (currentRoundRef.current + 1) % 7 === 0,
@@ -897,9 +910,13 @@ export function useGameEngine(props: EngineProps) {
                         opponentCurrentPointsRef.current = adjustedPts;
                         setOpponentChoice(pending.choice);
                         setOpponentCurrentPoints(adjustedPts);
+                        if (pending.choice !== "") {
+                            if (adjustedCorrect) wordupAudio.playOpponentCorrect();
+                            else wordupAudio.playOpponentIncorrect();
+                        }
                     }, cappedWaitMs);
                 }
-            } else if (botTimerRef.current === null && (!pending || !pending.gaveUp)) {
+            } else if (botTimerRef.current === null && (!pending || (!pending.gaveUp && !pending.timedOut))) {
                 // Fallback when timer wasn't running (e.g. headless E2E SET_INITIAL)
                 const activeCat =
                     (matchDataRef.current?.category as string | undefined) ||
@@ -915,9 +932,9 @@ export function useGameEngine(props: EngineProps) {
                     topicTelemetryRef.current,
                     activeCat,
                 );
-                const botChoice = pickBotChoice(q, br.correct);
+                const botChoice = br.timedOut || br.gaveUp ? "" : pickBotChoice(q, br.correct);
                 const botPts = calcPoints(
-                    br.correct,
+                    botChoice !== "" && br.correct,
                     br.time_taken,
                     duration,
                     (currentRoundRef.current + 1) % 7 === 0,
@@ -927,6 +944,10 @@ export function useGameEngine(props: EngineProps) {
                 opponentCurrentPointsRef.current = botPts;
                 setOpponentChoice(botChoice);
                 setOpponentCurrentPoints(botPts);
+                if (botChoice !== "") {
+                    if (botChoice === q.answer) wordupAudio.playOpponentCorrect();
+                    else wordupAudio.playOpponentIncorrect();
+                }
             }
         }
     }, [stopBotTimer]);
@@ -936,7 +957,7 @@ export function useGameEngine(props: EngineProps) {
 
         const q = questionsRef.current[currentRoundRef.current];
         const duration = q ? getQuestionDuration(q.type) : 10;
-        const correct = choice === q?.answer;
+        const correct = choice !== "" && choice === q?.answer;
         const pts = calcPoints(correct, timeTaken, duration, (currentRoundRef.current + 1) % 7 === 0);
 
         opponentTimeTakenRef.current = timeTaken;
@@ -944,6 +965,11 @@ export function useGameEngine(props: EngineProps) {
         opponentCurrentPointsRef.current = pts;
         setOpponentChoice(choice);
         setOpponentCurrentPoints(pts);
+
+        if (choice !== "") {
+            if (correct) wordupAudio.playOpponentCorrect();
+            else wordupAudio.playOpponentIncorrect();
+        }
     }, []);
 
     // ══════════════════════════════════════════════════════════════════

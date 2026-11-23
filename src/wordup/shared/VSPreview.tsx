@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Swords, Trophy, Activity, Loader2 } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
-import { ProtectedAvatar } from "../../components/chat/ProtectedAvatar";
+import { WordUpAvatar } from "./WordUpAvatar";
 import { BOT_PROFILES } from "../../utils/wordupQuestionGenerator";
 import { BOT_PROFILES_RATINGS } from "../../constants/wordup";
 import { CATEGORIES } from "./constants";
@@ -210,7 +210,7 @@ export const VSPreview = ({
                className="flex flex-col items-center text-center space-y-2.5"
             >
                <div className="w-16 h-16 rounded-full border-2 border-[#E85151] overflow-hidden bg-black/40 flex items-center justify-center shadow-lg shadow-[#E85151]/20">
-                  <ProtectedAvatar
+                  <WordUpAvatar
                      userId={currentUser?.id}
                      src={myAvatarUrl}
                      username={myName}
@@ -271,7 +271,7 @@ export const VSPreview = ({
                className="flex flex-col items-center text-center space-y-2.5"
             >
                <div className="w-16 h-16 rounded-full border-2 border-white/20 overflow-hidden bg-black/40 flex items-center justify-center shadow-lg">
-                  <ProtectedAvatar
+                  <WordUpAvatar
                      userId={matchData?.is_bot_match ? undefined : opponentStats?.id}
                      src={oppAvatarUrl}
                      username={oppName}

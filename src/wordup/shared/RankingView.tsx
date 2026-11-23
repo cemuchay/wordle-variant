@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Loader2, Trophy, Medal } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
-import { ProtectedAvatar } from "../../components/chat/ProtectedAvatar";
+import { WordUpAvatar } from "./WordUpAvatar";
 
 import { type ProfileStats } from "./types";
 import { RATING, INACTIVITY, RANKS, WORDUP_GAME } from "../../constants/wordup";
@@ -264,7 +264,7 @@ export const RankingView = ({ currentUser, userStats, categoryId }: RankingViewP
                         </div>
 
                         {/* Avatar */}
-                        <ProtectedAvatar
+                        <WordUpAvatar
                            userId={entry.id}
                            src={entry.profiles?.avatar_url}
                            username={formatUsername(entry.profiles?.username) || "Player"}
@@ -316,7 +316,7 @@ export const RankingView = ({ currentUser, userStats, categoryId }: RankingViewP
                      </div>
 
                      {/* Avatar */}
-                      <ProtectedAvatar
+                      <WordUpAvatar
                          userId={currentUser?.id}
                          src={currentUser?.user_metadata?.avatar_url}
                          username={formatUsername(currentUser?.user_metadata?.full_name) || "You"}

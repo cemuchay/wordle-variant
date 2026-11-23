@@ -3,6 +3,31 @@ import type { RegionCode } from "./locationEstimator";
 export type BotGender = "male" | "female";
 
 /**
+ * Temporary toggle: replace AI/stock portrait images across WordUp with clean
+ * first-letter initial avatars until more realistic portraits are introduced.
+ */
+export const USE_INITIAL_AVATARS_TEMPORARILY = true;
+
+const INITIAL_AVATAR_COLORS: string[] = [
+   "E85151",
+   "2563EB",
+   "059669",
+   "D97706",
+   "7C3AED",
+   "DB2777",
+   "0891B2",
+   "4F46E5",
+   "EA580C",
+   "16A34A",
+   "9333EA",
+   "0D9488",
+   "CA8A04",
+   "DC2626",
+   "0284C7",
+   "65A30D",
+];
+
+/**
  * Curated, high-availability realistic portrait photographs (Unsplash CDN cropped 256x256 face portraits)
  * grouped by demographic region and gender so synthetic profiles have authentic, real-world profile pictures.
  */
@@ -109,13 +134,46 @@ function hashSeed(seed: string): number {
 }
 
 /**
+ * Extracts a clean uppercase first letter and deterministic color hex for a user's initial avatar.
+ */
+export function getInitialAvatarVisuals(
+   username?: string | null,
+   seed?: string | null,
+): { initial: string; backgroundHex: string } {
+   const trimmed = (username || "").trim();
+   const match = trimmed.match(/[A-Za-z0-9]/);
+   const initial = (match ? match[0] : "P").toUpperCase();
+   const hashKey = (seed || trimmed || initial).toLowerCase();
+   const h = hashSeed(hashKey);
+   const backgroundHex = INITIAL_AVATAR_COLORS[h % INITIAL_AVATAR_COLORS.length];
+   return { initial, backgroundHex };
+}
+
+/**
+ * Generates a deterministic first-letter avatar URL (whitelisted by ProtectedAvatar).
+ */
+export function generateInitialAvatarUrl(
+   username?: string | null,
+   seed?: string | null,
+): string {
+   const { initial, backgroundHex } = getInitialAvatarVisuals(username, seed);
+   return `https://ui-avatars.com/api/?name=${encodeURIComponent(initial)}&length=1&background=${backgroundHex}&color=ffffff&bold=true&size=128&format=svg`;
+}
+
+/**
  * Generates a realistic avatar URL for a synthetic user profile, aligned with their region and gender.
+ * While USE_INITIAL_AVATARS_TEMPORARILY is true, returns a clean first-letter initial avatar.
  */
 export function generateRealisticBotAvatar(
    seed: string,
    region: RegionCode,
    gender: BotGender,
+   username?: string,
 ): string {
+   if (USE_INITIAL_AVATARS_TEMPORARILY) {
+      return generateInitialAvatarUrl(username || seed, seed);
+   }
+
    const h = hashSeed(seed);
    const roll = (h % 100) / 100;
 
