@@ -17,6 +17,13 @@ import {
    type BotPersonality,
 } from "../wordup/shared/botPersonality";
 import {
+   generateBotSchedule,
+   isBotActiveAt,
+   isMinuteInWindow,
+   deriveLegacyBotSchedule,
+   type BotSchedule,
+} from "../wordup/shared/botSchedule";
+import {
    getCachedTopicTelemetry,
    recordHumanTopicTelemetry,
 } from "../wordup/shared/topicTelemetryService";
@@ -297,6 +304,70 @@ describe("WordUp Realistic Synthetic Bot System", () => {
 
          expect(quickAccepts).toBeGreaterThan(30); // >50% even for declines_rematch when <= 3s
          expect(quickAccepts).toBeGreaterThan(lateAccepts);
+      });
+   });
+
+   describe("Timezone-Aware Bot Active Windows", () => {
+      it("evaluates normal and overnight wrap-around windows accurately", () => {
+         // Normal daytime window: 09:00 (540) to 17:00 (1020)
+         expect(isMinuteInWindow(600, { startMinute: 540, endMinute: 1020 })).toBe(true);
+         expect(isMinuteInWindow(500, { startMinute: 540, endMinute: 1020 })).toBe(false);
+
+         // Overnight wrap-around: 21:30 (1290) to 03:30 (210)
+         expect(isMinuteInWindow(1350, { startMinute: 1290, endMinute: 210 })).toBe(true); // 22:30
+         expect(isMinuteInWindow(90, { startMinute: 1290, endMinute: 210 })).toBe(true);   // 01:30
+         expect(isMinuteInWindow(600, { startMinute: 1290, endMinute: 210 })).toBe(false); // 10:00
+      });
+
+      it("evaluates bot schedules in their own timezone (e.g. Africa/Lagos WAT = UTC+1) and splits weekday vs weekend", () => {
+         const lagosNineToFive: BotSchedule = {
+            lifestyle: "nine_to_five",
+            timeZone: "Africa/Lagos",
+            weekdayWindows: [
+               { startMinute: 7 * 60, endMinute: 8 * 60 + 45 },
+               { startMinute: 12 * 60, endMinute: 13 * 60 + 45 },
+               { startMinute: 17 * 60 + 45, endMinute: 22 * 60 + 30 },
+            ],
+            weekendWindows: [
+               { startMinute: 9 * 60 + 30, endMinute: 13 * 60 },
+            ],
+         };
+
+         // Monday 11:30 UTC = 12:30 WAT (lunch break -> active)
+         expect(isBotActiveAt(lagosNineToFive, new Date("2026-11-23T11:30:00Z"))).toBe(true);
+         // Monday 14:30 UTC = 15:30 WAT (working at desk -> inactive)
+         expect(isBotActiveAt(lagosNineToFive, new Date("2026-11-23T14:30:00Z"))).toBe(false);
+         // Monday 02:00 UTC = 03:00 WAT (asleep -> inactive)
+         expect(isBotActiveAt(lagosNineToFive, new Date("2026-11-23T02:00:00Z"))).toBe(false);
+         // Saturday 09:30 UTC = 10:30 WAT (weekend morning -> active)
+         expect(isBotActiveAt(lagosNineToFive, new Date("2026-11-28T09:30:00Z"))).toBe(true);
+         // Saturday 19:00 UTC = 20:00 WAT (outside weekend window -> inactive)
+         expect(isBotActiveAt(lagosNineToFive, new Date("2026-11-28T19:00:00Z"))).toBe(false);
+      });
+
+      it("ensures newly spawned bots with ensureActiveNow=true are active at spawn time across any hour of the day", () => {
+         const testTimes = [
+            new Date("2026-11-23T03:30:00Z"), // 04:30 WAT (quietest hour)
+            new Date("2026-11-23T09:30:00Z"), // 10:30 WAT
+            new Date("2026-11-23T14:30:00Z"), // 15:30 WAT
+            new Date("2026-11-23T21:30:00Z"), // 22:30 WAT
+            new Date("2026-11-28T12:00:00Z"), // Saturday 13:00 WAT
+         ];
+
+         for (const t of testTimes) {
+            const schedule = generateBotSchedule("NG", t, true);
+            expect(schedule.timeZone).toBe("Africa/Lagos");
+            expect(isBotActiveAt(schedule, t)).toBe(true);
+         }
+      });
+
+      it("derives a deterministic fallback schedule for legacy DB bots without schedule metadata", () => {
+         const s1 = deriveLegacyBotSchedule("11111111-2222-3333-4444-555555555555", "NG");
+         const s2 = deriveLegacyBotSchedule("11111111-2222-3333-4444-555555555555", "NG");
+         expect(s1).toEqual(s2);
+         expect(s1.timeZone).toBe("Africa/Lagos");
+         expect(s1.weekdayWindows.length).toBeGreaterThan(0);
+         expect(s1.weekendWindows.length).toBeGreaterThan(0);
       });
    });
 });

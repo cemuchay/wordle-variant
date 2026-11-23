@@ -11,6 +11,7 @@ import {
    USE_INITIAL_AVATARS_TEMPORARILY,
    generateInitialAvatarUrl,
 } from "./botAvatarGenerator";
+import { isBotActiveAt } from "./botSchedule";
 import type { BotPersonality } from "./botPersonality";
 import type { ProfileStats } from "./types";
 
@@ -135,10 +136,21 @@ export async function getOrSpawnBotOpponent(options: {
             .eq("is_bot", true)
             .gte("rating", Math.max(600, targetRating - 280))
             .lte("rating", targetRating + 280)
-            .limit(10);
+            .limit(25);
 
-         if (existingBots && existingBots.length > 0) {
-            const pick = existingBots[Math.floor(Math.random() * existingBots.length)] as Record<string, unknown>;
+         const now = new Date();
+         const activeExistingBots = (existingBots || []).filter((row) => {
+            const rec = row as Record<string, unknown>;
+            const botId = String(rec.id || "");
+            if (!botId || botId === options.excludeBotId) return false;
+            const prof = (rec.profiles as Record<string, unknown> | null) ?? null;
+            const personality = rec.bot_personality as BotPersonality | undefined;
+            const country = typeof prof?.country_code === "string" ? prof.country_code : location.countryCode;
+            return isBotActiveAt(personality?.schedule, now, { botId, region: country });
+         });
+
+         if (activeExistingBots.length > 0) {
+            const pick = activeExistingBots[Math.floor(Math.random() * activeExistingBots.length)] as Record<string, unknown>;
             const prof = (pick.profiles as Record<string, unknown> | null) ?? null;
             if (typeof prof?.username === "string") {
                const ratingVal = typeof pick.rating === "number" ? pick.rating : targetRating;
@@ -172,7 +184,12 @@ export async function getOrSpawnBotOpponent(options: {
    }
 
    // Local fallback pool (when offline or in test environments)
-   const localPool = getLocalBotPool().filter((b) => b.id !== options.excludeBotId);
+   const now = new Date();
+   const localPool = getLocalBotPool().filter(
+      (b) =>
+         b.id !== options.excludeBotId &&
+         isBotActiveAt(b.bot_personality?.schedule, now, { botId: b.id, region: b.country_code }),
+   );
    if (!shouldForceSpawn && localPool.length > 0) {
       const closeBots = localPool.filter((b) => Math.abs(b.rating - targetRating) <= 300);
       const poolToUse = closeBots.length > 0 ? closeBots : localPool;

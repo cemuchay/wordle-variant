@@ -1,7 +1,7 @@
 import type { TargetAndTransition, Transition } from "framer-motion";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, PauseCircle, Volume2, VolumeX } from "lucide-react";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useConfirmation } from "../../../hooks/useConfirmation";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../utils/wordupQuestionGenerator";
 import { getCachedFlagUrl } from "../../../utils/wordupQuestionPostProcessor";
@@ -104,16 +104,7 @@ export const BattleView = ({
    useEffect(() => {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setParticles([]);
-      // eslint-disable-next-line react-hooks/immutability
-      setScorePopups([]);
    }, [currentIdx]);
-
-
-
-   const [scorePopups, setScorePopups] = useState<Array<{ id: number; points: number; side: "my" | "opp" }>>([]);
-   const prevMyScoreRef = useRef(0);
-   const prevOppScoreRef = useRef(0);
-   const popupIdRef = useRef(0);
 
    const activeQuestion = questions[currentIdx];
 
@@ -136,25 +127,18 @@ export const BattleView = ({
    const myScore = isP1 ? (matchData?.p1_score || 0) : (matchData?.p2_score || 0);
    const oppScore = isP1 ? (matchData?.p2_score || 0) : (matchData?.p1_score || 0);
 
-   // Detect score changes and create +points popups
-   useEffect(() => {
-      if (myScore > prevMyScoreRef.current) {
-         const diff = myScore - prevMyScoreRef.current;
-         popupIdRef.current += 1;
-         const newPopup = { id: popupIdRef.current, points: diff, side: "my" as const };
-         setScorePopups((p) => [...p, newPopup]);
-         setTimeout(() => setScorePopups((p) => p.filter((x) => x.id !== newPopup.id)), 3000);
-      }
-      if (oppScore > prevOppScoreRef.current) {
-         const diff = oppScore - prevOppScoreRef.current;
-         popupIdRef.current += 1;
-         const newPopup = { id: popupIdRef.current, points: diff, side: "opp" as const };
-         setScorePopups((p) => [...p, newPopup]);
-         setTimeout(() => setScorePopups((p) => p.filter((x) => x.id !== newPopup.id)), 3000);
-      }
-      prevMyScoreRef.current = myScore;
-      prevOppScoreRef.current = oppScore;
-   }, [myScore, oppScore]);
+   // Track per-round baseline scores so each player's live score for the current round starts at 0
+   // and persists under their avatar until the next round starts.
+   const [roundBaseline, setRoundBaseline] = useState({
+      idx: currentIdx,
+      my: myScore,
+      opp: oppScore,
+   });
+   if (roundBaseline.idx !== currentIdx) {
+      setRoundBaseline({ idx: currentIdx, my: myScore, opp: oppScore });
+   }
+   const myRoundPoints = roundBaseline.idx === currentIdx ? Math.max(0, myScore - roundBaseline.my) : 0;
+   const oppRoundPoints = roundBaseline.idx === currentIdx ? Math.max(0, oppScore - roundBaseline.opp) : 0;
 
    if (!activeQuestion) return null;
 
@@ -162,11 +146,23 @@ export const BattleView = ({
    const opponentName = opponentStats?.username || (matchData?.is_bot_match ? ((matchData.bot_profile && BOT_PROFILES[matchData.bot_profile]?.name) || "Opponent") : "Opponent");
 
 
-   // Resolve opponent choice
+   // Resolve opponent choice & answered states for per-round score badges
    const oppAnswers = isP1 ? matchData?.p2_answers : matchData?.p1_answers;
    const oppChoiceFromAnswers = oppAnswers?.[currentIdx]?.choice;
    const oppChoiceFromStore = useLiveStore((s) => s.opponentChoice);
    const oppChoice = oppChoiceFromAnswers || (isP1 ? oppChoiceFromStore : selectedAnswer);
+
+   const myHasAnswered =
+      myRoundPoints > 0 ||
+      selectedAnswer !== null ||
+      revealAnswers ||
+      Boolean(isP1 ? matchData?.p1_answered : matchData?.p2_answered);
+   const oppHasAnswered =
+      oppRoundPoints > 0 ||
+      Boolean(oppChoiceFromAnswers) ||
+      Boolean(oppChoiceFromStore) ||
+      revealAnswers ||
+      Boolean(isP1 ? matchData?.p2_answered : matchData?.p1_answered);
 
    const onChoiceSelect = (choice: string) => {
       handleAnswerSelect(choice);
@@ -274,31 +270,37 @@ export const BattleView = ({
          {/* Top Bar: Player | Timer | Opponent */}
          <div className="flex items-center justify-between gap-1 sm:gap-2 px-1 shrink-0 z-40 pt-3">
             <div className="flex items-center gap-2 min-w-0 relative">
-               <WordUpAvatar
-                  userId={playerProfile?.id || undefined}
-                  src={playerProfile?.avatar_url || undefined}
-                  username={playerProfile?.username || "You"}
-                  className="w-10 h-10 rounded-full border border-correct/30 shrink-0"
-               />
+               <div className="flex flex-col items-center gap-0.5 shrink-0">
+                  <WordUpAvatar
+                     userId={playerProfile?.id || undefined}
+                     src={playerProfile?.avatar_url || undefined}
+                     username={playerProfile?.username || "You"}
+                     className="w-10 h-10 rounded-full border border-correct/30 shrink-0"
+                  />
+                  <motion.span
+                     key={`my-round-${currentIdx}-${myRoundPoints}-${myHasAnswered ? 1 : 0}`}
+                     initial={myRoundPoints > 0 ? { scale: 0.75, opacity: 0.6 } : false}
+                     animate={{ scale: 1, opacity: 1 }}
+                     transition={{ type: "spring", stiffness: 420, damping: 22 }}
+                     className={`px-1.5 py-0.5 rounded-full text-[10px] leading-none font-black tabular-nums border ${
+                        myRoundPoints > 0
+                           ? "bg-correct/20 text-correct border-correct/40 shadow-[0_0_8px_rgba(106,170,100,0.35)]"
+                           : myHasAnswered
+                              ? "bg-[#E85151]/15 text-[#E85151]/85 border-[#E85151]/30"
+                              : "bg-white/5 text-white/45 border-white/10"
+                     }`}
+                  >
+                     {myRoundPoints > 0 ? `+${myRoundPoints}` : myHasAnswered ? "+0" : "0"}
+                  </motion.span>
+               </div>
                <div className="truncate max-w-[100px]">
                   <p className="text-[9px] text-white/40 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
                   <p className="text-base font-black text-white">{myScore} pts</p>
                </div>
                {typeof playerSignalLevel === 'number' && <SignalBar level={playerSignalLevel as 0 | 1 | 2 | 3 | 4} className="ml-1" />}
-               {scorePopups.filter((p) => p.side === "my").map((p) => (
-                  <motion.span
-                     key={p.id}
-                     initial={{ opacity: 0, y: 0, scale: 0.5 }}
-                     animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
-                     transition={{ duration: 2.5, ease: "easeOut" }}
-                     className="absolute -top-1 right-0 text-correct font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(106,170,100,0.8)] pointer-events-none"
-                  >
-                     +{p.points}
-                  </motion.span>
-               ))}
             </div>
 
-            <CircularTimer maxTime={qMaxTime} currentIdx={currentIdx} />
+            <CircularTimer maxTime={qMaxTime} currentIdx={currentIdx} paused={revealAnswers} />
 
             <div className="flex items-center gap-2 min-w-0 justify-end text-right relative">
                <div className="truncate max-w-[100px]">
@@ -306,23 +308,29 @@ export const BattleView = ({
                   <p className="text-base font-black text-white">{oppScore} pts</p>
                </div>
                {typeof opponentSignalLevel === 'number' && <SignalBar level={opponentSignalLevel as 0 | 1 | 2 | 3 | 4} className="ml-1" />}
-               {scorePopups.filter((p) => p.side === "opp").map((p) => (
+               <div className="flex flex-col items-center gap-0.5 shrink-0">
+                  <WordUpAvatar
+                     userId={matchData?.is_bot_match ? undefined : ((isP1 ? matchData?.player2_id : matchData?.player1_id) || undefined)}
+                     src={opponentStats?.avatar_url || undefined}
+                     username={opponentName}
+                     className="w-10 h-10 rounded-full border border-[#E85151]/30 shrink-0"
+                  />
                   <motion.span
-                     key={p.id}
-                     initial={{ opacity: 0, y: 0, scale: 0.5 }}
-                     animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
-                     transition={{ duration: 2.5, ease: "easeOut" }}
-                     className="absolute -top-1 left-0 text-[#E85151] font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(232,81,81,0.8)] pointer-events-none"
+                     key={`opp-round-${currentIdx}-${oppRoundPoints}-${oppHasAnswered ? 1 : 0}`}
+                     initial={oppRoundPoints > 0 ? { scale: 0.75, opacity: 0.6 } : false}
+                     animate={{ scale: 1, opacity: 1 }}
+                     transition={{ type: "spring", stiffness: 420, damping: 22 }}
+                     className={`px-1.5 py-0.5 rounded-full text-[10px] leading-none font-black tabular-nums border ${
+                        oppRoundPoints > 0
+                           ? "bg-correct/20 text-correct border-correct/40 shadow-[0_0_8px_rgba(106,170,100,0.35)]"
+                           : oppHasAnswered
+                              ? "bg-[#E85151]/15 text-[#E85151]/85 border-[#E85151]/30"
+                              : "bg-white/5 text-white/45 border-white/10"
+                     }`}
                   >
-                     +{p.points}
+                     {oppRoundPoints > 0 ? `+${oppRoundPoints}` : oppHasAnswered ? "+0" : "0"}
                   </motion.span>
-               ))}
-               <WordUpAvatar
-                  userId={matchData?.is_bot_match ? undefined : ((isP1 ? matchData?.player2_id : matchData?.player1_id) || undefined)}
-                  src={opponentStats?.avatar_url || undefined}
-                  username={opponentName}
-                  className="w-10 h-10 rounded-full border border-[#E85151]/30 shrink-0"
-               />
+               </div>
             </div>
          </div>
 

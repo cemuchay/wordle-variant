@@ -73,18 +73,13 @@ export const BattleView = ({
    onToggleSound,
 }: BattleViewProps) => {
    const [particles, setParticles] = useState<Particle[]>([]);
-   const [scorePopups, setScorePopups] = useState<Array<{ id: number; points: number; side: "my" | "opp" }>>([]);
    const [imgErrorMap, setImgErrorMap] = useState<Record<string, boolean>>({});
 
    const [lastIdx, setLastIdx] = useState(currentIdx);
    if (currentIdx !== lastIdx) {
       setLastIdx(currentIdx);
       setParticles([]);
-      setScorePopups([]);
    }
-   const prevMyScoreRef = useRef(0);
-   const prevOppScoreRef = useRef(0);
-   const popupIdRef = useRef(0);
    const timerBarRef = useRef<HTMLDivElement | null>(null);
 
    const activeQuestion = questions[currentIdx];
@@ -106,24 +101,16 @@ export const BattleView = ({
    const myScore = isP1 ? (matchData?.p1_score || 0) : (matchData?.p2_score || 0);
    const oppScore = isP1 ? (matchData?.p2_score || 0) : (matchData?.p1_score || 0);
 
-   useEffect(() => {
-      if (myScore > prevMyScoreRef.current) {
-         const diff = myScore - prevMyScoreRef.current;
-         popupIdRef.current += 1;
-         const newPopup = { id: popupIdRef.current, points: diff, side: "my" as const };
-         setScorePopups((p) => [...p, newPopup]);
-         setTimeout(() => setScorePopups((p) => p.filter((x) => x.id !== newPopup.id)), 3000);
-      }
-      if (oppScore > prevOppScoreRef.current) {
-         const diff = oppScore - prevOppScoreRef.current;
-         popupIdRef.current += 1;
-         const newPopup = { id: popupIdRef.current, points: diff, side: "opp" as const };
-         setScorePopups((p) => [...p, newPopup]);
-         setTimeout(() => setScorePopups((p) => p.filter((x) => x.id !== newPopup.id)), 3000);
-      }
-      prevMyScoreRef.current = myScore;
-      prevOppScoreRef.current = oppScore;
-   }, [myScore, oppScore]);
+   const [roundBaseline, setRoundBaseline] = useState({
+      idx: currentIdx,
+      my: myScore,
+      opp: oppScore,
+   });
+   if (roundBaseline.idx !== currentIdx) {
+      setRoundBaseline({ idx: currentIdx, my: myScore, opp: oppScore });
+   }
+   const myRoundPoints = roundBaseline.idx === currentIdx ? Math.max(0, myScore - roundBaseline.my) : 0;
+   const oppRoundPoints = roundBaseline.idx === currentIdx ? Math.max(0, oppScore - roundBaseline.opp) : 0;
 
    const opponentName = opponentStats?.username || (matchData?.is_bot_match ? ((matchData.bot_profile && BOT_PROFILES[matchData.bot_profile]?.name) || "Opponent") : "Opponent");
 
@@ -155,7 +142,7 @@ export const BattleView = ({
       const bar = timerBarRef.current;
       if (!bar) return;
 
-      if (selectedAnswer !== null) {
+      if (selectedAnswer !== null || revealAnswers) {
          const computedStyle = window.getComputedStyle(bar);
          const currentWidth = computedStyle.width;
          const currentColor = computedStyle.backgroundColor;
@@ -166,7 +153,7 @@ export const BattleView = ({
          bar.style.backgroundColor = currentColor;
          bar.style.boxShadow = currentBoxShadow;
       }
-   }, [selectedAnswer]);
+   }, [selectedAnswer, revealAnswers]);
 
    const onChoiceSelect = (choice: string) => {
       handleAnswerSelect(choice);
@@ -218,27 +205,33 @@ export const BattleView = ({
          {/* Top Bar: Player | Round/Category | Opponent */}
          <div className="flex items-center justify-between gap-1 sm:gap-2 px-1 shrink-0 z-40">
             <div className="flex items-center gap-2 min-w-0 relative">
-               <WordUpAvatar
-                  userId={playerProfile?.id || undefined}
-                  src={playerProfile?.avatar_url || undefined}
-                  username={playerProfile?.username || "You"}
-                  className="w-10 h-10 rounded-full border border-correct/30 shrink-0"
-               />
+               <div className="flex flex-col items-center gap-0.5 shrink-0">
+                  <WordUpAvatar
+                     userId={playerProfile?.id || undefined}
+                     src={playerProfile?.avatar_url || undefined}
+                     username={playerProfile?.username || "You"}
+                     className="w-10 h-10 rounded-full border border-correct/30 shrink-0"
+                  />
+                  <motion.span
+                     key={`async-my-round-${currentIdx}-${myRoundPoints}-${selectedAnswer !== null || revealAnswers ? 1 : 0}`}
+                     initial={myRoundPoints > 0 ? { scale: 0.75, opacity: 0.6 } : false}
+                     animate={{ scale: 1, opacity: 1 }}
+                     transition={{ type: "spring", stiffness: 420, damping: 22 }}
+                     className={`px-1.5 py-0.5 rounded-full text-[10px] leading-none font-black tabular-nums border ${
+                        myRoundPoints > 0
+                           ? "bg-correct/20 text-correct border-correct/40 shadow-[0_0_8px_rgba(106,170,100,0.35)]"
+                           : selectedAnswer !== null || revealAnswers
+                              ? "bg-[#E85151]/15 text-[#E85151]/85 border-[#E85151]/30"
+                              : "bg-white/5 text-white/45 border-white/10"
+                     }`}
+                  >
+                     {myRoundPoints > 0 ? `+${myRoundPoints}` : selectedAnswer !== null || revealAnswers ? "+0" : "0"}
+                  </motion.span>
+               </div>
                <div className="truncate max-w-[100px]">
                   <p className="text-[9px] text-white/40 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
                   <p className="text-base font-black text-white">{myScore} pts</p>
                </div>
-               {scorePopups.filter((p) => p.side === "my").map((p) => (
-                  <motion.span
-                     key={p.id}
-                     initial={{ opacity: 0, y: 0, scale: 0.5 }}
-                     animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
-                     transition={{ duration: 2.5, ease: "easeOut" }}
-                     className="absolute -top-1 right-0 text-correct font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(106,170,100,0.8)] pointer-events-none"
-                  >
-                     +{p.points}
-                  </motion.span>
-               ))}
             </div>
 
             <div className="flex flex-col items-center">
@@ -256,23 +249,29 @@ export const BattleView = ({
                   <p className="text-[9px] text-white/40 font-bold uppercase truncate">{opponentName}</p>
                   <p className="text-base font-black text-white">{oppScore} pts</p>
                </div>
-               {scorePopups.filter((p) => p.side === "opp").map((p) => (
+               <div className="flex flex-col items-center gap-0.5 shrink-0">
+                  <WordUpAvatar
+                     userId={matchData?.is_bot_match ? undefined : ((isP1 ? matchData?.player2_id : matchData?.player1_id) || undefined)}
+                     src={opponentStats?.avatar_url || undefined}
+                     username={opponentName}
+                     className="w-10 h-10 rounded-full border border-[#E85151]/30 shrink-0"
+                  />
                   <motion.span
-                     key={p.id}
-                     initial={{ opacity: 0, y: 0, scale: 0.5 }}
-                     animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
-                     transition={{ duration: 2.5, ease: "easeOut" }}
-                     className="absolute -top-1 left-0 text-[#E85151] font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(232,81,81,0.8)] pointer-events-none"
+                     key={`async-opp-round-${currentIdx}-${oppRoundPoints}-${Boolean(oppChoice) || revealAnswers ? 1 : 0}`}
+                     initial={oppRoundPoints > 0 ? { scale: 0.75, opacity: 0.6 } : false}
+                     animate={{ scale: 1, opacity: 1 }}
+                     transition={{ type: "spring", stiffness: 420, damping: 22 }}
+                     className={`px-1.5 py-0.5 rounded-full text-[10px] leading-none font-black tabular-nums border ${
+                        oppRoundPoints > 0
+                           ? "bg-correct/20 text-correct border-correct/40 shadow-[0_0_8px_rgba(106,170,100,0.35)]"
+                           : Boolean(oppChoice) || revealAnswers
+                              ? "bg-[#E85151]/15 text-[#E85151]/85 border-[#E85151]/30"
+                              : "bg-white/5 text-white/45 border-white/10"
+                     }`}
                   >
-                     +{p.points}
+                     {oppRoundPoints > 0 ? `+${oppRoundPoints}` : Boolean(oppChoice) || revealAnswers ? "+0" : "0"}
                   </motion.span>
-               ))}
-               <WordUpAvatar
-                  userId={matchData?.is_bot_match ? undefined : ((isP1 ? matchData?.player2_id : matchData?.player1_id) || undefined)}
-                  src={opponentStats?.avatar_url || undefined}
-                  username={opponentName}
-                  className="w-10 h-10 rounded-full border border-[#E85151]/30 shrink-0"
-               />
+               </div>
             </div>
          </div>
 

@@ -1,5 +1,6 @@
 import type { WordUpQuestion } from "../../utils/wordupQuestionGenerator/types";
 import type { RegionCode } from "./locationEstimator";
+import { generateBotSchedule, type BotSchedule } from "./botSchedule";
 import {
    getCachedTopicTelemetry,
    type TopicResponseTelemetry,
@@ -26,6 +27,7 @@ export interface BotPersonality {
    maxDelay: number;
    clutchModifier: number;
    region: RegionCode;
+   schedule?: BotSchedule;
 }
 
 const ARCHETYPES: Array<{
@@ -133,6 +135,7 @@ export function generateBotPersonality(
       maxDelay,
       clutchModifier: chosen.clutchModifier,
       region,
+      schedule: generateBotSchedule(region, new Date(), true),
    };
 }
 

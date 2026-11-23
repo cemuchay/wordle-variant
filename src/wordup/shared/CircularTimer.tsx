@@ -4,6 +4,7 @@ interface CircularTimerProps {
    maxTime: number;
    currentIdx: number;
    colorClass?: string;
+   paused?: boolean;
 }
 
 const RADIUS = 45;
@@ -13,16 +14,20 @@ export const CircularTimer = ({
    maxTime,
    currentIdx,
    colorClass = "text-correct",
+   paused = false,
 }: CircularTimerProps) => {
    const circleRef = useRef<SVGCircleElement | null>(null);
    const startTimeRef = useRef<number>(0);
    const intervalRef = useRef<number | null>(null);
-   const [displayTime, setDisplayTime] = useState(maxTime);
+   const roundKey = `${currentIdx}-${maxTime}`;
+   const [timerState, setTimerState] = useState({ key: roundKey, displayTime: maxTime });
+   if (timerState.key !== roundKey) {
+      setTimerState({ key: roundKey, displayTime: maxTime });
+   }
 
    useEffect(() => {
       const now = Date.now();
       startTimeRef.current = now;
-      setDisplayTime(maxTime);
 
       const circle = circleRef.current;
       if (!circle) return;
@@ -39,7 +44,7 @@ export const CircularTimer = ({
       intervalRef.current = window.setInterval(() => {
          const elapsed = (Date.now() - startTimeRef.current) / 1000;
          const remaining = Math.max(0, maxTime - elapsed);
-         setDisplayTime(remaining);
+         setTimerState({ key: roundKey, displayTime: remaining });
          if (remaining <= 0 && intervalRef.current !== null) {
             window.clearInterval(intervalRef.current);
          }
@@ -48,9 +53,25 @@ export const CircularTimer = ({
       return () => {
          if (intervalRef.current !== null) window.clearInterval(intervalRef.current);
       };
-   }, [currentIdx, maxTime]);
+   }, [currentIdx, maxTime, roundKey]);
 
-   const seconds = Math.ceil(displayTime);
+   useEffect(() => {
+      if (!paused) return;
+
+      if (intervalRef.current !== null) {
+         window.clearInterval(intervalRef.current);
+         intervalRef.current = null;
+      }
+
+      const circle = circleRef.current;
+      if (circle) {
+         const computedOffset = window.getComputedStyle(circle).strokeDashoffset;
+         circle.style.transition = "none";
+         circle.style.strokeDashoffset = computedOffset;
+      }
+   }, [paused]);
+
+   const seconds = Math.ceil(timerState.key === roundKey ? timerState.displayTime : maxTime);
 
    return (
       <div className="relative w-16 h-16">
