@@ -31,10 +31,24 @@ export const NextActionCard: React.FC<NextActionCardProps> = ({
 }) => {
   return (
     <div className="w-full space-y-4">
-      {/* Daily Bot Marathon Banner if available */}
-      {isMarathonLoading ? (
-        <div className="w-full h-20 bg-slate-900/50 border border-white/5 rounded-2xl animate-pulse flex flex-col justify-center px-6 gap-2" />
-      ) : isMarathonError || !activeDailyMarathons || activeDailyMarathons.length === 0 ? (
+      {/* Daily Bot Marathon Banner — retains exact structure while loading */}
+      {(activeDailyMarathons && activeDailyMarathons.length > 0) || (isMarathonLoading && !isMarathonError) ? (
+        <div className="w-full border border-white/5 rounded-2xl overflow-hidden shadow-xl">
+          <MarathonBanner
+            challenges={activeDailyMarathons}
+            allowFallbackShell={isMarathonLoading}
+            onClick={(challenge) => {
+              const targetId = challenge.challenge_id || challenge.challenge?.id;
+              if (targetId && targetId !== "daily-marathon-shell" && setSelectedChallengeId && setIsChallengeOpen) {
+                setSelectedChallengeId(targetId);
+                setIsChallengeOpen(true);
+              } else {
+                onNavigateChallenges();
+              }
+            }}
+          />
+        </div>
+      ) : (
         <div
           onClick={onNavigateChallenges}
           className="w-full flex items-center justify-between bg-red-800 rounded-2xl p-4 transition-all duration-300 shadow-md cursor-pointer group"
@@ -47,20 +61,6 @@ export const NextActionCard: React.FC<NextActionCardProps> = ({
             </div>
           </div>
           <ChevronRight size={16} className="text-indigo-400 group-hover:translate-x-0.5 transition-transform" />
-        </div>
-      ) : (
-        <div className="w-full border border-white/5 rounded-2xl overflow-hidden shadow-xl">
-          <MarathonBanner
-            challenges={activeDailyMarathons}
-            onClick={(challenge) => {
-              if (setSelectedChallengeId && setIsChallengeOpen) {
-                setSelectedChallengeId(challenge.challenge_id || challenge.challenge?.id);
-                setIsChallengeOpen(true);
-              } else {
-                onNavigateChallenges();
-              }
-            }}
-          />
         </div>
       )}
 

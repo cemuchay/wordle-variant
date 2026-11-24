@@ -16,6 +16,7 @@ import {
    runWithFailSafeRetry,
 } from "../services/bootOrchestrator";
 import { QueryClient } from "@tanstack/react-query";
+import { useChallengeStore } from "../store/useChallengeStore";
 
 describe("Trusted Device 24-Hour Boot & Background Revalidation Action Gate", () => {
    beforeEach(() => {
@@ -244,5 +245,44 @@ describe("Trusted Device 24-Hour Boot & Background Revalidation Action Gate", ()
       } finally {
          window.removeEventListener("app-visibility-visible", listener);
       }
+   });
+
+   it("persists open challenge snapshot in useChallengeStore so returning to Challenges populates immediately without loading screen", () => {
+      const mockChallenge: any = {
+         id: "challenge-abc",
+         creator_id: "user-123",
+         mode: "ANYTIME",
+         word_length: 5,
+         target_word: "OBFUSCATED",
+         salt: "salt",
+         max_time: null,
+         expires_at: "2027-01-01T00:00:00Z",
+         created_at: "2026-06-01T00:00:00Z",
+         participants: [],
+      };
+      const mockParticipation: any = {
+         id: "part-1",
+         challenge_id: "challenge-abc",
+         user_id: "user-123",
+         status: "playing",
+         score: 420,
+         attempts: 2,
+         guesses: [],
+         hints_used: false,
+         hint_record: null,
+      };
+
+      useChallengeStore.getState().setSelectedChallenge(mockChallenge);
+      useChallengeStore.getState().setMyParticipation(mockParticipation);
+
+      const snapshotRaw = safeLocalStorage.getItem("wordle_open_challenge_snapshot");
+      expect(snapshotRaw).toBeTruthy();
+      const parsed = JSON.parse(snapshotRaw!);
+      expect(parsed.selectedChallenge.id).toBe("challenge-abc");
+      expect(parsed.myParticipation.score).toBe(420);
+
+      // Clearing selectedChallenge (e.g. clicking Back to List) removes the open snapshot
+      useChallengeStore.getState().setSelectedChallenge(null);
+      expect(safeLocalStorage.getItem("wordle_open_challenge_snapshot")).toBeNull();
    });
 });

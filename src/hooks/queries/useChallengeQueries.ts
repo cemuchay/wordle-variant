@@ -67,11 +67,10 @@ export const usePlayedChallenges = (userId: string | undefined, page: number) =>
    useQuery({
       queryKey: ["played-challenges", userId, page],
       enabled: !!userId,
-      staleTime: 30_000,
-      gcTime: 300_000,
+      staleTime: 60_000,
+      gcTime: 600_000,
       queryFn: async () => {
          if (!userId) return { items: [], total: 0 };
-         console.log(`[NET-LOG][usePlayedChallenges] userId=${userId} page=${page}`, new Error().stack);
 
          const from = (page - 1) * PLAYED_PAGE_SIZE;
          const to = from + PLAYED_PAGE_SIZE - 1;
@@ -113,7 +112,28 @@ export const usePlayedChallenges = (userId: string | undefined, page: number) =>
             return { ...mapped, _section: isExpired ? "expired" : "played" };
          });
 
-         return { items, total: total || 0 };
+         const result = { items, total: total || 0 };
+         try {
+            safeLocalStorage.setItem(
+               `wordle_played_challenges_${userId}_p${page}`,
+               JSON.stringify(result),
+            );
+         } catch {
+            // Ignore quota errors
+         }
+         return result;
+      },
+      placeholderData: (previousData) => {
+         if (previousData) return previousData;
+         if (!userId) return undefined;
+         try {
+            const cached = safeLocalStorage.getItem(
+               `wordle_played_challenges_${userId}_p${page}`,
+            );
+            return cached ? JSON.parse(cached) : undefined;
+         } catch {
+            return undefined;
+         }
       },
    });
 

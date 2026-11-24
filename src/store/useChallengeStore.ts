@@ -1,6 +1,47 @@
 import { create } from 'zustand';
 import { type Challenge, type ChallengeParticipant } from '../hooks/useChallenge';
 import { MAX_ATTEMPTS, DEFAULT_WORD_LENGTH } from '../constants/game';
+import { safeLocalStorage } from '../utils/storage';
+
+const OPEN_CHALLENGE_SNAPSHOT_KEY = 'wordle_open_challenge_snapshot';
+
+function loadOpenChallengeSnapshot(): {
+    selectedChallenge: Challenge | null;
+    myParticipation: ChallengeParticipant | null;
+} {
+    try {
+        const raw = safeLocalStorage.getItem(OPEN_CHALLENGE_SNAPSHOT_KEY);
+        if (!raw) return { selectedChallenge: null, myParticipation: null };
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.selectedChallenge && typeof parsed.selectedChallenge.id === 'string') {
+            return {
+                selectedChallenge: parsed.selectedChallenge,
+                myParticipation: parsed.myParticipation || null,
+            };
+        }
+    } catch {
+        // Ignore parse error
+    }
+    return { selectedChallenge: null, myParticipation: null };
+}
+
+function saveOpenChallengeSnapshot(
+    selectedChallenge: Challenge | null,
+    myParticipation: ChallengeParticipant | null,
+): void {
+    try {
+        if (!selectedChallenge) {
+            safeLocalStorage.removeItem(OPEN_CHALLENGE_SNAPSHOT_KEY);
+        } else {
+            safeLocalStorage.setItem(
+                OPEN_CHALLENGE_SNAPSHOT_KEY,
+                JSON.stringify({ selectedChallenge, myParticipation, savedAt: Date.now() }),
+            );
+        }
+    } catch {
+        // Ignore storage error
+    }
+}
 
 export type ChallengeViewType = 'list' | 'lobby' | 'gameplay';
 
@@ -75,9 +116,11 @@ interface ChallengeState {
     resetForm: () => void;
 }
 
+const initialOpenSnapshot = loadOpenChallengeSnapshot();
+
 export const useChallengeStore = create<ChallengeState>((set) => ({
     // Initial State
-    activeTab: 'my',
+    activeTab: initialOpenSnapshot.selectedChallenge ? 'join' : 'my',
     isPlaying: false,
     joinId: '',
     previewParticipant: null,
@@ -91,8 +134,8 @@ export const useChallengeStore = create<ChallengeState>((set) => ({
     maxAttempts: MAX_ATTEMPTS,
     maxTime: null,
     invitedIds: [],
-    selectedChallenge: null,
-    myParticipation: null,
+    selectedChallenge: initialOpenSnapshot.selectedChallenge,
+    myParticipation: initialOpenSnapshot.myParticipation,
     searchQuery: '',
     statusFilter: 'ALL',
     modeFilter: 'ALL',
@@ -122,8 +165,14 @@ export const useChallengeStore = create<ChallengeState>((set) => ({
             ? state.invitedIds.filter(i => i !== id)
             : [...state.invitedIds, id]
     })),
-    setSelectedChallenge: (selectedChallenge) => set({ selectedChallenge }),
-    setMyParticipation: (myParticipation) => set({ myParticipation }),
+    setSelectedChallenge: (selectedChallenge) => set((state) => {
+        saveOpenChallengeSnapshot(selectedChallenge, selectedChallenge ? state.myParticipation : null);
+        return { selectedChallenge };
+    }),
+    setMyParticipation: (myParticipation) => set((state) => {
+        saveOpenChallengeSnapshot(state.selectedChallenge, myParticipation);
+        return { myParticipation };
+    }),
     setSearchQuery: (searchQuery) => set({ searchQuery }),
     setStatusFilter: (statusFilter) => set({ statusFilter }),
     setModeFilter: (modeFilter) => set({ modeFilter }),

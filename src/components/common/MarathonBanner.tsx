@@ -10,6 +10,7 @@ interface MarathonBannerProps {
     onClick: (challenge: any) => void;
     className?: string;
     showTimer?: boolean;
+    allowFallbackShell?: boolean;
 }
 
 const BannerItem = ({ challenge, onClick, showTimer, navigation }: { challenge: any, onClick: (c: any) => void, showTimer: boolean, navigation?: React.ReactNode }) => {
@@ -104,43 +105,53 @@ const BannerItem = ({ challenge, onClick, showTimer, navigation }: { challenge: 
                         Play Now &rarr;
                     </span>
                 </div>
-                {participantCount > 0 && (
-                    <div className="flex items-center gap-3 text-[10px] text-white/30 mt-1">
-                        {leader && leader.score > 0 && (
+                <div className="flex items-center gap-3 text-[10px] text-white/30 mt-1 min-h-[16px]">
+                    {participantCount > 0 ? (
+                        <>
+                            {leader && leader.score > 0 && (
+                                <span className="flex items-center gap-1 text-white">
+                                    <Trophy size={11} className={config.textAccent} />
+                                    <span className="font-medium text-white uppercase">{formatUsername(leader.profiles.username)}</span>
+                                    <span className="font-black tabular-nums">{leader.score}</span>
+                                </span>
+                            )}
                             <span className="flex items-center gap-1 text-white">
-                                <Trophy size={11} className={config.textAccent} />
-                                <span className="font-medium text-white uppercase">{formatUsername(leader.profiles.username)}</span>
-                                <span className="font-black tabular-nums">{leader.score}</span>
+                                <Swords size={11} />
+                                <span className="font-black tabular-nums">{gamesPlayed}</span>
+                                <span className="text-white/20">games</span>
                             </span>
-                        )}
-                        <span className="flex items-center gap-1 text-white">
-                            <Swords size={11} />
-                            <span className="font-black tabular-nums">{gamesPlayed}</span>
-                            <span className="text-white/20">games</span>
-                        </span>
-                        <span className="flex items-center gap-1 text-white">
-                            <Users size={11} />
-                            <span className="font-black tabular-nums">{participantCount}</span>
-
-                        </span>
-                    </div>
-                )}
+                            <span className="flex items-center gap-1 text-white">
+                                <Users size={11} />
+                                <span className="font-black tabular-nums">{participantCount}</span>
+                            </span>
+                        </>
+                    ) : (
+                        <div className="flex items-center gap-3 opacity-40">
+                            <span className="h-2.5 w-20 bg-white/15 rounded animate-pulse inline-block" />
+                            <span className="h-2.5 w-14 bg-white/10 rounded animate-pulse inline-block" />
+                            <span className="h-2.5 w-8 bg-white/10 rounded animate-pulse inline-block" />
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
 };
 
-export const MarathonBanner = ({ challenges, onClick, className, showTimer = true }: MarathonBannerProps) => {
+export const MarathonBanner = ({ challenges, onClick, className, showTimer = true, allowFallbackShell = false }: MarathonBannerProps) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [direction, setDirection] = useState(0);
 
     const sortedChallenges = useMemo(() => {
+        if (challenges.length === 0 && allowFallbackShell) {
+            return [{ id: 'daily-marathon-shell', is_bot_marathon: true, challenge: { id: 'daily-marathon-shell', is_bot_marathon: true, participants: [] } }];
+        }
         return [...challenges].sort((a, b) => {
             const dateA = new Date(a.expires_at || a.challenge?.expires_at).getTime();
             const dateB = new Date(b.expires_at || b.challenge?.expires_at).getTime();
             return dateA - dateB;
         });
-    }, [challenges]);
+    }, [challenges, allowFallbackShell]);
 
     const paginate = (newDirection: number) => {
         setDirection(newDirection);

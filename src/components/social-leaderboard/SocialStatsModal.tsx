@@ -27,7 +27,7 @@ import {
   saveLeaderboardSnapshot,
   type RankMovementInfo,
 } from "../../utils/leaderboardSnapshotUtils";
-import { LeaderboardSkeleton } from "../common/Skeletons";
+import { LeaderboardFeedSkeleton, LeaderboardSkeleton } from "../common/Skeletons";
 import GuessPreviewModal from "../guess-preview";
 import { StreakCounter } from "../StreakCounter";
 import SocialTable from "./components/SocialTable";
@@ -223,7 +223,26 @@ export const SocialStatsModal: React.FC<Props> = ({
     safeSessionStorage.setItem("wordle_social_lb_view_mode", mode);
   };
 
-  // Fetch Leaderboard Data
+  const lastBgRefreshAtRef = useRef<Record<string, number>>({});
+
+  // Listen for optimistic boot prefetch completion so Leaderboard populates immediately
+  useEffect(() => {
+    const handlePrefetched = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (
+        detail?.data &&
+        detail?.timeframe === timeframe &&
+        (!currentDate || detail?.date === currentDate)
+      ) {
+        setLeaderboard(detail.data);
+        setLeaderboardError(null);
+      }
+    };
+    window.addEventListener("leaderboard-prefetched", handlePrefetched);
+    return () => window.removeEventListener("leaderboard-prefetched", handlePrefetched);
+  }, [timeframe, currentDate]);
+
+  // Fetch Leaderboard Data (Instant Cache Population + Silent Background Refresh)
   const fetchLeaderboard = useCallback(
     async (ignoreCache = false, isBackground = false) => {
       if (!isOpen || activeTab !== "leaderboard" || !currentDate) return;
@@ -239,11 +258,14 @@ export const SocialStatsModal: React.FC<Props> = ({
             const parsed = JSON.parse(cached);
             setLeaderboard(parsed);
             setLeaderboardError(null);
-            // If cached in sessionStorage (this session), return in 0ms.
-            // If only in localStorage (from previous session), render immediately and revalidate silently in background!
-            if (safeSessionStorage.getItem(cacheKey)) {
+            // We populated from cache in 0ms! Now trigger a silent background refresh
+            // (throttled to once every 20s per timeframe) so the UI never blocks.
+            const now = Date.now();
+            const lastBg = lastBgRefreshAtRef.current[cacheKey] || 0;
+            if (now - lastBg < 20_000) {
               return;
             }
+            lastBgRefreshAtRef.current[cacheKey] = now;
             isBackground = true;
           }
         } catch (e) {
@@ -907,8 +929,12 @@ export const SocialStatsModal: React.FC<Props> = ({
                     Retry Connection
                   </button>
                 </div>
-              ) : loading ? (
-                <LeaderboardSkeleton />
+              ) : loading && leaderboard.length === 0 ? (
+                supportsFeed && viewMode === "feed" ? (
+                  <LeaderboardFeedSkeleton />
+                ) : (
+                  <LeaderboardSkeleton />
+                )
               ) : leaderboard.length === 0 ? (
                 <p className="text-center text-[10px] text-gray-500 uppercase py-16 tracking-widest font-black">
                   No scores submitted yet for this period

@@ -27,7 +27,7 @@ export const RegularGameplay = memo(function RegularGameplay({
     challenge, participation, triggerToast, submitChallengeResult, onFinish, gameIndex, onBack
 }: RegularGameplayProps) {
     const { setBackAction } = useChallengeContext();
-    const { isDynamicIslandVisible } = useApp();
+    const { isDynamicIslandVisible, isChallengeOpen, isChatOpen } = useApp();
 
     const { state, actions, isSaving, syncFailed, retryCount, wordLength, maxAttempts, networkLogs } = useChallengeGameEngine({
         challenge,
@@ -198,8 +198,8 @@ export const RegularGameplay = memo(function RegularGameplay({
         }
     }, [isGameOver, wordLength]);
 
-    // Physical Keyboard Support
-    useKeyboard(actions, isGameOver);
+    // Physical Keyboard Support (disabled when challenge view is hidden or chat is open)
+    useKeyboard(actions, isGameOver || !isChallengeOpen || isChatOpen);
 
     useEffect(() => {
         // Ensure window has focus to capture keyboard events when game starts

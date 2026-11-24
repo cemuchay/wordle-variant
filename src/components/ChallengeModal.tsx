@@ -367,7 +367,7 @@ const AuthenticatedChallengeContent = memo(
         handleViewChallenge(initialChallengeId);
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
+    }, [initialChallengeId])
 
     // Reset played page when navigating tabs or changing filters
     useEffect(() => {
@@ -536,11 +536,15 @@ const AuthenticatedChallengeContent = memo(
 
                       {/* Search and Filters Toggle */}
                       <div className="space-y-4">
-                        {dailyMarathonChallenges.length > 0 && listColumn === 'unplayed' && (
+                        {listColumn === 'unplayed' && (dailyMarathonChallenges.length > 0 || loading) && (
                           <MarathonBanner
                             challenges={dailyMarathonChallenges}
+                            allowFallbackShell={loading}
                             onClick={(challenge) => {
-                              handleViewChallenge(challenge.challenge_id || challenge.challenge?.id)
+                              const cid = challenge.challenge_id || challenge.challenge?.id;
+                              if (cid && cid !== "daily-marathon-shell") {
+                                handleViewChallenge(cid);
+                              }
                             }}
                           />
                         )}
@@ -644,9 +648,7 @@ const AuthenticatedChallengeContent = memo(
                       </div>
 
                       <div className="space-y-4">
-                        {loading && displayChallenges.length === 0 ? (
-                          <ChallengeSkeleton />
-                        ) : (isPlayedFetching && listColumn === 'played') || (loading && listColumn !== 'played') ? (
+                        {(loading || (isPlayedFetching && listColumn === 'played')) && displayChallenges.length === 0 ? (
                           <ChallengeSkeleton />
                         ) : displayChallenges.length === 0 ? (
                           <div className="py-12 text-center text-white">

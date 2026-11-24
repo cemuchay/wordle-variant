@@ -2,7 +2,7 @@
 import { useCallback, useState, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import type { AppUser } from '../types/game';
-import { safeSessionStorage } from '../utils/storage';
+import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 
 import { fetchWithRetry } from '../utils/fetchWithRetry';
 
@@ -102,17 +102,21 @@ export const useChallenge = (_user: AppUser | null) => {
         return p;
     }, []);
 
-    const subscribeToParticipants = useCallback((challengeId: string) => {
+    const subscribeToParticipants = useCallback((challengeId: string, seedParticipants?: ChallengeParticipant[]) => {
         const channelName = `challenge_participants_${challengeId}`;
         
         activeChallengeIdRef.current = challengeId;
         
-        // Attempt to load from sessionStorage to prevent loading flash
+        // Attempt to load from sessionStorage, localStorage, or passed seedParticipants to prevent loading flash
         let initialParticipants: ChallengeParticipant[] = [];
         try {
-            const cached = safeSessionStorage.getItem(`wordle_challenge_participants_${challengeId}`);
+            const cached =
+                safeSessionStorage.getItem(`wordle_challenge_participants_${challengeId}`) ||
+                safeLocalStorage.getItem(`wordle_challenge_participants_${challengeId}`);
             if (cached) {
                 initialParticipants = JSON.parse(cached);
+            } else if (Array.isArray(seedParticipants) && seedParticipants.length > 0) {
+                initialParticipants = seedParticipants;
             }
         } catch (e) {
             console.error('Failed to parse cached participants', e);
@@ -120,6 +124,7 @@ export const useChallenge = (_user: AppUser | null) => {
 
         setParticipants(initialParticipants);
         participantsRef.current = initialParticipants;
+        setLoadingParticipants(initialParticipants.length === 0);
         setParticipantsError(null);
 
         // Remove existing channel if it exists
@@ -176,6 +181,7 @@ export const useChallenge = (_user: AppUser | null) => {
                     participantsRef.current = normalized;
                     try {
                         safeSessionStorage.setItem(`wordle_challenge_participants_${challengeId}`, newStringified);
+                        safeLocalStorage.setItem(`wordle_challenge_participants_${challengeId}`, newStringified);
                     } catch (e) {
                         console.error('Failed to cache participants', e);
                     }

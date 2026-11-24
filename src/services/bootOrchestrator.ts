@@ -2,7 +2,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { supabase } from "../lib/supabaseClient";
 import { useAppStore } from "../store/useAppStore";
-import { safeLocalStorage } from "../utils/storage";
+import { safeLocalStorage, safeSessionStorage } from "../utils/storage";
 import {
    getLagosDateSync,
    getTrustedDeviceStamp,
@@ -82,6 +82,68 @@ class BootOrchestrator {
    private lastHiddenAt = Date.now();
    private lastKnownLagosDate = getLagosDateSync();
    private isChatBootstrappedForUser: string | null = null;
+   private leaderboardPrefetchDate: string | null = null;
+   private leaderboardPrefetchInFlight = false;
+
+   /**
+    * Optimistically prefetches today's leaderboard on boot so switching to the
+    * Leaderboard tab is 0ms (already populated in local/session cache), then
+    * silently refreshed in the background.
+    */
+   public async prefetchTodayLeaderboard(date?: string): Promise<void> {
+      const targetDate = date || getLagosDateSync();
+      if (!targetDate) return;
+      if (
+         this.leaderboardPrefetchInFlight ||
+         this.leaderboardPrefetchDate === targetDate
+      ) {
+         return;
+      }
+
+      this.leaderboardPrefetchInFlight = true;
+      const cacheKey = `wordle_global_leaderboard_today_${targetDate}`;
+
+      try {
+         await runWithFailSafeRetry(
+            async () => {
+               const { data: edgeRes, error } = await supabase.functions.invoke(
+                  "redis-cache",
+                  {
+                     body: {
+                        action: "get-leaderboard",
+                        timeframe: "today",
+                        date: targetDate,
+                        ignoreCache: false,
+                     },
+                  },
+               );
+               if (error) throw error;
+               if (edgeRes?.data) {
+                  const serialized = JSON.stringify(edgeRes.data);
+                  safeSessionStorage.setItem(cacheKey, serialized);
+                  safeLocalStorage.setItem(cacheKey, serialized);
+                  this.leaderboardPrefetchDate = targetDate;
+                  if (typeof window !== "undefined") {
+                     window.dispatchEvent(
+                        new CustomEvent("leaderboard-prefetched", {
+                           detail: {
+                              date: targetDate,
+                              timeframe: "today",
+                              data: edgeRes.data,
+                           },
+                        }),
+                     );
+                  }
+               }
+            },
+            { maxRetries: 2, baseDelayMs: 600, label: "leaderboard_prefetch" },
+         );
+      } catch {
+         // Non-fatal background prefetch error
+      } finally {
+         this.leaderboardPrefetchInFlight = false;
+      }
+   }
 
    /**
     * Stage 0: Synchronously seed TanStack Query cache from hot localStorage keys
@@ -91,6 +153,11 @@ class BootOrchestrator {
       try {
          const todayLagos = getLagosDateSync();
          this.lastKnownLagosDate = todayLagos;
+
+         // Optimistically schedule today's leaderboard fetch right after initial frame
+         runWhenIdle(() => {
+            this.prefetchTodayLeaderboard(todayLagos).catch(() => {});
+         }, 800);
 
          if (!queryClient.getQueryData(["server-date"])) {
             const stamp = getTrustedDeviceStamp();

@@ -345,32 +345,67 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         return p;
     }, []);
 
+    const discoverChallengesRef = useRef(discoverChallenges);
+    useEffect(() => {
+        discoverChallengesRef.current = discoverChallenges;
+    }, [discoverChallenges]);
+
     const handleViewChallenge = useCallback(async (id: string | null | undefined) => {
         if (!id || id === "null" || id === "undefined") {
             return;
         }
 
-        setBootstrappingMessage("Entering lobby...");
-
-        // 1. Check local cache (myChallenges) for immediate display
+        // 1. Check all local caches for immediate 0ms display (zero loading screen)
         const localMatch = myChallengesRef.current.find((item: any) => item.challenge_id === id || item.challenge?.id === id);
+        const discoverMatch = discoverChallengesRef.current.find((c: any) => c.id === id);
+        const currentSelected = useChallengeStore.getState().selectedChallenge;
+        const currentMyPart = useChallengeStore.getState().myParticipation;
 
-        if (localMatch && localMatch.challenge) {
-            const cachedChallenge = { ...localMatch.challenge };
-            cachedChallenge.participants = cachedChallenge.participants?.map((p: any) => normalizeParticipation(p, cachedChallenge)) || [];
+        let cachedChallenge: any =
+            localMatch?.challenge ||
+            discoverMatch ||
+            (currentSelected?.id === id ? currentSelected : null);
 
-            setSelectedChallenge(cachedChallenge);
-            setMyParticipation(normalizeParticipation(localMatch, cachedChallenge));
-            setActiveTab('join');
-        } else {
-            const currentSelected = useChallengeStore.getState().selectedChallenge;
-            if (currentSelected?.id !== id) {
-                setSelectedChallenge(null);
-                setMyParticipation(null);
+        if (!cachedChallenge) {
+            try {
+                const rawCached = safeLocalStorage.getItem(`wordle_challenge_cache_${id}`);
+                if (rawCached) {
+                    cachedChallenge = JSON.parse(rawCached);
+                }
+            } catch {
+                // Ignore parse error
             }
         }
 
-        // 2. Background Refresh / Fetch Detailed Data
+        if (cachedChallenge) {
+            const populatedChallenge = { ...cachedChallenge };
+            populatedChallenge.participants =
+                populatedChallenge.participants?.map((p: any) =>
+                    normalizeParticipation(p, populatedChallenge),
+                ) || [];
+
+            setSelectedChallenge(populatedChallenge);
+            if (localMatch) {
+                setMyParticipation(normalizeParticipation(localMatch, populatedChallenge));
+            } else if (currentSelected?.id === id && currentMyPart) {
+                setMyParticipation(normalizeParticipation(currentMyPart, populatedChallenge));
+            }
+            setActiveTab('join');
+
+            // Immediately seed participants into ChallengeLobby so there is zero participant skeleton
+            cleanupSubscription();
+            const earlyCleanup = subscribeToParticipants(
+                populatedChallenge.id,
+                populatedChallenge.participants,
+            );
+            participantsCleanupRef.current = earlyCleanup;
+        } else {
+            setBootstrappingMessage("Entering lobby...");
+            setSelectedChallenge(null);
+            setMyParticipation(null);
+        }
+
+        // 2. Silent Background Refresh / Fetch Detailed Data
         try {
             const challengePromise = queryClient.fetchQuery({
                 queryKey: ['challenge', id],
@@ -390,28 +425,43 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 }
             });
 
-            let challenge = localMatch?.challenge;
+            let challenge = cachedChallenge;
 
             // Run challenge fetch and my-challenges refetch in parallel
             const [fetchedChallenge] = await Promise.all([
-                challenge ? Promise.resolve(challenge) : challengePromise,
+                challenge ? challengePromise.catch(() => challenge) : challengePromise,
                 queryClient.refetchQueries({ queryKey: ['my-challenges'] })
             ]);
 
-            if (!challenge) {
-                challenge = fetchedChallenge;
+            if (fetchedChallenge) {
+                challenge = {
+                    ...cachedChallenge,
+                    ...fetchedChallenge,
+                    participants:
+                        fetchedChallenge.participants?.length
+                            ? fetchedChallenge.participants
+                            : cachedChallenge?.participants || [],
+                };
             }
 
             if (challenge) {
+                try {
+                    safeLocalStorage.setItem(
+                        `wordle_challenge_cache_${challenge.id}`,
+                        JSON.stringify(challenge),
+                    );
+                } catch {
+                    // Ignore storage error
+                }
+
                 const isExpired = new Date(challenge.expires_at) < new Date();
-                if (isExpired) {
+                if (isExpired && !cachedChallenge) {
                     triggerToast("This challenge has expired. Viewing results.", TOAST_DURATION.LONG);
                 }
 
                 // Add to recent challenges in localStorage
                 addRecentChallenge(challenge.id);
 
-                cleanupSubscription();
                 setSelectedChallenge(challenge);
                 setActiveTab('join');
 
@@ -462,25 +512,32 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                     setMyParticipation(null);
                 }
 
-                // subscribeToParticipants now returns a cleanup function
-                const cleanup = subscribeToParticipants(challenge.id);
-                participantsCleanupRef.current = cleanup;
+                // Ensure participants subscription is active
+                if (!participantsCleanupRef.current) {
+                    const cleanup = subscribeToParticipants(
+                        challenge.id,
+                        challenge.participants,
+                    );
+                    participantsCleanupRef.current = cleanup;
+                }
                 // Keep channelRef for backward compatibility (used elsewhere)
                 const existingChannels = supabase.getChannels().filter(
                     (c) => (c as any).topic === `realtime:challenge_participants_${challenge.id}` ||
                         (c as any).topic === `realtime:challenge_participants_marathon_${challenge.id}`
                 );
                 channelRef.current = existingChannels[0] || null;
-            } else {
+            } else if (!cachedChallenge) {
                 setSelectedChallenge(null);
                 setMyParticipation(null);
                 triggerToast("Challenge not found.", TOAST_DURATION.LONG);
             }
         } catch (err: any) {
             console.error("Error viewing challenge:", err);
-            triggerToast(err?.message || "Failed to load challenge details.", TOAST_DURATION.LONG);
-            setSelectedChallenge(null);
-            setMyParticipation(null);
+            if (!cachedChallenge) {
+                triggerToast(err?.message || "Failed to load challenge details.", TOAST_DURATION.LONG);
+                setSelectedChallenge(null);
+                setMyParticipation(null);
+            }
         } finally {
             setBootstrappingMessage(null);
         }
@@ -553,17 +610,15 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         }
     }, [selectedChallenge, effectiveUser, myParticipation, joinSelectedChallenge, normalizeParticipation, joinMutation.isPending, setMyParticipation, participants, loadingParticipants]);
 
-    // Reset challenge state on unmount (when closing ChallengeModal)
+    // Preserve active challenge state across tab switches (only reset transient preview overlays on unmount)
     useEffect(() => {
         return () => {
-            setSelectedChallenge(null);
-            setMyParticipation(null);
             setIsPlaying(false);
             setPreviewParticipant(null);
             setPreviewMarathonLength(null);
             setPreviewMarathonGameIndex(null);
         };
-    }, [setSelectedChallenge, setMyParticipation, setIsPlaying, setPreviewParticipant, setPreviewMarathonLength, setPreviewMarathonGameIndex]);
+    }, [setIsPlaying, setPreviewParticipant, setPreviewMarathonLength, setPreviewMarathonGameIndex]);
 
     const handleCreate = useCallback(async (customParams?: any, viewAfterCreate = true) => {
         if (!effectiveUser) return;
@@ -755,7 +810,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         }
     }, [myParticipation, selectedChallenge, marathonMutation, submitMutation, setMyParticipation]);
 
-    // Initial Load Logic
+    // Initial Load & Existing Open Challenge Restoration (0ms populate + silent background refresh)
     useEffect(() => {
         if (initialProcessed.current) return;
         initialProcessed.current = true;
@@ -771,10 +826,13 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 }
             });
         } else {
-            setSelectedChallenge(null);
-            setMyParticipation(null);
+            const existingOpen = useChallengeStore.getState().selectedChallenge;
+            if (existingOpen?.id) {
+                // An existing challenge was open: keep it populated and silently refresh in background
+                handleViewChallenge(existingOpen.id);
+            }
         }
-    }, [initialChallengeId, handleViewChallenge, setSelectedChallenge, setMyParticipation]);
+    }, [initialChallengeId, handleViewChallenge]);
 
     // Refresh challenge, participants, and user status when finishing/exiting gameplay
     const wasPlayingRef = useRef(isPlaying);

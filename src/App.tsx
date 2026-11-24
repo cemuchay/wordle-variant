@@ -290,17 +290,18 @@ function MainApp() {
   const [freePlayMode, setFreePlayMode] = useState<'guest' | 'archive'>('archive');
 
   const isAlreadyPlayedTodayOnLoad = useMemo(() => {
-    if (!isHydrated || !date || !user) return false;
+    if (!date) return false;
     const saved = safeLocalStorage.getItem(`wordle-${date}`);
     if (!saved) return false;
     try {
       const payload = JSON.parse(saved);
+      if (!isAuthLoading && Boolean(payload.isGuest) !== !user) return false;
       const isFinished = payload.status === "won" || payload.status === "lost" || (payload.guesses && payload.guesses.length >= (payload.config?.maxAttempts ?? MAX_ATTEMPTS));
       return !!isFinished;
     } catch {
       return false;
     }
-  }, [isHydrated, date, user]);
+  }, [date, user, isAuthLoading]);
 
   // Victory Splash Fireworks & Animation State
   const [showVictorySplash, setShowVictorySplash] = useState(false);
@@ -993,6 +994,7 @@ function MainApp() {
 
 
   const [hasVisitedLeaderboard, setHasVisitedLeaderboard] = useState(false);
+  const [hasVisitedChallenges, setHasVisitedChallenges] = useState(false);
   const leaderboardPrefetchInFlightRef = useRef(false);
 
   const handlePrefetchTab = useCallback(
@@ -1046,6 +1048,9 @@ function MainApp() {
 
     if (item === "leaderboard") {
       setHasVisitedLeaderboard(true);
+    }
+    if (item === "challenges") {
+      setHasVisitedChallenges(true);
     }
 
     setIsChatOpen(item === "chat");
@@ -1126,7 +1131,9 @@ function MainApp() {
     );
   }
 
-  const currentTheme = selectedChallenge || isChallengeOpen || isStatsOpen || activeNavigationItem === "challenges" || activeNavigationItem === "leaderboard" || isPlayingChallenge
+  const isChallengeContextActive = activeNavigationItem === "challenges" || isChallengeOpen;
+
+  const currentTheme = (isChallengeContextActive && (selectedChallenge || isPlayingChallenge)) || isChallengeOpen || isStatsOpen || activeNavigationItem === "challenges" || activeNavigationItem === "leaderboard"
     ? "#111827"
     : activeNavigationItem === "wordup" || isWordUpOpen
       ? "#18181b"
@@ -1134,13 +1141,13 @@ function MainApp() {
         ? "#0f172a"
         : "#121213";
 
-  const hideHeader = isPlayingChallenge || isBattlePlaying || isChatConversationOpen || !!selectedChallenge || activeNavigationItem === "leaderboard" || isTutorialOpen || isWordupTutorialOpen || (activeNavigationItem === "more" && (moreGameMode === "wordgrid" || moreGameMode === "wordscramble"));
+  const hideHeader = (isChallengeContextActive && (isPlayingChallenge || !!selectedChallenge)) || isBattlePlaying || isChatConversationOpen || activeNavigationItem === "leaderboard" || isTutorialOpen || isWordupTutorialOpen || (activeNavigationItem === "more" && (moreGameMode === "wordgrid" || moreGameMode === "wordscramble"));
 
   return (
     <AppLayout
       theme={currentTheme}
       hideHeader={hideHeader}
-      hideNavigation={isPlayingChallenge || isBattlePlaying || isFreePlayOpen || (activeNavigationItem === "more" && (moreGameMode === "wordscramble" || moreGameMode === "wordgrid"))}
+      hideNavigation={(isChallengeContextActive && isPlayingChallenge) || isBattlePlaying || isFreePlayOpen || (activeNavigationItem === "more" && (moreGameMode === "wordscramble" || moreGameMode === "wordgrid"))}
       headerProps={{
         hideGameplayActions: activeNavigationItem !== "play",
         onOpenSettings: () => setIsSettingsOpen(true),
@@ -1273,6 +1280,7 @@ function MainApp() {
                 letterStatuses={state.letterStatuses}
                 hintRecord={state.hintRecord}
                 isGameOver={state.isGameOver}
+                isRevealing={state.isRevealing}
                 isShake={state.isShake}
                 isSaving={isRevalidating || state.syncStatus === "syncing"}
                 onChar={actions.onChar}
@@ -1340,11 +1348,18 @@ function MainApp() {
             </div>
           )}
 
-          {activeNavigationItem === "challenges" && (
-            <div className="h-full flex flex-col items-center justify-center p-0 sm:p-2 bg-gray-900">
+          {/* Keep-Alive Challenges Tab: stays mounted once visited so an open challenge never shows a loading screen */}
+          {(activeNavigationItem === "challenges" || hasVisitedChallenges) && (
+            <div
+              className={
+                activeNavigationItem === "challenges"
+                  ? "h-full flex flex-col items-center justify-center p-0 sm:p-2 bg-gray-900"
+                  : "hidden"
+              }
+            >
               <Suspense fallback={null}>
                 <ChallengeModal
-                  isOpen={true}
+                  isOpen={activeNavigationItem === "challenges"}
                   inline={true}
                   onClose={() => {
                     setIsChallengeOpen(false);

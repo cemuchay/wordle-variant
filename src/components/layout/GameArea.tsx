@@ -16,6 +16,7 @@ interface GameAreaProps {
     letterStatuses: Record<string, LetterStatus>;
     hintRecord: { letter: string; index: number; row?: number } | null;
     isGameOver: boolean;
+    isRevealing?: boolean;
     isShake?: boolean;
     isSaving?: boolean;
     onChar: (char: string) => void;
@@ -53,6 +54,7 @@ export const GameArea = ({
     letterStatuses,
     hintRecord,
     isGameOver,
+    isRevealing = false,
     isShake,
     onChar,
     onDelete,
@@ -86,8 +88,12 @@ export const GameArea = ({
     const keyboardRef = useRef<HTMLDivElement>(null);
     const wasGameOverOnMount = useRef(isGameOver || isAlreadyPlayed);
 
-    // Instantaneous game over state resolution
-    const [hideKeyboard, setHideKeyboard] = useState(wasGameOverOnMount.current);
+    // Instantaneous game over state resolution (0ms when already finished and not mid-reveal animation)
+    const [hideKeyboardState, setHideKeyboard] = useState(
+        () => wasGameOverOnMount.current || (isGameOver && !isRevealing),
+    );
+    const hideKeyboard =
+        isAlreadyPlayed || (isGameOver && !isRevealing) || hideKeyboardState;
     const [isBoardCollapsed, setIsBoardCollapsed] = useState(true);
 
     const updateDimensions = useCallback(() => {

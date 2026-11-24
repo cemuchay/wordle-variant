@@ -244,7 +244,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
     setPreviewParticipant,
     handleStartGame,
     setSelectedChallenge,
-    loading,
+    bootstrappingMessage,
     registerAnonymousUser,
     effectiveUser,
     setIsEditingChallenge,
@@ -683,7 +683,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
               ) : !myHasFinished ? (
                 <button
                   onClick={handleStartGame}
-                  disabled={loading}
+                  disabled={!!bootstrappingMessage}
                   className={`w-full ${dayTheme ? dayTheme.accent : 'bg-correct'} text-black py-4 rounded-2xl font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer`}
                 >
                   <Play size={18} fill="currentColor" />{" "}
