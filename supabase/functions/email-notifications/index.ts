@@ -1,6 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
 import formatUsername from "../_shared/formatUsername.ts";
+import { runOtdbCurationInBackground } from "../_shared/otdbCurator.ts";
+
+// Scheduled (cron) actions that also kick off background trivia curation
+const CURATION_PIGGYBACK_ACTIONS = new Set([
+   "morning-reminders",
+   "evening-reminders",
+   "weekly-report",
+   "bot-marathon-new-event",
+]);
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = (
@@ -1006,6 +1015,19 @@ serve(async (req) => {
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
       const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+      // ── Piggyback: curate WordUp trivia from Open Trivia DB in parallel ──
+      // Non-blocking: runs alongside the email loop, never throws, time-boxed,
+      // and kept alive past the response via EdgeRuntime.waitUntil.
+      if (CURATION_PIGGYBACK_ACTIONS.has(action) && body.skip_curation !== true) {
+         runOtdbCurationInBackground(supabase, {
+            maxCategories: 2,
+            amountPerCategory: 25,
+            ttlDays: 30,
+            timeoutMs: 20_000,
+            log: (m) => console.log(m),
+         });
+      }
 
       let sentCount = 0;
 

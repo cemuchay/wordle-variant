@@ -1244,9 +1244,13 @@ export function useGameEngine(props: EngineProps) {
                     cleanIdRef.current = cleanId;
                     if (isProceduralCategory(category)) {
                         const seed = `${cleanId}-${category}`;
+                        const { getQuestionRequestContext, recordPlayedQuestions } = await import(
+                            "../../shared/questionHistoryService"
+                        );
+                        const { userId, excludeQuestionIds } = await getQuestionRequestContext(category);
                         const { data: edgeData } = await supabase.functions.invoke(
                             "generate-match-questions",
-                            { body: { matchId: cleanId, category, seed } },
+                            { body: { matchId: cleanId, category, seed, userId, excludeQuestionIds } },
                         );
                         if (edgeData?.encryptedQuestions && edgeData?.encryptionKey) {
                             encryptedQuestionsRef.current = edgeData.encryptedQuestions;
@@ -1255,6 +1259,7 @@ export function useGameEngine(props: EngineProps) {
                                 questions: edgeData.encryptedQuestions,
                                 encryption_key: edgeData.encryptionKey,
                             } as unknown as Parameters<typeof decryptMatchQuestions>[0]);
+                            recordPlayedQuestions(category, questions as Array<{ id?: unknown }>);
                         } else {
                             questions = await generateWordUpQuestions(category);
                             const fKey = generateSecretKey();

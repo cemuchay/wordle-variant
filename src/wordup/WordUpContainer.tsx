@@ -78,6 +78,18 @@ export const WordUpContainer = ({
       }
    }, [wordupMode, refreshPausedMatches]);
 
+   // Background, throttled Open Trivia DB curation while the user is in /wordup
+   useEffect(() => {
+      const timer = setTimeout(() => {
+         import("./shared/otdbClientCurator")
+            .then(({ maybeCurateWordUpTrivia }) =>
+               maybeCurateWordUpTrivia(safeLocalStorage.getItem("wordup_last_category")),
+            )
+            .catch(() => { /* non-critical */ });
+      }, 4000);
+      return () => clearTimeout(timer);
+   }, []);
+
    const handleResumePausedMatch = useCallback((paused: PausedMatch) => {
       updateLastCategory(paused.categoryId);
       const liveStore = useLiveStore.getState();
@@ -139,9 +151,11 @@ export const WordUpContainer = ({
          if (isProceduralCategory(cat)) {
             const seed = `${rawMatchId}-${cat}`;
             try {
+               const { getQuestionRequestContext, recordPlayedQuestions } = await import("./shared/questionHistoryService");
+               const { userId, excludeQuestionIds } = await getQuestionRequestContext(cat);
                const { data: edgeData } = await supabase.functions.invoke(
                   "generate-match-questions",
-                  { body: { matchId: rawMatchId, category: cat, seed, count: totalRounds } }
+                  { body: { matchId: rawMatchId, category: cat, seed, count: totalRounds, userId, excludeQuestionIds } }
                );
                if (edgeData?.encryptedQuestions && edgeData?.encryptionKey) {
                   secretKey = edgeData.encryptionKey;
@@ -150,6 +164,7 @@ export const WordUpContainer = ({
                      questions: edgeData.encryptedQuestions,
                      encryption_key: edgeData.encryptionKey,
                   });
+                  recordPlayedQuestions(cat, rawQuestions);
                }
             } catch (err) {
                console.warn("[WordUpContainer] Edge question generation failed for category:", cat, err);

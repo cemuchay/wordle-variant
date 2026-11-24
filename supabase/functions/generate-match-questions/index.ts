@@ -1005,6 +1005,17 @@ function _generateQuestion(
    };
 }
 
+function cryptoRandom(): number {
+   const buf = new Uint32Array(1);
+   crypto.getRandomValues(buf);
+   return buf[0] / 4294967296;
+}
+
+/** Unbiased Fisher-Yates shuffle using crypto randomness. */
+function cryptoShuffle<T>(arr: T[]): T[] {
+   return seededShuffle(arr, cryptoRandom);
+}
+
 function resolveHandcraftedQuestion(hq: any, rng: () => number): any {
    let finalPrompt = hq.prompt;
    let finalAnswer = hq.answer;
@@ -1032,12 +1043,31 @@ function resolveHandcraftedQuestion(hq: any, rng: () => number): any {
       }
    }
 
-   // Randomize options (limit to 4: correct + 3 wrong)
-   const wrongChoices = finalChoices.filter((c: string) => c !== finalAnswer);
-   const shuffledWrong = seededShuffle(wrongChoices, rng);
-   const chosenWrong = shuffledWrong.slice(0, Math.min(3, shuffledWrong.length));
-   const mergedChoices = [finalAnswer, ...chosenWrong];
-   const shuffledFinalChoices = seededShuffle(mergedChoices, rng);
+   // Normalize: trim + dedupe so stray whitespace never yields broken/duplicate options
+   const answerStr = String(finalAnswer ?? "").trim();
+   const cleanedChoices: string[] = Array.from(
+      new Set(
+         (Array.isArray(finalChoices) ? finalChoices : [])
+            .map((c: unknown) => String(c ?? "").trim())
+            .filter(Boolean),
+      ),
+   );
+   finalAnswer = answerStr;
+
+   // Keep True/False in natural order
+   const isTrueFalse =
+      cleanedChoices.length === 2 && cleanedChoices.includes("True") && cleanedChoices.includes("False");
+
+   let shuffledFinalChoices: string[];
+   if (isTrueFalse) {
+      shuffledFinalChoices = ["True", "False"];
+   } else {
+      // Limit to 4 options (correct + 3 wrong), then shuffle with unbiased crypto randomness.
+      // Questions are persisted once per match, so both players still see the same order.
+      const wrongChoices = cleanedChoices.filter((c) => c !== answerStr);
+      const chosenWrong = cryptoShuffle(wrongChoices).slice(0, Math.min(3, wrongChoices.length));
+      shuffledFinalChoices = cryptoShuffle([answerStr, ...chosenWrong]);
+   }
 
    return {
       type: "definition",
@@ -1058,8 +1088,19 @@ serve(async (req) => {
    }
 
    try {
-      const { matchId, category, seed: clientSeed, count: clientCount } = await req.json();
+      const {
+         matchId,
+         category,
+         seed: clientSeed,
+         count: clientCount,
+         userId: clientUserId,
+         excludeQuestionIds: rawExcludeIds,
+      } = await req.json();
       const targetQuestionCount = typeof clientCount === "number" && clientCount > 0 ? Math.min(clientCount, 70) : 7;
+      const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const clientExcludeIds: string[] = Array.isArray(rawExcludeIds)
+         ? rawExcludeIds.filter((id: unknown) => typeof id === "string" && UUID_RX.test(id)).slice(0, 300)
+         : [];
 
       if (!matchId || !category) {
          return new Response(
@@ -1103,6 +1144,23 @@ serve(async (req) => {
       if (existing?.player1_id) playerIds.push(existing.player1_id);
       if (existing?.player2_id && !existing.is_bot_match) {
          playerIds.push(existing.player2_id);
+      }
+
+      // Prefetched / pre-insert matches (bot prefetch, marathon) have no match row yet.
+      // Accept the caller's userId only if it matches the verified JWT, so history is
+      // still excluded + recorded and back-to-back matches don't repeat questions.
+      if (playerIds.length === 0 && typeof clientUserId === "string" && UUID_RX.test(clientUserId)) {
+         try {
+            const jwt = (req.headers.get("Authorization") || "").replace(/Bearer /i, "").trim();
+            if (jwt) {
+               const { data: authData } = await supabaseClient.auth.getUser(jwt);
+               if (authData?.user?.id === clientUserId) {
+                  playerIds.push(clientUserId);
+               }
+            }
+         } catch (e: any) {
+            console.warn(`${logPrefix} Could not verify caller userId:`, e?.message);
+         }
       }
 
        // Fetch category profile ratings and compute target difficulty
@@ -1265,114 +1323,74 @@ serve(async (req) => {
             userTopicSkill = 1500;
          }
 
-          // Compute difficulty range around target
-          const diffMin = Math.max(1, targetDifficulty - 1);
-          const diffMax = Math.min(5, targetDifficulty + 1);
-          const MIN_HANDCRAFTED_POOL = 10;
+           // Compute difficulty range around target
+           const MAX_SEEN_HISTORY_ROWS = 5000;
 
-          // Step 1: Find question IDs that BOTH players have seen (to exclude them)
-          let bothSeenIds: string[] = [];
-          if (playerIds.length >= 2) {
-             try {
-                const { data: seenData } = await supabaseClient
-                   .from("wordup_user_handcrafted_history")
-                   .select("question_id, user_id")
-                   .in("user_id", playerIds);
+           // Step 1: Seen history scoped to THESE players only (works for solo/bot matches too).
+           // Tracks how many players saw each question and when it was last seen (for LRU recycling).
+           const seenMap = new Map<string, { users: Set<string>; lastSeen: number }>();
+           if (playerIds.length >= 1) {
+              try {
+                 const { data: seenData } = await supabaseClient
+                    .from("wordup_user_handcrafted_history")
+                    .select("question_id, user_id, seen_at")
+                    .in("user_id", playerIds)
+                    .order("seen_at", { ascending: false })
+                    .limit(MAX_SEEN_HISTORY_ROWS);
 
-                if (seenData) {
-                   // Group by question_id, find questions seen by ALL players
-                   const seenByQuestion = new Map<string, Set<string>>();
-                   for (const row of seenData) {
-                      if (!seenByQuestion.has(row.question_id)) {
-                         seenByQuestion.set(row.question_id, new Set());
-                      }
-                      seenByQuestion.get(row.question_id)!.add(row.user_id);
-                   }
-                   for (const [qid, users] of seenByQuestion) {
-                      if (playerIds.every((uid) => users.has(uid))) {
-                         bothSeenIds.push(qid);
-                      }
-                   }
-                }
-             } catch (e: any) {
-                console.warn(`${logPrefix} Could not fetch both-seen IDs:`, e.message);
-             }
-          }
-          console.log(
-             `${logPrefix} Both players have seen ${bothSeenIds.length} handcrafted questions — excluding from primary pool`,
-          );
+                 for (const row of seenData || []) {
+                    const ts = row.seen_at ? new Date(row.seen_at).getTime() : 0;
+                    const entry = seenMap.get(row.question_id) || { users: new Set<string>(), lastSeen: 0 };
+                    entry.users.add(row.user_id);
+                    entry.lastSeen = Math.max(entry.lastSeen, ts);
+                    seenMap.set(row.question_id, entry);
+                 }
+              } catch (e: any) {
+                 console.warn(`${logPrefix} Could not fetch seen history:`, e.message);
+              }
+           }
+           const clientExcludeSet = new Set<string>(clientExcludeIds);
+           console.log(
+              `${logPrefix} Seen history: ${seenMap.size} questions for ${playerIds.length} player(s), ${clientExcludeSet.size} client-excluded`,
+           );
 
-          // Step 2: Fetch handcrafted questions, excluding both-seen
-          let hcQuery = supabaseClient
-            .from("wordup_handcrafted_questions")
-            .select(`
-               id,
-               prompt,
-               choices,
-               answer,
-               explanation,
-               variations,
-               image_url,
-               difficulty,
-               history:wordup_user_handcrafted_history(user_id, seen_at),
-               stats:wordup_question_stats(difficulty_elo, topic_elo)
-            `)
-            .eq("category", category)
-            .or("expires_at.is.null,expires_at.gt.now()");
+           // Step 2: Fetch all active (unexpired) handcrafted + curated questions for the category
+           const { data: hcData, error: hcError } = await supabaseClient
+             .from("wordup_handcrafted_questions")
+             .select(`
+                id,
+                prompt,
+                choices,
+                answer,
+                explanation,
+                variations,
+                image_url,
+                difficulty,
+                stats:wordup_question_stats(difficulty_elo, topic_elo)
+             `)
+             .eq("category", category)
+             .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+             .limit(3000);
 
-          // Exclude both-seen if we found any
-          if (bothSeenIds.length > 0) {
-             hcQuery = hcQuery.not("id", "in", `(${bothSeenIds.join(",")})`);
-          }
-
-          let { data: hcData, error: hcError } = await hcQuery;
-
-          // Step 3: Widen difficulty range if pool is too small
-          if (!hcError && (hcData || []).length < MIN_HANDCRAFTED_POOL) {
-             console.log(
-                `${logPrefix} Only ${(hcData || []).length} unseen handcrafted, widening difficulty range`,
+          if (hcError) {
+             console.warn(
+                `${logPrefix} Error fetching handcrafted questions:`,
+                hcError,
              );
-             const { data: wideData } = await supabaseClient
-               .from("wordup_handcrafted_questions")
-               .select(`
-                  id,
-                  prompt,
-                  choices,
-                  answer,
-                  explanation,
-                  variations,
-                  image_url,
-                  difficulty,
-                  history:wordup_user_handcrafted_history(user_id, seen_at),
-                  stats:wordup_question_stats(difficulty_elo, topic_elo)
-               `)
-               .eq("category", category)
-               .or("expires_at.is.null,expires_at.gt.now()");
-
-             if (wideData) {
-                const currentIds = new Set((hcData || []).map((q: any) => q.id));
-                const additional = wideData.filter((q: any) => !currentIds.has(q.id));
-                hcData = [...(hcData || []), ...additional];
-             }
-          }
-
-         if (hcError) {
-            console.warn(
-               `${logPrefix} Error fetching handcrafted questions:`,
-               hcError,
-            );
-         } else {
+          } else {
+              const nowMs = Date.now();
               const enriched = (hcData || []).map((hq: any) => {
-                 const playerHistory = (hq.history || []).filter((h: any) => playerIds.includes(h.user_id));
-                 const seenUsers = new Set(playerHistory.map((h: any) => h.user_id));
-                 const seenCount = seenUsers.size;
+                 const seen = seenMap.get(hq.id);
+                 const clientExcluded = clientExcludeSet.has(hq.id);
+                 const seenCount = seen ? seen.users.size : 0;
                  const difficulty = hq.difficulty ?? 3;
-                 const topicElo = hq.stats?.topic_elo ?? 1500;
+                 const stats = Array.isArray(hq.stats) ? hq.stats[0] : hq.stats;
+                 const topicElo = stats?.topic_elo ?? 1500;
                  const diffScore = Math.abs(topicElo - userTopicSkill);
                  const difficultyProximity = Math.abs(difficulty - targetDifficulty);
-                 // seenStatus: "none" = unseen by both, "some" = seen by 1, "all" = seen by all
+                 // seenStatus: "none" = fresh for everyone, "some" = seen by a subset, "all" = seen by all
                  let seenStatus: "none" | "some" | "all" = "none";
-                 if (seenCount >= playerIds.length) seenStatus = "all";
+                 if (clientExcluded || (seenCount > 0 && seenCount >= playerIds.length)) seenStatus = "all";
                  else if (seenCount > 0) seenStatus = "some";
                  return {
                     id: hq.id,
@@ -1385,31 +1403,43 @@ serve(async (req) => {
                     difficulty,
                     seenCount,
                     seenStatus,
+                    lastSeenAt: Math.max(seen?.lastSeen ?? 0, clientExcluded ? nowMs : 0),
                     diffScore,
                     topicElo,
                     difficultyProximity,
                  };
               });
 
-             // Tiered bucket: neither → one → both, sorted by difficulty proximity first, then diffScore
-             const buckets = { neither: [] as any[], one: [] as any[], both: [] as any[] };
-             for (const hq of enriched) {
-                if (hq.seenCount === 0) buckets.neither.push(hq);
-                else if (hq.seenCount < playerIds.length) buckets.one.push(hq);
-                else buckets.both.push(hq);
-             }
-             for (const key of ["neither", "one", "both"] as const) {
-                buckets[key].sort((a, b) => {
-                   const dp = a.difficultyProximity - b.difficultyProximity;
-                   return dp !== 0 ? dp : a.diffScore - b.diffScore;
-                });
-             }
+              // Tiered ordering — the order of handcraftedList IS the pick priority:
+              //   1. unseen    → shuffled within difficulty-proximity bands (fresh + unpredictable)
+              //   2. seen-some → least-recently-seen first (shuffled within 24h bands)
+              //   3. seen-all  → least-recently-seen first (LRU recycling; just-played go last)
+              const orderRng = createSeededRandom(hashSeed(`${seed}-hc-order`));
+              const DAY_MS = 86_400_000;
+              const bandShuffle = (items: any[], bandOf: (q: any) => number) => {
+                 const bands = new Map<number, any[]>();
+                 for (const q of items) {
+                    const b = bandOf(q);
+                    if (!bands.has(b)) bands.set(b, []);
+                    bands.get(b)!.push(q);
+                 }
+                 return [...bands.keys()]
+                    .sort((a, b) => a - b)
+                    .flatMap((b) => seededShuffle(bands.get(b)!, orderRng));
+              };
 
-             handcraftedList = [
-                ...buckets.neither,
-                ...buckets.one,
-                ...buckets.both,
-             ];
+              const unseen = enriched.filter((q: any) => q.seenStatus === "none");
+              const seenSome = enriched.filter((q: any) => q.seenStatus === "some");
+              const seenAll = enriched.filter((q: any) => q.seenStatus === "all");
+
+              handcraftedList = [
+                 ...bandShuffle(unseen, (q) => (q.difficultyProximity <= 1 ? 0 : q.difficultyProximity)),
+                 ...bandShuffle(seenSome, (q) => Math.floor(q.lastSeenAt / DAY_MS)),
+                 ...bandShuffle(seenAll, (q) => Math.floor(q.lastSeenAt / DAY_MS)),
+              ];
+              console.log(
+                 `${logPrefix} Handcrafted tiers: unseen=${unseen.length} seenSome=${seenSome.length} seenAll=${seenAll.length}`,
+              );
          }
       } catch (e: any) {
          console.warn(`${logPrefix} Handcrafted query exception:`, e.message);
@@ -1454,7 +1484,9 @@ serve(async (req) => {
       );
 
       const matchRng = createSeededRandom(hashSeed(seed));
-      const shuffledHandcrafted = seededShuffle(handcraftedList, matchRng);
+      // handcraftedList is already priority-ordered (unseen → least-recently-seen);
+      // a flat shuffle here would push recently-seen questions back to the front.
+      const shuffledHandcrafted = handcraftedList;
       let handcraftedCursor = 0;
 
       const config = await fetchQuestionConfigFromDB(category, supabaseClient);
@@ -1890,6 +1922,8 @@ serve(async (req) => {
             encryptedQuestions,
             encryptionKey,
             questionCount: questions.length,
+            chosenHandcraftedIds,
+            chosenEntityIds: chosenEntities.filter((e) => e && e.id).map((e) => e.id),
          }),
          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );

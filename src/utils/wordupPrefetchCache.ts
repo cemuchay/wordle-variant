@@ -7,6 +7,11 @@ import {
    decryptMatchQuestions,
 } from "./wordupQuestionGenerator";
 import type { WordUpQuestion } from "./wordupQuestionGenerator";
+import {
+   getQuestionRequestContext,
+   recordPlayedQuestions,
+} from "../wordup/shared/questionHistoryService";
+import { extractQuestionIds } from "../wordup/shared/recentQuestions";
 
 export interface PrefetchedBotMatch {
    matchId: string;
@@ -71,6 +76,7 @@ export function cleanExpiredPrefetches() {
 /** Generates and returns a single bot match payload */
 async function generateBotMatchData(
    category: string,
+   extraExcludeIds: string[] = [],
 ): Promise<PrefetchedBotMatch> {
    const rawId = crypto.randomUUID();
    const matchId = `bot-match-${rawId}`;
@@ -81,9 +87,21 @@ async function generateBotMatchData(
    if (isProceduralCategory(category)) {
       const seed = `${rawId}-${category}`;
       try {
+         const { userId, excludeQuestionIds } = await getQuestionRequestContext(
+            category,
+            extraExcludeIds,
+         );
          const { data: edgeData } = await supabase.functions.invoke(
             "generate-match-questions",
-            { body: { matchId: rawId, category, seed } },
+            {
+               body: {
+                  matchId: rawId,
+                  category,
+                  seed,
+                  userId,
+                  excludeQuestionIds,
+               },
+            },
          );
          if (edgeData?.encryptedQuestions && edgeData?.encryptionKey) {
             encryptedQuestions = edgeData.encryptedQuestions;
@@ -154,6 +172,10 @@ export function getPrefetchedBotMatch(
    cache[category] = list;
    saveCache(cache);
 
+   // Mark consumed prefetch questions as played immediately so back-to-back games
+   // and newly replenished prefetches never repeat them.
+   recordPlayedQuestions(category, item.questions as Array<{ id?: unknown }>);
+
    if (requiredRounds === 7) {
       prefetchBotMatchInBackground(category);
    }
@@ -174,8 +196,15 @@ export async function prefetchBotMatchInBackground(
          if (list.length >= targetCount) return;
 
          const needed = targetCount - list.length;
+         // Collect IDs already queued in the prefetch cache so queued matches never overlap
+         const queuedIds = new Set<string>(
+            list.flatMap((m) => extractQuestionIds(m.questions as Array<{ id?: unknown }>)),
+         );
          for (let i = 0; i < needed; i++) {
-            const matchData = await generateBotMatchData(category);
+            const matchData = await generateBotMatchData(category, Array.from(queuedIds));
+            for (const qid of extractQuestionIds(matchData.questions as Array<{ id?: unknown }>)) {
+               queuedIds.add(qid);
+            }
             // Re-read cache to avoid race conditions during async loop
             const latestCache = getCache();
             const latestList = latestCache[category] || [];
