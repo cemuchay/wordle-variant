@@ -12,34 +12,34 @@ import { useAppInit } from '../hooks/useAppInit';
 import { useQueryClient } from '@tanstack/react-query';
 import { syncWithRetry } from '../lib/game-logic';
 import { safeLocalStorage } from '../utils/storage';
-import { getAllMessages, saveMessages, addMessage, updateMessage, removeMessage, purgeMessagesOlderThan } from '../utils/indexedDBMessages';
+import { addMessage, updateMessage, removeMessage } from '../utils/indexedDBMessages';
 import { getOutbox, removeOutbox, purgeOldOutbox } from '../utils/outbox';
 import { deliverOutboxEntry } from '../utils/messageDelivery';
-import { isReactionRow, mergeReadReceipts } from '../utils/readReceipts';
+import { isReactionRow } from '../utils/readReceipts';
 import { showDesktopNotification, } from '../utils/notifications';
 import { logger } from '../lib/logger';
 import { TOAST_DURATION } from '../constants/ui';
 import { AppContext, type AppContextType } from './AppContext';
-import { TIMEOUT, LIMITS, MISC } from '../constants/game';
 import { useIsTabVisible } from '../hooks/useIsTabVisible';
+import { getSharedAuthSession } from '../hooks/useAuth';
+import { getTrustedDeviceStamp } from '../utils/trustedDevice';
+import { bootOrchestrator } from '../services/bootOrchestrator';
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
-    const [user, setUser] = useState<any>(null);
+    const [user, setUser] = useState<any>(() => getTrustedDeviceStamp()?.user ?? null);
     const isTabVisible = useIsTabVisible();
     const [incomingWordUpInvite, setIncomingWordUpInvite] = useState<{ senderId: string; senderName: string; category: string } | null>(null);
     const [incomingAsyncInvite, setIncomingAsyncInvite] = useState<{ senderId: string; senderName: string; category: string; matchId: string } | null>(null);
     const queryClient = useQueryClient();
 
     useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null));
+        getSharedAuthSession().then(({ data: { session } }) => setUser(session?.user ?? null));
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setUser(session?.user ?? null));
         return () => subscription.unsubscribe();
     }, []);
 
     const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'disconnected'>('connected');
     const wasDisconnectedRef = useRef(false);
-    const lastHiddenTimeRef = useRef<number>(Date.now());
-    const lastSyncRef = useRef<number>(0);
 
     useEffect(() => {
         const channel = supabase
@@ -90,52 +90,43 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const readReceipts = useAppStore(s => s.readReceipts);
     const joinedGroupIds = useAppStore(s => s.joinedGroupIds);
     const hasHydrated = useAppStore(s => s.hasHydrated);
+    const dailyGameFinishedDate = useAppStore(s => s.dailyGameFinishedDate);
 
-    // Centralized reactive unread chat messages calculator
+    // Centralized reactive unread chat messages calculator (0-network synchronous calculation)
     useEffect(() => {
         if (!user?.id || !hasHydrated) {
             setUnreadCount(0);
             return;
         }
 
-        let isCancelled = false;
+        const cached = queryClient.getQueryData(['server-date']) as any;
+        const gameDate = cached?.formatted || null;
+        let hasPlayed = Boolean(gameDate && dailyGameFinishedDate === gameDate);
 
-        const calculateUnread = async () => {
-            let hasPlayed = false;
-            const cached = queryClient.getQueryData(['server-date']) as any;
-            const gameDate = cached?.formatted || null;
-            if (gameDate) {
-                const { data } = await supabase
-                    .from("scores")
-                    .select("status")
-                    .eq("user_id", user.id)
-                    .eq("game_date", gameDate)
-                    .in("status", ["won", "lost"])
-                    .maybeSingle();
-                hasPlayed = !!data;
+        if (!hasPlayed && gameDate) {
+            try {
+                const localGame = safeLocalStorage.getItem(`wordle-${gameDate}`);
+                if (localGame) {
+                    const parsed = JSON.parse(localGame);
+                    hasPlayed = parsed?.status === 'won' || parsed?.status === 'lost';
+                }
+            } catch {
+                // Ignore parse error
             }
+        }
 
-            if (isCancelled) return;
+        const joinedSet = new Set(joinedGroupIds);
+        const count = globalMessages.filter((m) => {
+            if (m.user_id === user.id) return false;
+            if (isReactionRow(m.content)) return false;
+            if (!joinedSet.has(m.group_id)) return false;
+            if (!hasPlayed && m.group_id === "00000000-0000-0000-0000-000000000002") return false;
+            const lastSeen = readReceipts[m.group_id] || new Date(0).toISOString();
+            return new Date(m.created_at).getTime() > new Date(lastSeen).getTime();
+        }).length;
 
-            const joinedSet = new Set(joinedGroupIds);
-            const count = globalMessages.filter((m) => {
-                if (m.user_id === user.id) return false;
-                if (isReactionRow(m.content)) return false;
-                if (!joinedSet.has(m.group_id)) return false;
-                if (!hasPlayed && m.group_id === "00000000-0000-0000-0000-000000000002") return false;
-                const lastSeen = readReceipts[m.group_id] || new Date(0).toISOString();
-                return new Date(m.created_at).getTime() > new Date(lastSeen).getTime();
-            }).length;
-
-            setUnreadCount(count);
-        };
-
-        calculateUnread();
-
-        return () => {
-            isCancelled = true;
-        };
-    }, [globalMessages, readReceipts, joinedGroupIds, user?.id, setUnreadCount, queryClient, hasHydrated]);
+        setUnreadCount(count);
+    }, [globalMessages, readReceipts, joinedGroupIds, user?.id, setUnreadCount, queryClient, hasHydrated, dailyGameFinishedDate]);
 
     // Refs for signaling
     const signalingChannelRef = useRef<any>(null);
@@ -550,149 +541,26 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             .map(u => ({ challengeId: u.activeVoiceRoomId!, user: u }));
     }, [onlineUsers, user?.id, myParticipations]);
 
-    // Global chat background sync: messages and read receipts pre-fetching + real-time subscription
+    // Global chat background sync via BootOrchestrator + real-time subscription
     useEffect(() => {
         if (!user?.id) return;
 
-        const fetchMessagesAndReceipts = async () => {
-            const { data: receiptData } = await supabase
-                .from('chat_read_receipts')
-                .select('group_id, last_seen_at')
-                .eq('user_id', user.id);
-
-            const receipts: Record<string, string> = {};
-            if (receiptData) {
-                receiptData.forEach(r => {
-                    receipts[r.group_id] = r.last_seen_at;
-                });
-            }
-            const currentReceipts = useAppStore.getState().readReceipts;
-            useAppStore.getState().setReadReceipts(mergeReadReceipts(currentReceipts, receipts));
-
-            const { data: memberData } = await supabase
-                .from('chat_group_members')
-                .select('group_id')
-                .eq('user_id', user.id)
-                .eq('status', 'joined');
-
-            const joinedSet = new Set<string>();
-            joinedSet.add("00000000-0000-0000-0000-000000000001");
-            joinedSet.add("00000000-0000-0000-0000-000000000002");
-            joinedSet.add("00000000-0000-0000-0000-000000000003");
-            if (memberData) {
-                memberData.forEach(m => joinedSet.add(m.group_id));
-            }
-            const joinedArray = Array.from(joinedSet);
-            useAppStore.getState().setJoinedGroupIds(joinedArray);
-
-            // 1. Read cached messages from IndexedDB for instant render
-            // (reaction-sync rows are signals, not messages — never ingested)
-            let cachedMessages: any[] = [];
-            try {
-                cachedMessages = (await getAllMessages()).filter((m: any) => !isReactionRow(m.content));
-                if (cachedMessages.length > 0) {
-                    cachedMessages.sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-                    useAppStore.getState().setGlobalMessages(cachedMessages);
-                }
-            } catch (e) {
-                console.warn('Failed to read cached messages from IndexedDB:', e);
-            }
-
-            // 2. Fetch delta from Supabase
-            const latestTimestamp = cachedMessages.length > 0
-                ? cachedMessages[cachedMessages.length - 1].created_at
-                : null;
-
-            if (latestTimestamp) {
-                const { data, error } = await supabase
-                    .from('messages')
-                    .select('*, profiles(username, avatar_url)')
-                    .gt('created_at', latestTimestamp)
-                    .order('created_at', { ascending: true });
-
-                if (!error && data && data.length > 0) {
-                    const fresh = data.filter((m: any) => !isReactionRow(m.content));
-                    fresh.forEach(msg => {
-                        useAppStore.getState().addGlobalMessage(msg);
-                    });
-                    if (fresh.length > 0) {
-                        saveMessages(fresh).catch(e => console.warn('Failed to cache delta messages:', e));
-                    }
-                }
-            } else {
-                // No cache — fetch full 300
-                const { data } = await supabase
-                    .from('messages')
-                    .select('*, profiles(username, avatar_url)')
-                    .order('created_at', { ascending: false })
-                    .limit(LIMITS.MESSAGES);
-
-                if (data) {
-                    const chronData = data.reverse().filter((m: any) => !isReactionRow(m.content));
-                    useAppStore.getState().setGlobalMessages(chronData);
-                    saveMessages(chronData).catch(e => console.warn('Failed to cache messages:', e));
-                }
-            }
-
-            // 3. Purge messages older than 7 days
-            purgeMessagesOlderThan(MISC.MESSAGE_PURGE_DAYS).catch(e => console.warn('Failed to purge old messages:', e));
-        };
-
-        const syncMessages = async () => {
-            if (!user?.id) return;
-
-            const now = Date.now();
-            if (now - lastSyncRef.current < TIMEOUT.MESSAGE_SYNC_THROTTLE) return;
-            lastSyncRef.current = now;
-
-            queryClient.invalidateQueries({ queryKey: ['notifications', user.id] });
-
-            const currentMessages = useAppStore.getState().globalMessages;
-            if (currentMessages.length === 0) {
-                fetchMessagesAndReceipts();
-                return;
-            }
-
-            const lastMessage = currentMessages[currentMessages.length - 1];
-            const lastCreatedAt = lastMessage?.created_at;
-
-            if (!lastCreatedAt) return;
-
-            const { data, error } = await supabase
-                .from('messages')
-                .select('*, profiles(username, avatar_url)')
-                .gt('created_at', lastCreatedAt)
-                .order('created_at', { ascending: true });
-
-            if (!error && data && data.length > 0) {
-                data.forEach(msg => {
-                    useAppStore.getState().addGlobalMessage(msg);
-                });
-                saveMessages(data).catch(e => console.warn('Failed to cache sync messages:', e));
-            }
-        };
-
-        fetchMessagesAndReceipts();
+        bootOrchestrator.bootstrapUserSession(user.id, queryClient);
 
         const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible') {
-                syncMessages();
-
-                const timeHidden = Date.now() - lastHiddenTimeRef.current;
-                const shouldRefresh = wasDisconnectedRef.current || timeHidden > TIMEOUT.REFRESH_AFTER_HIDDEN;
-
-                if (shouldRefresh) {
-                    queryClient.refetchQueries({ queryKey: ['server-date'], type: 'active' });
-                    window.dispatchEvent(new CustomEvent('app-visibility-visible'));
+            bootOrchestrator.handleVisibilityChange({
+                isVisible: document.visibilityState === 'visible',
+                userId: user.id,
+                queryClient,
+                wasDisconnected: wasDisconnectedRef.current,
+                clearDisconnectedFlag: () => {
                     wasDisconnectedRef.current = false;
-                }
-            } else {
-                lastHiddenTimeRef.current = Date.now();
-            }
+                },
+            });
         };
 
         const handleOnline = () => {
-            syncMessages();
+            bootOrchestrator.syncMessageDelta(user.id, queryClient).catch(() => {});
             queryClient.refetchQueries({ queryKey: ['server-date'], type: 'active' });
             window.dispatchEvent(new CustomEvent('app-visibility-visible'));
             wasDisconnectedRef.current = false;

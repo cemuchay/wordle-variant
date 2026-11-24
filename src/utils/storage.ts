@@ -24,6 +24,23 @@ const originalSessionStorage = (() => {
   }
 })();
 
+const HOT_BOOT_KEY_PREFIXES = [
+  'variant_trusted_device_v1',
+  'variant_daily_config_',
+  'cached-server-date',
+  'cached-profile-',
+  'cached-challenge-status-',
+  'wordle_guest_opted_in',
+  'wordle_tutorial_completed',
+  'wordle_last_hydrated_timestamp',
+  'variant-app-storage',
+  'sb-',
+];
+
+function isHotBootKey(key: string): boolean {
+  return HOT_BOOT_KEY_PREFIXES.some((prefix) => key === prefix || key.startsWith(prefix));
+}
+
 class SafeStorage implements Storage {
   private type: StorageType;
   private memoryStore: Record<string, string> = {};
@@ -43,8 +60,21 @@ class SafeStorage implements Storage {
     this._hydratePromise = (async () => {
       try {
         const entries = await idbGetAllEntries();
+        const storage = this.getUnderlyingStorage();
         for (const { key, value } of entries) {
-          this.memoryStore[key] = value;
+          if (!Object.prototype.hasOwnProperty.call(this.memoryStore, key)) {
+            this.memoryStore[key] = value;
+          }
+          // Ensure hot boot keys remain available synchronously in native localStorage for Frame-0 Trusted Device boots
+          if (this.type === 'local' && storage && isHotBootKey(key)) {
+            try {
+              if (storage.getItem(key) === null) {
+                storage.setItem(key, this.memoryStore[key]);
+              }
+            } catch {
+              // Ignore quota errors on hot key mirror
+            }
+          }
         }
         this._hydrated = true;
       } catch (e) {
@@ -314,11 +344,17 @@ export function purgeStaleStorage(): number {
         }
       }
 
-      // 3. Stale word definitions from previous days
+      // 3. Stale word definitions & daily configs from previous days
       if (key.startsWith('wordle_def_')) {
         const defDate = key.replace('wordle_def_', '');
         const todayStr = new Date().toISOString().split('T')[0];
         if (defDate !== todayStr) {
+          keysToRemove.push(key);
+        }
+      }
+      if (key.startsWith('variant_daily_config_')) {
+        const match = key.match(/^variant_daily_config_(\d{4}-\d{2}-\d{2})_/);
+        if (match && match[1] < sevenDaysAgo) {
           keysToRemove.push(key);
         }
       }

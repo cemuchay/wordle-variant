@@ -33,6 +33,7 @@ export interface AppLayoutHeaderProps {
 export interface AppLayoutNavigationProps {
     activeItem: 'play' | 'chat' | 'leaderboard' | 'challenges' | 'wordup' | 'more';
     onNavigate: (item: 'play' | 'chat' | 'leaderboard' | 'challenges' | 'wordup' | 'more') => void;
+    onPrefetch?: (item: 'play' | 'chat' | 'leaderboard' | 'challenges' | 'wordup' | 'more') => void;
     challengeUnreadCount: number;
     chatUnreadCount: number;
     wordupUnreadCount?: number;

@@ -86,14 +86,48 @@ export async function loadWordLists(length: number, isChallenge = false): Promis
    }
 }
 
-// Preload word lists on bootstrap to populate memory cache & IndexedDB
-const PRELOAD_LENGTHS = [4, 5, 6, 7];
-PRELOAD_LENGTHS.forEach(l => {
-   loadWordLists(l, false).catch(() => {});
-   if (l !== 5) {
-      loadWordLists(l, true).catch(() => {});
-   }
-});
+// Staggered idle preloader for word lists so initial boot & main thread are never blocked
+const PRELOAD_LENGTHS = [5, 4, 6, 7];
+let idlePreloadScheduled = false;
+
+export function scheduleIdleWordListPreload(priorityLength = 5): void {
+   if (
+      typeof window === 'undefined' ||
+      typeof indexedDB === 'undefined' ||
+      idlePreloadScheduled
+   )
+      return;
+   idlePreloadScheduled = true;
+
+   const runIdle = (cb: () => void, delayMs = 1500) => {
+      if ('requestIdleCallback' in window) {
+         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         (window as any).requestIdleCallback(cb, { timeout: 4000 });
+      } else {
+         setTimeout(cb, delayMs);
+      }
+   };
+
+   // 1. First load only the active/priority word length when idle
+   runIdle(() => {
+      loadWordLists(priorityLength, false).catch(() => {});
+
+      // 2. Stagger remaining lengths across subsequent idle callbacks
+      const remaining = PRELOAD_LENGTHS.filter((l) => l !== priorityLength);
+      remaining.forEach((l, idx) => {
+         setTimeout(() => {
+            runIdle(() => {
+               loadWordLists(l, false).catch(() => {});
+               if (l !== 5) {
+                  loadWordLists(l, true).catch(() => {});
+               }
+            }, 500);
+         }, (idx + 1) * 800);
+      });
+   }, 1200);
+}
+
+scheduleIdleWordListPreload();
 
 export const getWORDS_3 = () => loadWordLists(3).then(r => r.official);
 export const getWORDS_4 = () => loadWordLists(4).then(r => r.official);

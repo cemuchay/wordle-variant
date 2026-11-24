@@ -231,6 +231,7 @@ export const useChat = (userId: string) => {
    const [users, setUsers] = useState<
       { username: string; avatar_url: string; id: string }[]
    >([]);
+   const dailyGameFinishedDate = useAppStore((state) => state.dailyGameFinishedDate);
    const [hasPlayedToday, setHasPlayedToday] = useState(false);
    const [dailyGuesses, setDailyGuesses] = useState<any[]>([]);
 
@@ -247,9 +248,28 @@ export const useChat = (userId: string) => {
 
    const activeRoom = groups.find((g) => g.id === activeRoomId) || null;
 
-   // Check if user played today (unlock Game Analysis)
+   // Check if user played today (unlock Game Analysis) — fast synchronous check first
    useEffect(() => {
       if (!userId || !date) return;
+      if (dailyGameFinishedDate === date) {
+         // eslint-disable-next-line react-hooks/set-state-in-effect
+         setHasPlayedToday(true);
+         return;
+      }
+      try {
+         const localSaved = safeLocalStorage.getItem(`wordle-${date}`);
+         if (localSaved) {
+            const parsed = JSON.parse(localSaved);
+            if (parsed?.status === "won" || parsed?.status === "lost") {
+               setHasPlayedToday(true);
+               return;
+            }
+         }
+      } catch {
+         // Fall through to remote verification
+      }
+
+      let cancelled = false;
       const checkGameStatus = async () => {
          const { data } = await supabase
             .from("scores")
@@ -258,10 +278,15 @@ export const useChat = (userId: string) => {
             .eq("game_date", date)
             .in("status", ["won", "lost"])
             .maybeSingle();
-         setHasPlayedToday(!!data);
+         if (!cancelled) {
+            setHasPlayedToday(!!data);
+         }
       };
       checkGameStatus();
-   }, [userId, date]);
+      return () => {
+         cancelled = true;
+      };
+   }, [userId, date, dailyGameFinishedDate]);
 
    // Fetch guesses of users for today (for mention/tag autocomplete)
    useEffect(() => {
@@ -284,23 +309,20 @@ export const useChat = (userId: string) => {
       };
    }, [userId, date]);
 
-   // Fetch groups & invites on load
+   // Fetch groups & invites on load (Batched: 0 N+1 queries)
    const fetchGroups = useCallback(async () => {
       if (!userId) return;
 
-      // 1. Fetch core groups
-      const { data: coreData } = await supabase
-         .from("chat_groups")
-         .select("*")
-         .eq("is_core", true);
-
-      // 2. Fetch custom/dm memberships
-      const { data: memberData } = await supabase
-         .from("chat_group_members")
-         .select(
-            "group_id, status, chat_groups(*, creator:profiles!created_by(username))",
-         )
-         .eq("user_id", userId);
+      // 1. Fetch core groups and user's memberships in parallel
+      const [{ data: coreData }, { data: memberData }] = await Promise.all([
+         supabase.from("chat_groups").select("*").eq("is_core", true),
+         supabase
+            .from("chat_group_members")
+            .select(
+               "group_id, status, chat_groups(*, creator:profiles!created_by(username))",
+            )
+            .eq("user_id", userId),
+      ]);
 
       const activeGroups: ChatGroup[] =
          coreData && coreData.length > 0
@@ -316,7 +338,37 @@ export const useChat = (userId: string) => {
 
       const incomingInvites: any[] = [];
 
-      if (memberData) {
+      if (memberData && memberData.length > 0) {
+         // Collect all joined DM and custom group IDs for a single batched member lookup
+         const joinedNonCoreGroupIds: string[] = [];
+         for (const m of memberData) {
+            const cg = m.chat_groups as any;
+            if (!cg) continue;
+            if (
+               m.status === "joined" &&
+               (cg.type === "dm" || cg.type === "custom")
+            ) {
+               joinedNonCoreGroupIds.push(cg.id);
+            }
+         }
+
+         const membersByGroupId = new Map<string, any[]>();
+         if (joinedNonCoreGroupIds.length > 0) {
+            const { data: batchedMembers } = await supabase
+               .from("chat_group_members")
+               .select("group_id, user_id, status, profiles(username, avatar_url)")
+               .in("group_id", joinedNonCoreGroupIds);
+
+            if (batchedMembers) {
+               for (const bm of batchedMembers) {
+                  const gId = (bm as any).group_id;
+                  const list = membersByGroupId.get(gId) || [];
+                  list.push(bm);
+                  membersByGroupId.set(gId, list);
+               }
+            }
+         }
+
          for (const m of memberData) {
             const cg = m.chat_groups as any;
             if (!cg) continue;
@@ -328,19 +380,15 @@ export const useChat = (userId: string) => {
                   creator: cg.creator?.username || "Someone",
                });
             } else if (m.status === "joined") {
-               // If type is DM, resolve the dm partner's profile
                let dmPartner = undefined;
                let groupName = cg.name;
                let members = undefined;
+               const groupMemberRows = membersByGroupId.get(cg.id) || [];
 
                if (cg.type === "dm") {
-                  const { data: partner } = await supabase
-                     .from("chat_group_members")
-                     .select("user_id, profiles(username, avatar_url)")
-                     .eq("group_id", cg.id)
-                     .neq("user_id", userId)
-                     .maybeSingle();
-
+                  const partner = groupMemberRows.find(
+                     (gm: any) => gm.user_id !== userId,
+                  );
                   if (partner && partner.profiles) {
                      const p = partner.profiles as any;
                      dmPartner = {
@@ -351,14 +399,11 @@ export const useChat = (userId: string) => {
                      groupName = p.username;
                   }
                } else if (cg.type === "custom") {
-                  const { data: groupMembers } = await supabase
-                     .from("chat_group_members")
-                     .select("user_id, profiles(username, avatar_url)")
-                     .eq("group_id", cg.id)
-                     .eq("status", "joined");
-
-                  if (groupMembers) {
-                     members = groupMembers.map((gm: any) => ({
+                  const joinedRows = groupMemberRows.filter(
+                     (gm: any) => !gm.status || gm.status === "joined",
+                  );
+                  if (joinedRows.length > 0) {
+                     members = joinedRows.map((gm: any) => ({
                         user_id: gm.user_id,
                         username: gm.profiles?.username,
                         avatar_url: gm.profiles?.avatar_url,

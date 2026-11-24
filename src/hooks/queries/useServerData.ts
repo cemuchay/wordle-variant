@@ -2,9 +2,15 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabaseClient";
 import { getServerDate } from "../../lib/time";
 import { safeLocalStorage } from "../../utils/storage";
+import {
+   getLagosDateSync,
+   getTrustedDeviceStamp,
+   saveTrustedDeviceStamp,
+} from "../../utils/trustedDevice";
 
 /**
  * Hook to fetch the authoritative server date.
+ * Provides instant synchronous placeholderData on Trusted Devices (<24h) or when cached.
  */
 export const useAuthoritativeDate = () => {
    return useQuery({
@@ -12,12 +18,32 @@ export const useAuthoritativeDate = () => {
       queryFn: async () => {
          const date = await getServerDate();
          safeLocalStorage.setItem("cached-server-date", JSON.stringify(date));
+         saveTrustedDeviceStamp({ date: date.formatted });
          return date;
       },
       placeholderData: () => {
-         const cached = safeLocalStorage.getItem("cached-server-date");
-         if (cached) {
-            return JSON.parse(cached as string);
+         const todayLagos = getLagosDateSync();
+         const trusted = getTrustedDeviceStamp();
+         if (trusted) {
+            return {
+               raw: new Date(),
+               formatted: todayLagos,
+            };
+         }
+         try {
+            const cached = safeLocalStorage.getItem("cached-server-date");
+            if (cached) {
+               const parsed = JSON.parse(cached as string);
+               if (parsed?.formatted === todayLagos) {
+                  return parsed;
+               }
+               return {
+                  raw: new Date(),
+                  formatted: todayLagos,
+               };
+            }
+         } catch {
+            // Fall through
          }
          return undefined;
       },

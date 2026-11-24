@@ -126,7 +126,11 @@ export const useActions = ({
    }, [state.cursorIndex, state.currentGuess.length, dispatch]);
 
    const onEnter = useCallback(async () => {
-      if (isGameOver || isSaving || state.currentGuess.length !== wordLength)
+      if (isSaving) {
+         triggerToast("Syncing latest game state, please wait...", TOAST_DURATION.SHORT);
+         return;
+      }
+      if (isGameOver || state.currentGuess.length !== wordLength)
          return;
       if (isSubmittingRef.current) return;
       isSubmittingRef.current = true;
@@ -371,6 +375,7 @@ triggerToast(
       // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [
       isGameOver,
+      isSaving,
       state.currentGuess,
       state.timeLeft,
       wordLength,
@@ -402,6 +407,10 @@ triggerToast(
    ]);
 
    const handleHint = useCallback(async () => {
+      if (isSaving) {
+         triggerToast("Syncing latest game state, please wait...", TOAST_DURATION.SHORT);
+         return;
+      }
       if (isGameOver || usedHint) return;
 
       if (challenge.disable_hints) {
@@ -473,6 +482,7 @@ triggerToast(
       }
    }, [
       isGameOver,
+      isSaving,
       usedHint,
       challenge.disable_hints,
       guesses,

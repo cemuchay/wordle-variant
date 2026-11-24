@@ -6,6 +6,7 @@ import { useIsStandalone } from '../../hooks/useIsStandalone';
 interface AppNavigationProps {
     activeItem: 'play' | 'chat' | 'leaderboard' | 'challenges' | 'wordup' | 'more';
     onNavigate: (item: 'play' | 'chat' | 'leaderboard' | 'challenges' | 'wordup' | 'more') => void;
+    onPrefetch?: (item: 'play' | 'chat' | 'leaderboard' | 'challenges' | 'wordup' | 'more') => void;
     challengeUnreadCount: number;
     chatUnreadCount: number;
     wordupUnreadCount?: number;
@@ -15,6 +16,7 @@ interface AppNavigationProps {
 export const AppNavigation = ({
     activeItem,
     onNavigate,
+    onPrefetch,
     challengeUnreadCount,
     chatUnreadCount,
     wordupUnreadCount,
@@ -67,7 +69,15 @@ export const AppNavigation = ({
                         <button
                             key={item.id}
                             onClick={() => onNavigate(item.id)}
-                            onPointerEnter={item.id === 'more' && userId ? () => { queryClient.prefetchQuery({ queryKey: ['my-challenges', userId] }); } : undefined}
+                            onPointerEnter={() => {
+                                onPrefetch?.(item.id);
+                                if (item.id === 'challenges' && userId) {
+                                    queryClient.prefetchQuery({ queryKey: ['my-challenges', userId] });
+                                }
+                            }}
+                            onTouchStart={() => {
+                                onPrefetch?.(item.id);
+                            }}
                             className="flex flex-col items-center justify-center gap-0.5 py-0.5 px-1 sm:px-3 rounded-xl transition-all duration-300 relative group cursor-pointer focus:outline-none min-w-[60px] sm:min-w-[72px]"
                         >
                             {/* Icon Wrapper with bounce-on-hover / active scale */}

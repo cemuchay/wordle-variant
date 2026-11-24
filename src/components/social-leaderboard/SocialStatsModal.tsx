@@ -19,7 +19,7 @@ import { supabase } from "../../lib/supabaseClient";
 import { fetchSocialActivities, type SocialActivityItem } from "../../services/socialActivityService";
 import type { AppUser, LeaderboardEntry } from "../../types/game";
 import formatUsername from "../../utils/formatUsername";
-import { safeSessionStorage } from "../../utils/storage";
+import { safeLocalStorage, safeSessionStorage } from "../../utils/storage";
 import {
   cleanStaleLeaderboardSnapshots,
   computeLeaderboardMovement,
@@ -81,6 +81,9 @@ export const SocialStatsModal: React.FC<Props> = ({
     }
   }
 
+  const { date: currentDate, triggerToast } = useApp();
+  const fetchIdRef = useRef(0);
+
   const [timeframe, setTimeframe] = useState<Timeframe>("today");
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = safeSessionStorage.getItem("wordle_social_lb_view_mode") as ViewMode | null;
@@ -88,7 +91,18 @@ export const SocialStatsModal: React.FC<Props> = ({
     return saved === "table" || saved === "feed" ? saved : "feed";
   });
   const [hideGridWords, setHideGridWords] = useState(false);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>(() => {
+    if (!currentDate) return [];
+    const cacheKey = `wordle_global_leaderboard_today_${currentDate}`;
+    try {
+      const cached =
+        safeSessionStorage.getItem(cacheKey) ||
+        safeLocalStorage.getItem(cacheKey);
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
   const [loading, setLoading] = useState(false);
   const [selectedEntryIndex, setSelectedEntryIndex] = useState<number | null>(null);
   const [initialOpenAnalysis, setInitialOpenAnalysis] = useState(false);
@@ -104,9 +118,6 @@ export const SocialStatsModal: React.FC<Props> = ({
     hintRecord?: { letter: string; index: number; row?: number } | null;
   } | null>(null);
 
-  const { date: currentDate, triggerToast } = useApp();
-  const fetchIdRef = useRef(0);
-
   const targetLbDate = useMemo(() => {
     if (timeframe === "yesterday" && currentDate) {
       const d = new Date(currentDate);
@@ -116,20 +127,51 @@ export const SocialStatsModal: React.FC<Props> = ({
     return currentDate || "";
   }, [timeframe, currentDate]);
 
-  const [newsfeedActivities, setNewsfeedActivities] = useState<SocialActivityItem[]>([]);
+  const [newsfeedActivities, setNewsfeedActivities] = useState<SocialActivityItem[]>(() => {
+    if (!currentDate) return [];
+    try {
+      const cached =
+        safeSessionStorage.getItem(`wordle_social_newsfeed_${currentDate}`) ||
+        safeLocalStorage.getItem(`wordle_social_newsfeed_${currentDate}`);
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
   const [newsfeedLoading, setNewsfeedLoading] = useState(false);
 
-  // Fetch Newsfeed Activities for current timeframe
+  // Fetch Newsfeed Activities for current timeframe (Cache-First SWR)
   const fetchNewsfeed = useCallback(async (isBackground = false) => {
     if (!isOpen || activeTab !== "leaderboard" || !targetLbDate) return;
 
-    if (!isBackground) {
+    const newsfeedCacheKey = `wordle_social_newsfeed_${targetLbDate}`;
+    let hasCached = false;
+    try {
+      const cached =
+        safeSessionStorage.getItem(newsfeedCacheKey) ||
+        safeLocalStorage.getItem(newsfeedCacheKey);
+      if (cached) {
+        setNewsfeedActivities(JSON.parse(cached));
+        hasCached = true;
+      }
+    } catch {
+      // Ignore cache read error
+    }
+
+    if (!isBackground && !hasCached) {
       setNewsfeedLoading(true);
     }
 
     try {
       const activities = await fetchSocialActivities(targetLbDate, "daily_game", 60);
       setNewsfeedActivities(activities);
+      try {
+        const serialized = JSON.stringify(activities);
+        safeSessionStorage.setItem(newsfeedCacheKey, serialized);
+        safeLocalStorage.setItem(newsfeedCacheKey, serialized);
+      } catch {
+        // Ignore quota error
+      }
     } catch (err) {
       console.error("Failed to load newsfeed activities:", err);
     } finally {
@@ -190,12 +232,19 @@ export const SocialStatsModal: React.FC<Props> = ({
 
       if (!ignoreCache) {
         try {
-          const cached = safeSessionStorage.getItem(cacheKey);
+          const cached =
+            safeSessionStorage.getItem(cacheKey) ||
+            safeLocalStorage.getItem(cacheKey);
           if (cached) {
             const parsed = JSON.parse(cached);
             setLeaderboard(parsed);
             setLeaderboardError(null);
-            return;
+            // If cached in sessionStorage (this session), return in 0ms.
+            // If only in localStorage (from previous session), render immediately and revalidate silently in background!
+            if (safeSessionStorage.getItem(cacheKey)) {
+              return;
+            }
+            isBackground = true;
           }
         } catch (e) {
           console.error("Failed to parse cached leaderboard", e);
@@ -223,7 +272,9 @@ export const SocialStatsModal: React.FC<Props> = ({
           setLeaderboard(edgeRes.data);
           setLeaderboardError(null);
           try {
-            safeSessionStorage.setItem(cacheKey, JSON.stringify(edgeRes.data));
+            const serialized = JSON.stringify(edgeRes.data);
+            safeSessionStorage.setItem(cacheKey, serialized);
+            safeLocalStorage.setItem(cacheKey, serialized);
           } catch (e) {
             console.error("Failed to cache leaderboard data", e);
           }

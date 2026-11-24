@@ -15,6 +15,11 @@ const INITIAL_STATS: GameStats = {
    guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0, X: 0 },
 };
 
+const STATS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+let lastFetchedUserId: string | null = null;
+let lastFetchedAt = 0;
+let inflightStatsPromise: Promise<GameStats | null> | null = null;
+
 export const useWordleStats = (
    user: AppUser | null,
    isOpen: boolean,
@@ -49,7 +54,7 @@ export const useWordleStats = (
                key.startsWith(prefix) &&
                key !== todayKey &&
                key !== `${todayKey}-backup` &&
-               key !== "wordle-statistics"
+               !key.startsWith("wordle-statistics")
             ) {
                safeLocalStorage.removeItem(key);
             }
@@ -75,62 +80,111 @@ export const useWordleStats = (
       }
    }, [userId, date]);
 
-   const fetchCloudStats = useCallback(async () => {
+   const fetchCloudStats = useCallback(async (force = false) => {
       if (!userId) return;
+
+      const now = Date.now();
+      if (
+         !force &&
+         lastFetchedUserId === userId &&
+         now - lastFetchedAt < STATS_CACHE_TTL_MS
+      ) {
+         return;
+      }
+
+      if (!force && inflightStatsPromise && lastFetchedUserId === userId) {
+         const sharedResult = await inflightStatsPromise;
+         if (isMounted.current && sharedResult) {
+            setStats(sharedResult);
+         }
+         return;
+      }
 
       // Prevent cascading render by checking current state
       setLoading((prev) => (prev ? prev : true));
+      lastFetchedUserId = userId;
 
-      const { data, error } = await supabase
-         .from("scores")
-         .select("status, attempts, game_date")
-         .eq("user_id", userId)
-         .order("game_date", { ascending: true });
+      const promise = (async (): Promise<GameStats | null> => {
+         const { data, error } = await supabase
+            .from("scores")
+            .select("status, attempts, game_date")
+            .eq("user_id", userId)
+            .order("game_date", { ascending: true });
 
-      if (isMounted.current && !error && data) {
-         const constructed: GameStats = JSON.parse(
-            JSON.stringify(INITIAL_STATS)
-         );
+         if (!error && data) {
+            const constructed: GameStats = JSON.parse(
+               JSON.stringify(INITIAL_STATS)
+            );
 
-         // Calculate streaks using shared date-aware function
-         const { currentStreak, maxStreak } = calculateStreak(data);
+            // Calculate streaks using shared date-aware function
+            const { currentStreak, maxStreak } = calculateStreak(data);
 
-         // Build guess distribution
-         data.forEach((score) => {
-            if (score.status === "won") {
-               const attKey = score.attempts?.toString();
-               if (attKey && constructed.guesses[attKey] !== undefined) {
-                  constructed.guesses[attKey]++;
+            // Build guess distribution
+            data.forEach((score) => {
+               if (score.status === "won") {
+                  const attKey = score.attempts?.toString();
+                  if (attKey && constructed.guesses[attKey] !== undefined) {
+                     constructed.guesses[attKey]++;
+                  }
+               } else if (score.status === "lost") {
+                  constructed.guesses["X"]++;
                }
-            } else if (score.status === "lost") {
-               constructed.guesses["X"]++;
+            });
+
+            constructed.gamesPlayed = data.filter(
+               (s) => s.status !== "playing"
+            ).length;
+            constructed.gamesWon = data.filter((s) => s.status === "won").length;
+            constructed.currentStreak = currentStreak;
+            constructed.maxStreak = maxStreak;
+
+            if (maxStreak >= 50 && userId) {
+               checkAndGrantStreakMilestoneOnWin(userId, maxStreak);
             }
-         });
 
-         constructed.gamesPlayed = data.filter(
-            (s) => s.status !== "playing"
-         ).length;
-         constructed.gamesWon = data.filter((s) => s.status === "won").length;
-         constructed.currentStreak = currentStreak;
-         constructed.maxStreak = maxStreak;
-
-         if (maxStreak >= 50 && userId) {
-            checkAndGrantStreakMilestoneOnWin(userId, maxStreak);
+            lastFetchedAt = Date.now();
+            try {
+               safeLocalStorage.setItem(
+                  `wordle-statistics-${userId}`,
+                  JSON.stringify(constructed)
+               );
+            } catch {
+               // Ignore quota error
+            }
+            return constructed;
          }
+         return null;
+      })();
 
-         setStats(constructed);
+      inflightStatsPromise = promise;
+
+      try {
+         const constructed = await promise;
+         if (isMounted.current && constructed) {
+            setStats(constructed);
+         }
+      } finally {
+         if (inflightStatsPromise === promise) {
+            inflightStatsPromise = null;
+         }
+         if (isMounted.current) setLoading(false);
       }
-
-      if (isMounted.current) setLoading(false);
    }, [userId, setStats]);
 
-   // Trigger fetch when user is present (e.g. on mount/refresh) OR when modal opens
+   // Seed stats immediately from local cache, then revalidate in background if stale
    useEffect(() => {
       if (userId) {
-         // Use a microtask to ensure we don't block the initial mount render
-         queueMicrotask(() => fetchCloudStats());
+         try {
+            const cachedUserStats = safeLocalStorage.getItem(`wordle-statistics-${userId}`);
+            if (cachedUserStats) {
+               setStats(JSON.parse(cachedUserStats));
+            }
+         } catch {
+            // Ignore parse error
+         }
+         queueMicrotask(() => fetchCloudStats(false));
       }
-   }, [userId, isOpen, fetchCloudStats]);
+   }, [userId, isOpen, fetchCloudStats, setStats]);
 
    // Load initial stats from local storage if no user
    useEffect(() => {
@@ -144,7 +198,19 @@ export const useWordleStats = (
 
    const updateOptimistically = useCallback((newStats: GameStats) => {
       setStats(newStats);
-   }, [setStats]);
+      if (userId) {
+         try {
+            safeLocalStorage.setItem(
+               `wordle-statistics-${userId}`,
+               JSON.stringify(newStats)
+            );
+         } catch {
+            // Ignore
+         }
+      }
+   }, [setStats, userId]);
 
-   return { stats, loading, refresh: fetchCloudStats, updateOptimistically };
+   const forceRefresh = useCallback(() => fetchCloudStats(true), [fetchCloudStats]);
+
+   return { stats, loading, refresh: forceRefresh, updateOptimistically };
 };

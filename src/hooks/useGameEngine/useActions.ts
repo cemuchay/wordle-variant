@@ -30,6 +30,7 @@ interface UseActionsProps {
    performSync: (payload: any) => Promise<boolean>;
    updateOptimistically: (stats: any) => void;
    refresh: () => Promise<void>;
+   isRevalidating?: boolean;
 }
 
 export const useActions = ({
@@ -44,6 +45,7 @@ export const useActions = ({
    performSync,
    updateOptimistically,
    refresh,
+   isRevalidating = false,
 }: UseActionsProps) => {
    const isSubmittingRef = useRef(false);
 
@@ -91,6 +93,10 @@ export const useActions = ({
    }, [state.cursorIndex, state.currentGuess.length, dispatch]);
 
    const onEnter = useCallback(async () => {
+      if (isRevalidating || !config?.word) {
+         triggerToast("Syncing latest game state, please wait...", TOAST_DURATION.SHORT);
+         return;
+      }
       if (state.isGameOver || state.currentGuess.length !== config?.length)
          return;
 
@@ -344,9 +350,14 @@ export const useActions = ({
       performSync,
       ask,
       dispatch,
+      isRevalidating,
    ]);
 
    const handleHint = useCallback(async () => {
+      if (isRevalidating || !config?.word) {
+         triggerToast("Syncing latest game state, please wait...", TOAST_DURATION.SHORT);
+         return;
+      }
       if (
          state.guesses.length < ANIMATION.HINT_MIN_GUESSES ||
          state.isGameOver ||
@@ -427,6 +438,7 @@ export const useActions = ({
       triggerToast,
       performSync,
       dispatch,
+      isRevalidating,
    ]);
 
    const loadState = useCallback(

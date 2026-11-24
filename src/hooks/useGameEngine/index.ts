@@ -14,6 +14,12 @@ import { useWordleStats } from "../useStats";
 import { useConfirmation } from "../../context/ConfirmationContext";
 
 import { safeLocalStorage } from "../../utils/storage";
+import {
+   getCachedDailyConfigSync,
+   isTrustedDeviceBoot,
+   saveCachedDailyConfigSync,
+   saveTrustedDeviceStamp,
+} from "../../utils/trustedDevice";
 import { getLocalSalt, areGuessesCoherent, saveGameWithBackup } from "./utils";
 import { usePersistence } from "./usePersistence";
 import { useActions } from "./useActions";
@@ -26,17 +32,18 @@ export const useGameEngine = (
    user: User | null,
    isAuthLoading: boolean,
 ) => {
+   const isAuthenticated = Boolean(user);
+
    const [state, dispatch] = useReducer(gameReducer, initialState, () => {
       if (!date || isAuthLoading) return initialState;
       const saved = safeLocalStorage.getItem(`wordle-${date}`);
-      const lastTimestamp = safeLocalStorage.getItem(
-         "wordle_last_hydrated_timestamp",
-      );
-      const isSameDay = date && lastTimestamp?.startsWith(date);
-      if (!saved || !isSameDay) return initialState;
+      if (!saved) return initialState;
 
       try {
          const payload = JSON.parse(saved);
+         const savedIsGuest = Boolean(payload.isGuest);
+         if (savedIsGuest !== !user) return initialState;
+
          if (payload.config?.word) {
             const localSalt = getLocalSalt(date, user?.id);
             payload.config.word = deobfuscateWord(
@@ -55,6 +62,7 @@ export const useGameEngine = (
 
    const [isHydrated, setIsHydrated] = useState(() => {
       if (!date || isAuthLoading) return false;
+      if (isTrustedDeviceBoot()) return true;
       const saved = safeLocalStorage.getItem(`wordle-${date}`);
       const lastTimestamp = safeLocalStorage.getItem(
          "wordle_last_hydrated_timestamp",
@@ -68,30 +76,13 @@ export const useGameEngine = (
 
    const [config, setConfig] = useState<GameConfig | null>(() => {
       if (!date || isAuthLoading) return null;
-      const saved = safeLocalStorage.getItem(`wordle-${date}`);
-      const lastTimestamp = safeLocalStorage.getItem(
-         "wordle_last_hydrated_timestamp",
-      );
-      const isSameDay = date && lastTimestamp?.startsWith(date);
-      if (saved && isSameDay) {
-         try {
-            const payload = JSON.parse(saved);
-            if (payload.config?.word) {
-               const localSalt = getLocalSalt(date, user?.id);
-               payload.config.word = deobfuscateWord(
-                  payload.config.word,
-                  localSalt,
-               );
-            }
-            return payload.config;
-         } catch {
-            return null;
-         }
-      }
-      return null;
+      return getCachedDailyConfigSync(date, Boolean(user), user?.id);
    });
 
    const [isConfigLoading, setIsConfigLoading] = useState(false);
+   const [isRevalidating, setIsRevalidating] = useState<boolean>(() =>
+      isTrustedDeviceBoot(),
+   );
    const hydratedUserRef = useRef<string | undefined>(user?.id);
    const hydratedDateRef = useRef<string | null>(date);
    const hydratedConfigWordRef = useRef<string | undefined>(
@@ -101,32 +92,52 @@ export const useGameEngine = (
    const { triggerToast, preferences } = useApp();
    const { ask } = useConfirmation();
 
-   // EARLY: Cache-first hydration — render immediately if saved state exists for today
+   // Safety timeout so offline/flaky networks never permanently lock mutations during background revalidation
+   useEffect(() => {
+      if (!isRevalidating) return;
+      const safetyTimer = setTimeout(() => {
+         setIsRevalidating(false);
+      }, 2500);
+      return () => clearTimeout(safetyTimer);
+   }, [isRevalidating]);
+
+   // EARLY: Cache-first hydration — render immediately if saved state or Trusted Device exists
    useEffect(() => {
       if (!date || isAuthLoading || cachedHydrationDoneRef.current) return;
+      const trusted = isTrustedDeviceBoot();
       const saved = safeLocalStorage.getItem(`wordle-${date}`);
       const lastTimestamp = safeLocalStorage.getItem(
          "wordle_last_hydrated_timestamp",
       );
       const isSameDay = date && lastTimestamp?.startsWith(date);
-      if (!saved || !isSameDay) return;
+      if (!saved && !trusted) return;
+      if (!isSameDay && !trusted) return;
 
       try {
-         const payload = JSON.parse(saved);
-         const savedIsGuest = !!payload.isGuest;
-         const currentIsGuest = !user;
-         if (savedIsGuest !== currentIsGuest) return;
-
-         if (payload.config?.word) {
-            const localSalt = getLocalSalt(date, user?.id);
-            payload.config.word = deobfuscateWord(
-               payload.config.word,
-               localSalt,
+         if (saved) {
+            const payload = JSON.parse(saved);
+            const savedIsGuest = !!payload.isGuest;
+            const currentIsGuest = !user;
+            if (savedIsGuest === currentIsGuest) {
+               if (payload.config?.word) {
+                  const localSalt = getLocalSalt(date, user?.id);
+                  payload.config.word = deobfuscateWord(
+                     payload.config.word,
+                     localSalt,
+                  );
+               }
+               // eslint-disable-next-line react-hooks/set-state-in-effect
+               if (payload.config) setConfig(payload.config);
+               dispatch({ type: "LOAD_STATE", payload });
+            }
+         } else {
+            const cachedCfg = getCachedDailyConfigSync(
+               date,
+               Boolean(user),
+               user?.id,
             );
+            if (cachedCfg) setConfig(cachedCfg);
          }
-         // eslint-disable-next-line react-hooks/set-state-in-effect
-         setConfig(payload.config);
-         dispatch({ type: "LOAD_STATE", payload });
          setIsHydrated(true);
          cachedHydrationDoneRef.current = true;
       } catch {
@@ -134,14 +145,13 @@ export const useGameEngine = (
       }
    }, [date, isAuthLoading, user]);
 
-   const isAuthenticated = Boolean(user);
-
    useEffect(() => {
       if (!date) return;
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsConfigLoading(true);
       getDailyConfig(isAuthenticated, date)
          .then((cfg) => {
+            saveCachedDailyConfigSync(date, isAuthenticated, user?.id, cfg);
             setConfig((prev) =>
                prev &&
                prev.word === cfg.word &&
@@ -161,7 +171,7 @@ export const useGameEngine = (
          .finally(() => {
             setIsConfigLoading(false);
          });
-   }, [date, isAuthenticated, triggerToast]);
+   }, [date, isAuthenticated, user?.id, triggerToast]);
 
    const { refresh, updateOptimistically } = useWordleStats(user, false, date);
    const isSyncInFlightRef = useRef(false);
@@ -187,6 +197,7 @@ export const useGameEngine = (
       performSync,
       updateOptimistically,
       refresh,
+      isRevalidating: isRevalidating || isConfigLoading || !config?.word,
    });
 
    // Hydration & Authentication Swap Logic
@@ -195,6 +206,7 @@ export const useGameEngine = (
 
    useEffect(() => {
       const handleRehydrate = () => {
+         setIsRevalidating(true);
          setRehydrateTrigger((prev) => prev + 1);
       };
       window.addEventListener("app-visibility-visible", handleRehydrate);
@@ -210,6 +222,7 @@ export const useGameEngine = (
          (Boolean(config?.word) &&
             hydratedConfigWordRef.current !== config?.word);
       const isUserOrDateChanged = isDateChanged || isUserOrConfigChanged;
+      const trustedBoot = isTrustedDeviceBoot();
 
       if (
          !date ||
@@ -218,6 +231,7 @@ export const useGameEngine = (
          isConfigLoading
       ) {
          if (
+            !trustedBoot &&
             !cachedHydrationDoneRef.current &&
             (!isHydrated || isUserOrDateChanged)
          ) {
@@ -231,14 +245,18 @@ export const useGameEngine = (
       lastProcessedTriggerRef.current = rehydrateTrigger;
 
       if (isHydrated && !isUserOrDateChanged && !isTriggeredByVisibility) {
-         if (!cachedHydrationDoneRef.current) return;
+         if (!cachedHydrationDoneRef.current) {
+            setIsRevalidating(false);
+            return;
+         }
          cachedHydrationDoneRef.current = false;
       }
 
       if (
-         isDateChanged ||
-         (isUserOrConfigChanged && !cachedHydrationDoneRef.current) ||
-         !isHydrated
+         !trustedBoot &&
+         (isDateChanged ||
+            (isUserOrConfigChanged && !cachedHydrationDoneRef.current) ||
+            !isHydrated)
       ) {
          if (!isSyncInFlightRef.current && !(state.isGameOver && state.status !== "playing" && !isUserOrDateChanged)) {
             setIsHydrated(false);
@@ -251,189 +269,80 @@ export const useGameEngine = (
       const saved = safeLocalStorage.getItem(`wordle-${date}`);
 
       const hydrate = async () => {
-         // GUARD: If a sync is currently in flight or local state has already concluded for today,
-         // do not let visibility-change or background rehydration overwrite recent progress.
-         if (
-            !isUserOrDateChanged &&
-            (isSyncInFlightRef.current ||
-               (state.isGameOver && state.status !== "playing"))
-         ) {
-            setIsHydrated(true);
-            return;
-         }
+         setIsRevalidating(true);
+         try {
+            // GUARD: If a sync is currently in flight or local state has already concluded for today,
+            // do not let visibility-change or background rehydration overwrite recent progress.
+            if (
+               !isUserOrDateChanged &&
+               (isSyncInFlightRef.current ||
+                  (state.isGameOver && state.status !== "playing"))
+            ) {
+               setIsHydrated(true);
+               return;
+            }
 
-         const currentConfig = config!;
-         const cloudPayload = user ? await loadFromCloud() : null;
+            const currentConfig = config!;
+            const cloudPayload = user ? await loadFromCloud() : null;
 
-         // Read primary saved storage or fallback to backup if missing/corrupt
-         let savedData = saved;
-         if (!savedData) {
-            savedData = safeLocalStorage.getItem(`wordle-${date}-backup`);
-         }
+            // Read primary saved storage or fallback to backup if missing/corrupt
+            let savedData = saved;
+            if (!savedData) {
+               savedData = safeLocalStorage.getItem(`wordle-${date}-backup`);
+            }
 
-         if (savedData) {
-            try {
-               let payload = JSON.parse(savedData);
-               const backupRaw = safeLocalStorage.getItem(`wordle-${date}-backup`);
-               if (backupRaw) {
-                  try {
-                     const backupParsed = JSON.parse(backupRaw);
-                     if (
-                        Array.isArray(backupParsed?.guesses) &&
-                        Array.isArray(payload?.guesses) &&
-                        backupParsed.guesses.length > payload.guesses.length
-                     ) {
-                        payload = backupParsed;
+            if (savedData) {
+               try {
+                  let payload = JSON.parse(savedData);
+                  const backupRaw = safeLocalStorage.getItem(`wordle-${date}-backup`);
+                  if (backupRaw) {
+                     try {
+                        const backupParsed = JSON.parse(backupRaw);
+                        if (
+                           Array.isArray(backupParsed?.guesses) &&
+                           Array.isArray(payload?.guesses) &&
+                           backupParsed.guesses.length > payload.guesses.length
+                        ) {
+                           payload = backupParsed;
+                        }
+                     } catch {
+                        /* empty block */
                      }
-                  } catch {
-                     /* empty block */
-                  }
-               }
-
-               // Deobfuscate target word for local in-memory gameplay state
-               if (payload.config && payload.config.word) {
-                  const localSalt = getLocalSalt(date, user?.id);
-                  payload.config.word = deobfuscateWord(
-                     payload.config.word,
-                     localSalt,
-                  );
-               }
-
-               // AUTH SWAP PROTECTION & BACKWARD COMPATIBILITY:
-               // Only perform mismatch check once auth state is stable.
-               if (
-                  payload.config &&
-                  payload.config.word !== currentConfig.word
-               ) {
-                  // Guard: If the saved game is authenticated, but user is currently null,
-                  // do not purge or update local storage. Wait for auth to settle.
-                  if (!payload.isGuest && !user) {
-                     return;
                   }
 
-                  safeLocalStorage.removeItem(`wordle-${date}`);
-                  safeLocalStorage.removeItem(`wordle-${date}-backup`);
-
-                  // If moving from Guest -> Auth (they are logged in now, but previous game was explicitly a guest game)
-                  if (user && payload.isGuest) {
-                     safeLocalStorage.removeItem("wordle-statistics");
-                     triggerToast(
-                        "Logged in: Starting today's official word fresh.",
+                  // Deobfuscate target word for local in-memory gameplay state
+                  if (payload.config && payload.config.word) {
+                     const localSalt = getLocalSalt(date, user?.id);
+                     payload.config.word = deobfuscateWord(
+                        payload.config.word,
+                        localSalt,
                      );
                   }
 
-                  if (user && cloudPayload) {
-                     dispatch({ type: "LOAD_STATE", payload: cloudPayload });
-                     const localSalt = getLocalSalt(date, user.id);
-                     const savedPayload = {
-                        ...cloudPayload,
-                        config: {
-                           ...cloudPayload.config,
-                           word: obfuscateWord(
-                              cloudPayload.config.word,
-                              localSalt,
-                           ),
-                        },
-                     };
-                     saveGameWithBackup(date, savedPayload);
-                  } else {
-                     dispatch({ type: "LOAD_STATE", payload: initialState });
-                  }
-               } else {
-                  // Both local and cloud states exist: check coherence and harmonize
-                  if (user && cloudPayload) {
-                     const isLocalFinished = payload.status === "won" || payload.status === "lost";
-                     const isCloudFinished = cloudPayload.status === "won" || cloudPayload.status === "lost";
-
-                     // TERMINAL STATE PROTECTION:
-                     // Never downgrade a completed local game to an unfinished or shorter cloud state.
-                     if (isLocalFinished && !isCloudFinished) {
-                        dispatch({ type: "LOAD_STATE", payload });
-                        setIsHydrated(true);
-                        safeLocalStorage.setItem(
-                           "wordle_last_hydrated_timestamp",
-                           `${date}_${Date.now()}`,
-                        );
-                        performSync(payload);
+                  // AUTH SWAP PROTECTION & BACKWARD COMPATIBILITY:
+                  // Only perform mismatch check once auth state is stable.
+                  if (
+                     payload.config &&
+                     payload.config.word !== currentConfig.word
+                  ) {
+                     // Guard: If the saved game is authenticated, but user is currently null,
+                     // do not purge or update local storage. Wait for auth to settle.
+                     if (!payload.isGuest && !user) {
                         return;
                      }
 
-                     const isCoherent = areGuessesCoherent(
-                        payload.guesses,
-                        cloudPayload.guesses,
-                     );
-                     if (isCoherent) {
-                        if (
-                           cloudPayload.guesses.length > payload.guesses.length
-                        ) {
-                           const mergedPayload = {
-                              ...cloudPayload,
-                              usedHint:
-                                 cloudPayload.usedHint || payload.usedHint,
-                              hintRecord:
-                                 cloudPayload.hintRecord || payload.hintRecord,
-                           };
-                           dispatch({
-                              type: "LOAD_STATE",
-                              payload: mergedPayload,
-                           });
-                           const localSalt = getLocalSalt(date, user.id);
-                           const savedPayload = {
-                              ...mergedPayload,
-                              config: {
-                                 ...mergedPayload.config,
-                                 word: obfuscateWord(
-                                    mergedPayload.config.word,
-                                    localSalt,
-                                 ),
-                              },
-                           };
-                           saveGameWithBackup(date, savedPayload);
-                        } else if (
-                           payload.guesses.length > cloudPayload.guesses.length
-                        ) {
-                           const mergedPayload = {
-                              ...payload,
-                              usedHint:
-                                 payload.usedHint || cloudPayload.usedHint,
-                              hintRecord:
-                                 payload.hintRecord || cloudPayload.hintRecord,
-                           };
-                           dispatch({
-                              type: "LOAD_STATE",
-                              payload: mergedPayload,
-                           });
-                           performSync(mergedPayload);
-                        } else {
-                           // Equal and coherent
-                           const localTs =
-                              payload.guessTimestamps ||
-                              payload.guess_timestamps ||
-                              [];
-                           const cloudTs =
-                              cloudPayload.guessTimestamps ||
-                              cloudPayload.guess_timestamps ||
-                              [];
-                           const mergedTimestamps =
-                              cloudTs.length >= localTs.length
-                                 ? cloudTs
-                                 : localTs;
+                     safeLocalStorage.removeItem(`wordle-${date}`);
+                     safeLocalStorage.removeItem(`wordle-${date}-backup`);
 
-                           const mergedPayload = {
-                              ...payload,
-                              guessTimestamps: mergedTimestamps,
-                              usedHint:
-                                 payload.usedHint || cloudPayload.usedHint,
-                              hintRecord:
-                                 payload.hintRecord || cloudPayload.hintRecord,
-                           };
-                           dispatch({
-                              type: "LOAD_STATE",
-                              payload: mergedPayload,
-                           });
-                        }
-                     } else {
-                        // Conflict/tampering: overwrite local with cloud data (cloud is authoritative)
+                     // If moving from Guest -> Auth (they are logged in now, but previous game was explicitly a guest game)
+                     if (user && payload.isGuest) {
+                        safeLocalStorage.removeItem("wordle-statistics");
+                        triggerToast(
+                           "Logged in: Starting today's official word fresh.",
+                        );
+                     }
+
+                     if (user && cloudPayload) {
                         dispatch({ type: "LOAD_STATE", payload: cloudPayload });
                         const localSalt = getLocalSalt(date, user.id);
                         const savedPayload = {
@@ -446,95 +355,224 @@ export const useGameEngine = (
                               ),
                            },
                         };
-
-                        // Get daily backup guesses if present to enrich admin logs
-                        let backupData = null;
-                        const backupRaw = safeLocalStorage.getItem(
-                           `wordle-${date}-backup`,
-                        );
-                        if (backupRaw) {
-                           try {
-                              backupData = JSON.parse(backupRaw);
-                           } catch {
-                              /* empty block */
-                           }
-                        }
-
-                        triggerToast(
-                           "Sync conflict resolved: restored from cloud.",
-                           TOAST_DURATION.VERY_LONG,
-                        );
-
-                        // Trigger admin email notification
-                        supabase.functions
-                           .invoke("send-error-email", {
-                              body: {
-                                 record: {
-                                    level: "fatal",
-                                    message: `CONFLICT RESOLUTION: ${user.email || "User"} (${user.id})`,
-                                    context: {
-                                       reason:
-                                          "Sync conflict: incoherent guesses between local storage and cloud. Cloud was restored as authoritative.",
-                                       localGuesses: payload.guesses,
-                                       cloudGuesses: cloudPayload.guesses,
-                                       backupGuesses:
-                                          backupData?.guesses || null,
-                                       gameDate: date,
-                                       userId: user.id,
-                                       email: user.email,
-                                    },
-                                    session_id: "conflict-monitor",
-                                    user_id: user.id,
-                                    created_at: new Date().toISOString(),
-                                 },
-                              },
-                           })
-                           .catch((e) =>
-                              console.warn(
-                                 "[Sync] Admin email alert failed:",
-                                 e,
-                              ),
-                           );
-
                         saveGameWithBackup(date, savedPayload);
+                     } else {
+                        dispatch({ type: "LOAD_STATE", payload: initialState });
                      }
                   } else {
-                     // No cloud payload exists (or guest)
-                     dispatch({ type: "LOAD_STATE", payload });
-                     if (
-                        user &&
-                        payload.guesses &&
-                        payload.guesses.length > 0
-                     ) {
-                        performSync(payload);
+                     // Both local and cloud states exist: check coherence and harmonize
+                     if (user && cloudPayload) {
+                        const isLocalFinished = payload.status === "won" || payload.status === "lost";
+                        const isCloudFinished = cloudPayload.status === "won" || cloudPayload.status === "lost";
+
+                        // TERMINAL STATE PROTECTION:
+                        // Never downgrade a completed local game to an unfinished or shorter cloud state.
+                        if (isLocalFinished && !isCloudFinished) {
+                           dispatch({ type: "LOAD_STATE", payload });
+                           setIsHydrated(true);
+                           safeLocalStorage.setItem(
+                              "wordle_last_hydrated_timestamp",
+                              `${date}_${Date.now()}`,
+                           );
+                           performSync(payload);
+                           return;
+                        }
+
+                        const isCoherent = areGuessesCoherent(
+                           payload.guesses,
+                           cloudPayload.guesses,
+                        );
+                        if (isCoherent) {
+                           if (
+                              cloudPayload.guesses.length > payload.guesses.length
+                           ) {
+                              const mergedPayload = {
+                                 ...cloudPayload,
+                                 usedHint:
+                                    cloudPayload.usedHint || payload.usedHint,
+                                 hintRecord:
+                                    cloudPayload.hintRecord || payload.hintRecord,
+                              };
+                              dispatch({
+                                 type: "LOAD_STATE",
+                                 payload: mergedPayload,
+                              });
+                              const localSalt = getLocalSalt(date, user.id);
+                              const savedPayload = {
+                                 ...mergedPayload,
+                                 config: {
+                                    ...mergedPayload.config,
+                                    word: obfuscateWord(
+                                       mergedPayload.config.word,
+                                       localSalt,
+                                    ),
+                                 },
+                              };
+                              saveGameWithBackup(date, savedPayload);
+                           } else if (
+                              payload.guesses.length > cloudPayload.guesses.length
+                           ) {
+                              const mergedPayload = {
+                                 ...payload,
+                                 usedHint:
+                                    payload.usedHint || cloudPayload.usedHint,
+                                 hintRecord:
+                                    payload.hintRecord || cloudPayload.hintRecord,
+                              };
+                              dispatch({
+                                 type: "LOAD_STATE",
+                                 payload: mergedPayload,
+                              });
+                              performSync(mergedPayload);
+                           } else {
+                              // Equal and coherent
+                              const localTs =
+                                 payload.guessTimestamps ||
+                                 payload.guess_timestamps ||
+                                 [];
+                              const cloudTs =
+                                 cloudPayload.guessTimestamps ||
+                                 cloudPayload.guess_timestamps ||
+                                 [];
+                              const mergedTimestamps =
+                                 cloudTs.length >= localTs.length
+                                    ? cloudTs
+                                    : localTs;
+
+                              const mergedPayload = {
+                                 ...payload,
+                                 guessTimestamps: mergedTimestamps,
+                                 usedHint:
+                                    payload.usedHint || cloudPayload.usedHint,
+                                 hintRecord:
+                                    payload.hintRecord || cloudPayload.hintRecord,
+                              };
+                              dispatch({
+                                 type: "LOAD_STATE",
+                                 payload: mergedPayload,
+                              });
+                           }
+                        } else {
+                           // Conflict/tampering: overwrite local with cloud data (cloud is authoritative)
+                           dispatch({ type: "LOAD_STATE", payload: cloudPayload });
+                           const localSalt = getLocalSalt(date, user.id);
+                           const savedPayload = {
+                              ...cloudPayload,
+                              config: {
+                                 ...cloudPayload.config,
+                                 word: obfuscateWord(
+                                    cloudPayload.config.word,
+                                    localSalt,
+                                 ),
+                              },
+                           };
+
+                           // Get daily backup guesses if present to enrich admin logs
+                           let backupData = null;
+                           const backupRaw = safeLocalStorage.getItem(
+                              `wordle-${date}-backup`,
+                           );
+                           if (backupRaw) {
+                              try {
+                                 backupData = JSON.parse(backupRaw);
+                              } catch {
+                                 /* empty block */
+                              }
+                           }
+
+                           triggerToast(
+                              "Sync conflict resolved: restored from cloud.",
+                              TOAST_DURATION.VERY_LONG,
+                           );
+
+                           // Trigger admin email notification
+                           supabase.functions
+                              .invoke("send-error-email", {
+                                 body: {
+                                    record: {
+                                       level: "fatal",
+                                       message: `CONFLICT RESOLUTION: ${user.email || "User"} (${user.id})`,
+                                       context: {
+                                          reason:
+                                             "Sync conflict: incoherent guesses between local storage and cloud. Cloud was restored as authoritative.",
+                                          localGuesses: payload.guesses,
+                                          cloudGuesses: cloudPayload.guesses,
+                                          backupGuesses:
+                                             backupData?.guesses || null,
+                                          gameDate: date,
+                                          userId: user.id,
+                                          email: user.email,
+                                       },
+                                       session_id: "conflict-monitor",
+                                       user_id: user.id,
+                                       created_at: new Date().toISOString(),
+                                    },
+                                 },
+                              })
+                              .catch((e) =>
+                                 console.warn(
+                                    "[Sync] Admin email alert failed:",
+                                    e,
+                                 ),
+                              );
+
+                           saveGameWithBackup(date, savedPayload);
+                        }
+                     } else {
+                        // No cloud payload exists (or guest)
+                        dispatch({ type: "LOAD_STATE", payload });
+                        if (
+                           user &&
+                           payload.guesses &&
+                           payload.guesses.length > 0
+                        ) {
+                           performSync(payload);
+                        }
                      }
                   }
+               } catch (e) {
+                  console.error("Failed to hydrate game state:", e);
                }
-            } catch (e) {
-               console.error("Failed to hydrate game state:", e);
+            } else if (user && cloudPayload) {
+               // No local state but authenticated and cloud payload exists
+               dispatch({ type: "LOAD_STATE", payload: cloudPayload });
+               const localSalt = getLocalSalt(date, user.id);
+               const savedPayload = {
+                  ...cloudPayload,
+                  config: {
+                     ...cloudPayload.config,
+                     word: obfuscateWord(cloudPayload.config.word, localSalt),
+                  },
+               };
+               saveGameWithBackup(date, savedPayload);
+            } else {
+               // Fresh start
+               dispatch({ type: "LOAD_STATE", payload: initialState });
             }
-         } else if (user && cloudPayload) {
-            // No local state but authenticated and cloud payload exists
-            dispatch({ type: "LOAD_STATE", payload: cloudPayload });
-            const localSalt = getLocalSalt(date, user.id);
-            const savedPayload = {
-               ...cloudPayload,
-               config: {
-                  ...cloudPayload.config,
-                  word: obfuscateWord(cloudPayload.config.word, localSalt),
-               },
-            };
-            saveGameWithBackup(date, savedPayload);
-         } else {
-            // Fresh start
-            dispatch({ type: "LOAD_STATE", payload: initialState });
-         }
 
-         setIsHydrated(true);
-         safeLocalStorage.setItem(
-            "wordle_last_hydrated_timestamp",
-            `${date}_${Date.now()}`,
-         );
+            setIsHydrated(true);
+            safeLocalStorage.setItem(
+               "wordle_last_hydrated_timestamp",
+               `${date}_${Date.now()}`,
+            );
+            saveTrustedDeviceStamp({
+               date,
+               isAuthenticated: Boolean(user),
+               user: user
+                  ? {
+                       id: user.id,
+                       email: user.email,
+                       user_metadata: user.user_metadata,
+                       app_metadata: user.app_metadata,
+                       aud: user.aud,
+                       created_at: user.created_at,
+                       updated_at: user.updated_at,
+                    }
+                  : null,
+            });
+         } finally {
+            setIsRevalidating(false);
+         }
       };
 
       hydrate();
@@ -569,6 +607,8 @@ export const useGameEngine = (
       [config?.word, state.guesses],
    );
 
+   const effectiveIsRevalidating = isRevalidating || isConfigLoading || !config?.word;
+
    return {
       state: { ...state, letterStatuses, isHintDisabled: isHintBar1Restricted },
       actions: {
@@ -577,5 +617,6 @@ export const useGameEngine = (
       },
       config,
       isHydrated,
+      isRevalidating: effectiveIsRevalidating,
    };
 };

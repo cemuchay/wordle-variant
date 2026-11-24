@@ -29,8 +29,8 @@ export const useMyChallengesSub = (userId: string | undefined) => {
    });
 
    return useQuery({
-      staleTime: 30_000,
-      gcTime: 300_000,
+      staleTime: 60_000,
+      gcTime: 600_000,
       enabled: !!userId || recentIds.length > 0,
       queryKey: ["my-challenges", userId],
       queryFn: async () => {
@@ -126,7 +126,9 @@ export const useMyChallengesSub = (userId: string | undefined) => {
          // Manual sessionStorage is redundant here, but kept if you have external dependencies relying on it.
          if (userId) {
             try {
-               safeSessionStorage.setItem(`wordle_my_challenges_${userId}`, JSON.stringify(sortedResults));
+               const serialized = JSON.stringify(sortedResults);
+               safeSessionStorage.setItem(`wordle_my_challenges_${userId}`, serialized);
+               safeLocalStorage.setItem(`wordle_my_challenges_${userId}`, serialized);
             } catch (e) {
                console.error("Failed to cache challenges list", e);
             }
@@ -137,7 +139,9 @@ export const useMyChallengesSub = (userId: string | undefined) => {
       placeholderData: () => {
          if (!userId) return [];
          try {
-            const cached = safeSessionStorage.getItem(`wordle_my_challenges_${userId}`);
+            const cached =
+               safeSessionStorage.getItem(`wordle_my_challenges_${userId}`) ||
+               safeLocalStorage.getItem(`wordle_my_challenges_${userId}`);
             return cached ? JSON.parse(cached) : undefined;
          } catch (e) {
             console.error("Failed to load placeholder challenges cache", e);

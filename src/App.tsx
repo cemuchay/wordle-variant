@@ -17,8 +17,6 @@ import { useLiveStore } from "./wordup/live/store/useLiveStore";
 import { useAsyncStore } from "./wordup/async/store/useAsyncStore";
 import { subscribeToPush } from "./lib/pushService";
 import { GuestBanner } from "./components/GuestBanner";
-import { TutorialModal } from "./components/TutorialModal";
-import { WordupTutorialModal } from "./wordup/components/WordupTutorialModal";
 import { useApp } from "./context/AppContext";
 import { useDiscoverChallenges, useMyChallenges, useBulkChallengeParticipants } from "./hooks/queries/useChallengeQueries";
 import { useAuth } from "./hooks/useAuth";
@@ -36,19 +34,23 @@ import { useChallengeStore } from "./store/useChallengeStore";
 import { useAppStore } from "./store/useAppStore";
 import { safeLazy } from "./utils/safeLazy";
 import { safeLocalStorage, safeSessionStorage } from "./utils/storage";
+import { saveTrustedDeviceStamp } from "./utils/trustedDevice";
 import formatUsername from './utils/formatUsername';
 import { TIMEOUT } from './constants/game';
 import { motion, AnimatePresence } from "framer-motion";
-import { FreePlayModal } from "./components/freeplay/FreePlayModal";
-import MoreGamesList from "./components/MoreGamesList";
 import AppLoadingSkeleton from "./components/app/AppLoadingSkeleton";
 import DisconnectedUI from "./components/app/DisconnectedUI";
 import { initTelemetry } from "./lib/telemetry";
 import { flushNotificationQueue } from "./lib/clientPush";
 import { useWordGridStore } from "./store/useWordGridStore";
 import { generateShareText } from "./lib/share";
-import { VictorySplashOverlay } from "./components/victory/VictorySplashOverlay";
 import { autoCreateWeeklyBotChallenge } from "./services/dailyBotChallengeService";
+
+const TutorialModal = safeLazy(() => import("./components/TutorialModal").then(m => ({ default: m.TutorialModal })));
+const WordupTutorialModal = safeLazy(() => import("./wordup/components/WordupTutorialModal").then(m => ({ default: m.WordupTutorialModal })));
+const FreePlayModal = safeLazy(() => import("./components/freeplay/FreePlayModal").then(m => ({ default: m.FreePlayModal })));
+const MoreGamesList = safeLazy(() => import("./components/MoreGamesList"));
+const VictorySplashOverlay = safeLazy(() => import("./components/victory/VictorySplashOverlay").then(m => ({ default: m.VictorySplashOverlay })));
 
 const StatsModal = safeLazy(() => import("./components/social-leaderboard").then(m => ({ default: m.SocialStatsModal })));
 const ChallengeModal = safeLazy(() => import("./components/ChallengeModal").then(m => ({ default: m.ChallengeModal })));
@@ -61,25 +63,21 @@ const WeeklyWrappedModal = safeLazy(() => import("./components/WeeklyWrappedModa
 const WelcomeScreen = safeLazy(() => import("./components/WelcomeScreen").then(m => ({ default: m.WelcomeScreen })));
 const WordFinderPage = safeLazy(() => import("./components/dev/WordFinderPage").then(m => ({ default: m.WordFinderPage })));
 
-const fadeVariants = {
-  initial: {
-    opacity: 0,
-  },
-  animate: {
-    opacity: 1,
-  },
-  exit: {
-    opacity: 0,
-  },
-};
-
 function MainApp() {
-  const { user, loading: isAuthLoading } = useAuth();
+  const { user, loading: isAuthLoading, isTrustedBoot } = useAuth();
 
   useEffect(() => {
-    initTelemetry();
-    // Silently check if Sunday auto-generation of weekly Daily Bot Challenge is needed
-    autoCreateWeeklyBotChallenge().catch(() => {});
+    const runDeferredBootTasks = () => {
+      initTelemetry();
+      // Silently check if Sunday auto-generation of weekly Daily Bot Challenge is needed
+      autoCreateWeeklyBotChallenge().catch(() => {});
+    };
+    if ("requestIdleCallback" in window) {
+      (window as any).requestIdleCallback(runDeferredBootTasks, { timeout: 4000 });
+    } else {
+      const t = setTimeout(runDeferredBootTasks, 2500);
+      return () => clearTimeout(t);
+    }
   }, []);
 
   const [guestOptedIn, setGuestOptedIn] = useState(() =>
@@ -129,7 +127,7 @@ function MainApp() {
   } = useApp();
 
   // Core Game Engine
-  const { state, actions, config, isHydrated } = useGameEngine(date as string, user, isAuthLoading);
+  const { state, actions, config, isHydrated, isRevalidating } = useGameEngine(date as string, user, isAuthLoading);
 
   // Stabilize UI state to wait for reveal animations
   const [stableGuessesCount, setStableGuessesCount] = useState(state.guesses.length);
@@ -455,6 +453,7 @@ function MainApp() {
       safeLocalStorage.setItem('wordle_guest_banner_last_dismissed', date as string);
       setGuestBannerLastDismissed(date as string);
     }
+    saveTrustedDeviceStamp({ guestOptedIn: true, isAuthenticated: false, user: null });
     setGuestOptedIn(true);
     setIsLeavingWelcome(false);
     setIsAuthOpen(false);
@@ -993,6 +992,48 @@ function MainApp() {
   }, [isChallengeOpen, activeNavigationItem, isPlayingChallenge, isWordUpOpen, moreGameMode]);
 
 
+  const [hasVisitedLeaderboard, setHasVisitedLeaderboard] = useState(false);
+  const leaderboardPrefetchInFlightRef = useRef(false);
+
+  const handlePrefetchTab = useCallback(
+    (item: "play" | "chat" | "leaderboard" | "challenges" | "wordup" | "more") => {
+      if (item === "leaderboard") {
+        StatsModal.preload?.();
+        if (date && !leaderboardPrefetchInFlightRef.current) {
+          const cacheKey = `wordle_global_leaderboard_today_${date}`;
+          if (!safeSessionStorage.getItem(cacheKey)) {
+            leaderboardPrefetchInFlightRef.current = true;
+            supabase.functions
+              .invoke("redis-cache", {
+                body: { action: "get-leaderboard", timeframe: "today", date, ignoreCache: false },
+              })
+              .then(({ data: edgeRes }) => {
+                if (edgeRes?.data) {
+                  try {
+                    const serialized = JSON.stringify(edgeRes.data);
+                    safeSessionStorage.setItem(cacheKey, serialized);
+                    safeLocalStorage.setItem(cacheKey, serialized);
+                  } catch {
+                    // Ignore quota error
+                  }
+                }
+              })
+              .catch(() => {})
+              .finally(() => {
+                leaderboardPrefetchInFlightRef.current = false;
+              });
+          }
+        }
+      } else if (item === "challenges") {
+        ChallengeModal.preload?.();
+      } else if (item === "wordup" || item === "more") {
+        WordUpContainer.preload?.();
+        MoreGamesList.preload?.();
+      }
+    },
+    [date],
+  );
+
   const handleNavigation = (
     item: "play" | "chat" | "leaderboard" | "challenges" | "wordup" | "more",
   ) => {
@@ -1001,6 +1042,10 @@ function MainApp() {
     if (item === "chat" && !user) {
       window.dispatchEvent(new CustomEvent("open-auth-modal"));
       return;
+    }
+
+    if (item === "leaderboard") {
+      setHasVisitedLeaderboard(true);
     }
 
     setIsChatOpen(item === "chat");
@@ -1066,7 +1111,7 @@ function MainApp() {
   }, [activeDailyMarathons]);
 
 
-  if (!isHydrated || isLoadingDate || isAuthLoading) {
+  if (!isTrustedBoot && (!isHydrated || isLoadingDate || isAuthLoading)) {
     return (
       <AppLoadingSkeleton />
     );
@@ -1151,13 +1196,14 @@ function MainApp() {
         isRevealing: state.isRevealing,
         usedHint: state.usedHint,
         canShowHint: stableGuessesCount >= 2,
-        isHintLocked: (stableGuessesCount >= (config?.maxAttempts ?? MAX_ATTEMPTS) - 1 || stableIsHintDisabled) && !state.usedHint,
-        syncStatus: state.syncStatus,
+        isHintLocked: isRevalidating || ((stableGuessesCount >= (config?.maxAttempts ?? MAX_ATTEMPTS) - 1 || stableIsHintDisabled) && !state.usedHint),
+        syncStatus: isRevalidating && state.syncStatus === "idle" ? "syncing" : state.syncStatus,
         isMonday: isMonday
       }}
       navigationProps={{
         activeItem: activeNavigationItem,
         onNavigate: handleNavigation,
+        onPrefetch: handlePrefetchTab,
         challengeUnreadCount: challengeUnreadCount,
         chatUnreadCount: unreadCount,
         wordupUnreadCount: moreGamesUnreadCount,
@@ -1207,155 +1253,159 @@ function MainApp() {
       )}
 
       <div className="flex-1 min-h-0 relative overflow-hidden">
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={activeNavigationItem === "wordup" ? `wordup-${wordupMode || "select"}` : activeNavigationItem}
-            variants={fadeVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={{
-              duration: 0.08,
-              ease: "linear",
-            }}
-            className="h-full w-full"
+        <div className="h-full w-full">
+          {/* Keep-Alive Play Tab: stays mounted for 0ms return */}
+          <main
+            className={
+              activeNavigationItem === "play"
+                ? "h-full flex flex-col bg-dark text-white p-2 sm:p-4"
+                : "hidden"
+            }
           >
-            {activeNavigationItem === "play" && (
-              <main className="h-full flex flex-col bg-dark text-white p-2 sm:p-4">
-                <div className="h-full flex flex-col relative min-h-0 w-full">
-                  <GameArea
-                    wordLength={config?.length ?? DEFAULT_WORD_LENGTH}
-                    maxAttempts={config?.maxAttempts ?? MAX_ATTEMPTS}
-                    guesses={state.guesses}
-                    currentGuess={state.currentGuess}
-                    cursorIndex={state.cursorIndex}
-                    editIndex={state.editIndex}
-                    letterStatuses={state.letterStatuses}
-                    hintRecord={state.hintRecord}
-                    isGameOver={state.isGameOver}
-                    isShake={state.isShake}
-                    isSaving={state.syncStatus === "syncing"}
-                    onChar={actions.onChar}
-                    onDelete={actions.onDelete}
-                    onClearRow={actions.onClearRow}
-                    onEnter={actions.onEnter}
-                    onSetCursor={actions.onSetCursor}
-                    onSetEditIndex={actions.onSetEditIndex}
-                    isAlreadyPlayed={isAlreadyPlayedTodayOnLoad}
-                    onHint={actions.handleHint}
-                    usedHint={state.usedHint}
-                    canShowHint={!preferences.disableHints}
-                    isHintLocked={
-                      (stableGuessesCount < 2 ||
-                        stableGuessesCount >= (config?.maxAttempts ?? MAX_ATTEMPTS) - 1 ||
-                        stableIsHintDisabled) &&
-                      !state.usedHint
-                    }
-                    gameMessage={state.gameMessage}
-                    targetWord={config?.word || ""}
-                    onNavigate={handleNavigation}
-                    onOpenFreePlay={(selectedMode) => {
-                      setFreePlayMode(selectedMode);
-                      setIsFreePlayOpen(true);
-                    }}
-                    activeDailyMarathons={activeDailyMarathons}
-                    isMarathonLoading={isMarathonLoading}
-                    isMarathonError={isMarathonError}
-                    setSelectedChallengeId={setSelectedChallengeId}
-                    setIsChallengeOpen={setIsChallengeOpen}
-                  />
-                </div>
-              </main>
-            )}
+            <div className="h-full flex flex-col relative min-h-0 w-full">
+              <GameArea
+                wordLength={config?.length ?? DEFAULT_WORD_LENGTH}
+                maxAttempts={config?.maxAttempts ?? MAX_ATTEMPTS}
+                guesses={state.guesses}
+                currentGuess={state.currentGuess}
+                cursorIndex={state.cursorIndex}
+                editIndex={state.editIndex}
+                letterStatuses={state.letterStatuses}
+                hintRecord={state.hintRecord}
+                isGameOver={state.isGameOver}
+                isShake={state.isShake}
+                isSaving={isRevalidating || state.syncStatus === "syncing"}
+                onChar={actions.onChar}
+                onDelete={actions.onDelete}
+                onClearRow={actions.onClearRow}
+                onEnter={actions.onEnter}
+                onSetCursor={actions.onSetCursor}
+                onSetEditIndex={actions.onSetEditIndex}
+                isAlreadyPlayed={isAlreadyPlayedTodayOnLoad}
+                onHint={actions.handleHint}
+                usedHint={state.usedHint}
+                canShowHint={!preferences.disableHints}
+                isHintLocked={
+                  isRevalidating ||
+                  ((stableGuessesCount < 2 ||
+                    stableGuessesCount >= (config?.maxAttempts ?? MAX_ATTEMPTS) - 1 ||
+                    stableIsHintDisabled) &&
+                    !state.usedHint)
+                }
+                gameMessage={state.gameMessage}
+                targetWord={config?.word || ""}
+                onNavigate={handleNavigation}
+                onOpenFreePlay={(selectedMode) => {
+                  setFreePlayMode(selectedMode);
+                  setIsFreePlayOpen(true);
+                }}
+                activeDailyMarathons={activeDailyMarathons}
+                isMarathonLoading={isMarathonLoading}
+                isMarathonError={isMarathonError}
+                setSelectedChallengeId={setSelectedChallengeId}
+                setIsChallengeOpen={setIsChallengeOpen}
+              />
+            </div>
+          </main>
 
-            {activeNavigationItem === "chat" && (
-              <div className="h-full w-full flex flex-col p-0 sm:p-2 bg-dark">
-                <Suspense fallback={<ChatSkeleton />}>
-                  <FloatingChatBubble mode="full" onCloseFull={() => setIsChatOpen(false)} />
-                </Suspense>
-              </div>
-            )}
+          {activeNavigationItem === "chat" && (
+            <div className="h-full w-full flex flex-col p-0 sm:p-2 bg-dark">
+              <Suspense fallback={<ChatSkeleton />}>
+                <FloatingChatBubble mode="full" onCloseFull={() => setIsChatOpen(false)} />
+              </Suspense>
+            </div>
+          )}
 
-            {activeNavigationItem === "leaderboard" && (
-              <div className="h-full w-full flex flex-col items-center justify-center p-0 sm:p-2 bg-gray-900">
+          {/* Keep-Alive Leaderboard Tab: stays mounted once visited for 0ms switches */}
+          {(activeNavigationItem === "leaderboard" || hasVisitedLeaderboard) && (
+            <div
+              className={
+                activeNavigationItem === "leaderboard"
+                  ? "h-full w-full flex flex-col items-center justify-center p-0 sm:p-2 bg-gray-900"
+                  : "hidden"
+              }
+            >
+              <Suspense fallback={null}>
+                <StatsModal
+                  isOpen={activeNavigationItem === "leaderboard"}
+                  inline={true}
+                  stats={stats}
+                  onClose={() => setIsStatsOpen(false)}
+                  user={user as AppUser}
+                  isGameOver={state.isGameOver}
+                  initialTab={statsActiveTab}
+                  initialCommentTarget={statsCommentTarget}
+                />
+              </Suspense>
+            </div>
+          )}
+
+          {activeNavigationItem === "challenges" && (
+            <div className="h-full flex flex-col items-center justify-center p-0 sm:p-2 bg-gray-900">
+              <Suspense fallback={null}>
+                <ChallengeModal
+                  isOpen={true}
+                  inline={true}
+                  onClose={() => {
+                    setIsChallengeOpen(false);
+                  }}
+                  user={user as AppUser}
+                  onChallengeCreated={handleChallengeCreated}
+                  initialChallengeId={selectedChallengeId || new URLSearchParams(window.location.search).get('challenge')}
+                />
+              </Suspense>
+            </div>
+          )}
+
+          {(activeNavigationItem === "wordup" || activeNavigationItem === "more") && (
+            <div className={`h-full flex flex-col items-center p-2 bg-dark w-full ${(moreGameMode === "upscramble" || moreGameMode === "wordscramble") ? "overflow-hidden justify-start" : "justify-center"}`}>
+              {activeNavigationItem === "more" && moreGameMode === "select" ? (
                 <Suspense fallback={null}>
-                  <StatsModal
-                    isOpen={true}
-                    inline={true}
-                    stats={stats}
-                    onClose={() => setIsStatsOpen(false)}
-                    user={user as AppUser}
-                    isGameOver={state.isGameOver}
-                    initialTab={statsActiveTab}
-                    initialCommentTarget={statsCommentTarget}
-                  />
-                </Suspense>
-              </div>
-            )}
-
-            {activeNavigationItem === "challenges" && (
-              <div className="h-full flex flex-col items-center justify-center p-0 sm:p-2 bg-gray-900">
-                <Suspense fallback={null}>
-                  <ChallengeModal
-                    isOpen={true}
-                    inline={true}
-                    onClose={() => {
-                      setIsChallengeOpen(false);
-                    }}
-                    user={user as AppUser}
-                    onChallengeCreated={handleChallengeCreated}
-                    initialChallengeId={selectedChallengeId || new URLSearchParams(window.location.search).get('challenge')}
-                  />
-                </Suspense>
-              </div>
-            )}
-
-            {(activeNavigationItem === "wordup" || activeNavigationItem === "more") && (
-              <div className={`h-full flex flex-col items-center p-2 bg-dark w-full ${(moreGameMode === "upscramble" || moreGameMode === "wordscramble") ? "overflow-hidden justify-start" : "justify-center"}`}>
-                {activeNavigationItem === "more" && moreGameMode === "select" ? (
                   <MoreGamesList
                     setMoreGameMode={setMoreGameMode}
                     handleNavigation={handleNavigation}
                     wordupUnreadCount={wordupUnreadCount}
                     wordgridUnreadCount={wordgridUnreadCount}
                   />
-                ) : (moreGameMode === "upscramble" || moreGameMode === "wordscramble") ? (
-                  <Suspense fallback={<div className="text-xs text-pink-400 animate-pulse font-bold">Loading UpScramble...</div>}>
-                    <ExternalGameEmbed
-                      title="UpScramble"
-                      url="https://upscramble.vercel.app/"
-                      badge="Standalone"
-                      gradientClass="from-pink-400 via-amber-300 to-cyan-300"
-                      onBack={() => setMoreGameMode("select")}
+                </Suspense>
+              ) : (moreGameMode === "upscramble" || moreGameMode === "wordscramble") ? (
+                <Suspense fallback={<div className="text-xs text-pink-400 animate-pulse font-bold">Loading UpScramble...</div>}>
+                  <ExternalGameEmbed
+                    title="UpScramble"
+                    url="https://upscramble.vercel.app/"
+                    badge="Standalone"
+                    gradientClass="from-pink-400 via-amber-300 to-cyan-300"
+                    onBack={() => setMoreGameMode("select")}
+                  />
+                </Suspense>
+              ) : moreGameMode === "wordgrid" ? (
+                <Suspense fallback={<div className="text-xs text-gray-400 animate-pulse font-bold">Loading WordGrid...</div>}>
+                  <WordGridContainer onBackToClassic={() => setMoreGameMode("select")} />
+                </Suspense>
+              ) : (
+                <>
+                  <Suspense fallback={null}>
+                    <WordUpContainer
+                      wordupMode={wordupMode}
+                      setWordupMode={setWordupMode}
+                      onTutorial={() => setIsWordupTutorialOpen(true)}
+                      onBack={() => {
+                        if (activeNavigationItem === "more") {
+                          setMoreGameMode("select");
+                        } else {
+                          setIsWordUpOpen(false);
+                          setIsMoreOpen(false);
+                        }
+                      }}
+                      onBackToClassic={() => {
+                        setMoreGameMode("select");
+                        handleNavigation('play');
+                      }}
                     />
                   </Suspense>
-                ) : moreGameMode === "wordgrid" ? (
-                  <Suspense fallback={<div className="text-xs text-gray-400 animate-pulse font-bold">Loading WordGrid...</div>}>
-                    <WordGridContainer onBackToClassic={() => setMoreGameMode("select")} />
-                  </Suspense>
-                ) : (
-                  <>
-                    <Suspense fallback={null}>
-                      <WordUpContainer
-                        wordupMode={wordupMode}
-                        setWordupMode={setWordupMode}
-                        onTutorial={() => setIsWordupTutorialOpen(true)}
-                        onBack={() => {
-                          if (activeNavigationItem === "more") {
-                            setMoreGameMode("select");
-                          } else {
-                            setIsWordUpOpen(false);
-                            setIsMoreOpen(false);
-                          }
-                        }}
-                        onBackToClassic={() => {
-                          setMoreGameMode("select");
-                          handleNavigation('play');
-                        }}
-                      />
-                    </Suspense>
 
-                    {isWordupTutorialOpen && (
+                  {isWordupTutorialOpen && (
+                    <Suspense fallback={null}>
                       <WordupTutorialModal
                         onComplete={() => {
                           safeLocalStorage.setItem('wordup_tutorial_completed', 'true');
@@ -1368,14 +1418,13 @@ function MainApp() {
                           setIsWordupTutorialOpen(false);
                         }}
                       />
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-
-          </motion.div>
-        </AnimatePresence>
+                    </Suspense>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <ModalsManager
@@ -1426,39 +1475,43 @@ function MainApp() {
       {navLoading.active && <TransitionLoader message={navLoading.message} />}
 
       {isWeeklyWrappedOpen && user && (
-        <WeeklyWrappedModal
-          isOpen={isWeeklyWrappedOpen}
-          onClose={() => {
-            setIsWeeklyWrappedOpen(false);
-            if (date) {
-              const parts = (date as string).split("-").map(Number);
-              const now = new Date(parts[0], parts[1] - 1, parts[2]);
-              const currentDay = now.getDay();
-              if (currentDay === 1) {
-                const mondayStr = date as string;
-                safeLocalStorage.setItem(`wrapped-seen-${mondayStr}-${user.id}`, "true");
+        <Suspense fallback={null}>
+          <WeeklyWrappedModal
+            isOpen={isWeeklyWrappedOpen}
+            onClose={() => {
+              setIsWeeklyWrappedOpen(false);
+              if (date) {
+                const parts = (date as string).split("-").map(Number);
+                const now = new Date(parts[0], parts[1] - 1, parts[2]);
+                const currentDay = now.getDay();
+                if (currentDay === 1) {
+                  const mondayStr = date as string;
+                  safeLocalStorage.setItem(`wrapped-seen-${mondayStr}-${user.id}`, "true");
+                }
               }
-            }
-          }}
-          userId={user.id}
-          isEasterEgg={false}
-          gameDate={date as string}
-        />
+            }}
+            userId={user.id}
+            isEasterEgg={false}
+            gameDate={date as string}
+          />
+        </Suspense>
       )}
 
       {isTutorialOpen && (
-        <TutorialModal
-          onComplete={() => {
-            safeLocalStorage.setItem('wordle_tutorial_completed', 'true');
-            setHasSeenTutorial(true);
-            setIsTutorialOpen(false);
-          }}
-          onSkip={() => {
-            safeLocalStorage.setItem('wordle_tutorial_completed', 'true');
-            setHasSeenTutorial(true);
-            setIsTutorialOpen(false);
-          }}
-        />
+        <Suspense fallback={null}>
+          <TutorialModal
+            onComplete={() => {
+              safeLocalStorage.setItem('wordle_tutorial_completed', 'true');
+              setHasSeenTutorial(true);
+              setIsTutorialOpen(false);
+            }}
+            onSkip={() => {
+              safeLocalStorage.setItem('wordle_tutorial_completed', 'true');
+              setHasSeenTutorial(true);
+              setIsTutorialOpen(false);
+            }}
+          />
+        </Suspense>
       )}
 
       <div className="fixed bottom-2 left-2 hidden sm:flex items-center gap-2 text-[10px] text-gray-600 z-40">
@@ -1716,20 +1769,26 @@ function MainApp() {
       <ImageModal />
       <PWAInstallBanner />
       <NotificationPermissionPrompt />
-      <FreePlayModal
-        isOpen={isFreePlayOpen}
-        initialMode={freePlayMode}
-        onClose={() => setIsFreePlayOpen(false)}
-      />
+      {isFreePlayOpen && (
+        <Suspense fallback={null}>
+          <FreePlayModal
+            isOpen={isFreePlayOpen}
+            initialMode={freePlayMode}
+            onClose={() => setIsFreePlayOpen(false)}
+          />
+        </Suspense>
+      )}
 
       <AnimatePresence>
         {showVictorySplash && (
-          <VictorySplashOverlay
-            score={victoryScore}
-            maxAttempts={config?.maxAttempts ?? MAX_ATTEMPTS}
-            targetWord={config?.word}
-            onDismiss={handleDismissVictorySplash}
-          />
+          <Suspense fallback={null}>
+            <VictorySplashOverlay
+              score={victoryScore}
+              maxAttempts={config?.maxAttempts ?? MAX_ATTEMPTS}
+              targetWord={config?.word}
+              onDismiss={handleDismissVictorySplash}
+            />
+          </Suspense>
         )}
       </AnimatePresence>
     </AppLayout>

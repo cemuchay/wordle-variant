@@ -151,8 +151,8 @@ export const useChallengeData = useChallengeDataSub;
  */
 export const useDiscoverChallenges = () => {
    return useQuery({
-      staleTime: 15_000,
-      gcTime: 120_000,
+      staleTime: 60_000,
+      gcTime: 600_000,
       queryKey: ["discover-challenges"],
       queryFn: async () => {
          const { data, error } = await supabase
