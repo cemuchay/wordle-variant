@@ -29,6 +29,8 @@ export interface WordUpQuestion {
    explanation?: string; // Shown after the game to explain why the correct answer is right
    imageUrl?: string; // Optional URL pointing to the Supabase Storage bucket asset
    imageUrls?: string[]; // Optional array of image codes/urls for multi-image questions
+   id?: string; // Handcrafted/curated question UUID when applicable
+   entityId?: string; // Entity UUID for entity-generated procedural questions
 }
 
 export const getQuestionImageUrl = (path: string): string => {

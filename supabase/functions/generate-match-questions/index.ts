@@ -1095,12 +1095,19 @@ serve(async (req) => {
          count: clientCount,
          userId: clientUserId,
          excludeQuestionIds: rawExcludeIds,
+         excludeEntityIds: rawExcludeEntityIds,
+         isPrefetch: rawIsPrefetch,
       } = await req.json();
+      const isPrefetch = rawIsPrefetch === true;
       const targetQuestionCount = typeof clientCount === "number" && clientCount > 0 ? Math.min(clientCount, 70) : 7;
       const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       const clientExcludeIds: string[] = Array.isArray(rawExcludeIds)
          ? rawExcludeIds.filter((id: unknown) => typeof id === "string" && UUID_RX.test(id)).slice(0, 300)
          : [];
+      const clientExcludeEntityIds: string[] = Array.isArray(rawExcludeEntityIds)
+         ? rawExcludeEntityIds.filter((id: unknown) => typeof id === "string" && UUID_RX.test(id)).slice(0, 300)
+         : [];
+      const clientExcludeEntitySet = new Set<string>(clientExcludeEntityIds);
 
       if (!matchId || !category) {
          return new Response(
@@ -1379,6 +1386,10 @@ serve(async (req) => {
              );
           } else {
               const nowMs = Date.now();
+              const clientExcludeIndex = new Map<string, number>();
+              clientExcludeIds.forEach((id, idx) => {
+                 if (!clientExcludeIndex.has(id)) clientExcludeIndex.set(id, idx);
+              });
               const enriched = (hcData || []).map((hq: any) => {
                  const seen = seenMap.get(hq.id);
                  const clientExcluded = clientExcludeSet.has(hq.id);
@@ -1403,6 +1414,8 @@ serve(async (req) => {
                     difficulty,
                     seenCount,
                     seenStatus,
+                    clientExcluded,
+                    clientExcludeOrder: clientExcludeIndex.get(hq.id) ?? Number.MAX_SAFE_INTEGER,
                     lastSeenAt: Math.max(seen?.lastSeen ?? 0, clientExcluded ? nowMs : 0),
                     diffScore,
                     topicElo,
@@ -1411,11 +1424,12 @@ serve(async (req) => {
               });
 
               // Tiered ordering — the order of handcraftedList IS the pick priority:
-              //   1. unseen    → shuffled within difficulty-proximity bands (fresh + unpredictable)
-              //   2. seen-some → least-recently-seen first (shuffled within 24h bands)
-              //   3. seen-all  → least-recently-seen first (LRU recycling; just-played go last)
+              //   1. unseen         → shuffled within difficulty-proximity bands (fresh + unpredictable)
+              //   2. seen-some      → least-recently-seen first (shuffled within 1h bands)
+              //   3. seen-all       → least-recently-seen first (shuffled within 1h bands)
+              //   4. excludedRecent → client-excluded IDs strictly last (least-recently-played first)
               const orderRng = createSeededRandom(hashSeed(`${seed}-hc-order`));
-              const DAY_MS = 86_400_000;
+              const HOUR_MS = 3_600_000;
               const bandShuffle = (items: any[], bandOf: (q: any) => number) => {
                  const bands = new Map<number, any[]>();
                  for (const q of items) {
@@ -1428,17 +1442,21 @@ serve(async (req) => {
                     .flatMap((b) => seededShuffle(bands.get(b)!, orderRng));
               };
 
-              const unseen = enriched.filter((q: any) => q.seenStatus === "none");
-              const seenSome = enriched.filter((q: any) => q.seenStatus === "some");
-              const seenAll = enriched.filter((q: any) => q.seenStatus === "all");
+              const unseen = enriched.filter((q: any) => !q.clientExcluded && q.seenStatus === "none");
+              const seenSome = enriched.filter((q: any) => !q.clientExcluded && q.seenStatus === "some");
+              const seenAll = enriched.filter((q: any) => !q.clientExcluded && q.seenStatus === "all");
+              const excludedRecent = enriched
+                 .filter((q: any) => q.clientExcluded)
+                 .sort((a: any, b: any) => b.clientExcludeOrder - a.clientExcludeOrder);
 
               handcraftedList = [
                  ...bandShuffle(unseen, (q) => (q.difficultyProximity <= 1 ? 0 : q.difficultyProximity)),
-                 ...bandShuffle(seenSome, (q) => Math.floor(q.lastSeenAt / DAY_MS)),
-                 ...bandShuffle(seenAll, (q) => Math.floor(q.lastSeenAt / DAY_MS)),
+                 ...bandShuffle(seenSome, (q) => Math.floor(q.lastSeenAt / HOUR_MS)),
+                 ...bandShuffle(seenAll, (q) => Math.floor(q.lastSeenAt / HOUR_MS)),
+                 ...excludedRecent,
               ];
               console.log(
-                 `${logPrefix} Handcrafted tiers: unseen=${unseen.length} seenSome=${seenSome.length} seenAll=${seenAll.length}`,
+                 `${logPrefix} Handcrafted tiers: unseen=${unseen.length} seenSome=${seenSome.length} seenAll=${seenAll.length} excludedRecent=${excludedRecent.length}`,
               );
          }
       } catch (e: any) {
@@ -1495,12 +1513,15 @@ serve(async (req) => {
       // Weighted variant selection from config
       const variantSequence = pickVariants(config.variantWeights, matchRng, targetQuestionCount);
 
-      // Shuffle comfort entities first (priority), then stretch for variety
-      const comfortPool = entityList.filter((e: any) => e._bucket === "comfort");
-      const stretchPool = entityList.filter((e: any) => e._bucket === "stretch");
+      // Shuffle comfort entities first (priority), then stretch for variety,
+      // keeping client-excluded entities at the very end so back-to-back games don't repeat.
+      const comfortPool = entityList.filter((e: any) => e._bucket === "comfort" && !clientExcludeEntitySet.has(e.id));
+      const stretchPool = entityList.filter((e: any) => e._bucket === "stretch" && !clientExcludeEntitySet.has(e.id));
+      const excludedPool = entityList.filter((e: any) => clientExcludeEntitySet.has(e.id));
       const shuffledComfort = seededShuffle(comfortPool, matchRng);
       const shuffledStretch = seededShuffle(stretchPool, matchRng);
-      const shuffledEntities = [...shuffledComfort, ...shuffledStretch];
+      const shuffledExcluded = seededShuffle(excludedPool, matchRng);
+      const shuffledEntities = [...shuffledComfort, ...shuffledStretch, ...shuffledExcluded];
       let entityCursor = 0;
 
       const chosenEntities: any[] = [];
@@ -1514,7 +1535,7 @@ serve(async (req) => {
       const isDifficulty1Capped = (e: any) =>
          (e.difficulty || 1) <= 1 && difficulty1Count >= DIFFICULTY1_CAP;
 
-      // Returns the next unseen entity (total_seen === 0) from the pool
+      // Returns the next unseen entity (total_seen === 0 and not client-excluded) from the pool
       const getNextUnseenEntity = (): any => {
          if (shuffledEntities.length === 0) return null;
          const startCursor = entityCursor;
@@ -1522,7 +1543,7 @@ serve(async (req) => {
          for (let attempt = 0; attempt < total; attempt++) {
             const e = shuffledEntities[entityCursor % total];
             entityCursor++;
-            if (!usedIds.has(e.id) && (e.total_seen || 0) === 0 && !isDifficulty1Capped(e)) {
+            if (!usedIds.has(e.id) && (e.total_seen || 0) === 0 && !clientExcludeEntitySet.has(e.id) && !isDifficulty1Capped(e)) {
                usedIds.add(e.id);
                return e;
             }
@@ -1752,8 +1773,11 @@ serve(async (req) => {
                 if (!generatedPrompts.has(cleanedPrompt) || shuffledEntities.length <= questions.length) {
                    generatedPrompts.add(cleanedPrompt);
                    if (chosenEntity) {
+                      if (chosenEntity.id && !q.entityId) {
+                         q.entityId = chosenEntity.id;
+                      }
                       // Track seen count for entities
-                      if ((chosenEntity.total_seen || 0) > 0) {
+                      if ((chosenEntity.total_seen || 0) > 0 || clientExcludeEntitySet.has(chosenEntity.id)) {
                          matchSeenCount++;
                       }
                       // Track difficulty 1 usage for cap
@@ -1770,7 +1794,7 @@ serve(async (req) => {
                   // Revert entity mapping and seen count for duplicate prompts
                   if (chosenEntity) {
                      usedIds.delete(chosenEntity.id);
-                     if ((chosenEntity.total_seen || 0) > 0) {
+                     if ((chosenEntity.total_seen || 0) > 0 || clientExcludeEntitySet.has(chosenEntity.id)) {
                         matchSeenCount = Math.max(0, matchSeenCount - 1);
                      }
                   }
@@ -1864,12 +1888,12 @@ serve(async (req) => {
       } else {
          console.log(`${logPrefix} Match updated successfully`);
 
-         // Log the chosen entities in the user history table for tracking
+         // Log the chosen entities in the user history table for tracking (skip for unplayed prefetches)
          const validChosenEntityIds = chosenEntities
             .filter((e) => e && e.id)
             .map((e) => e.id);
 
-         if (validChosenEntityIds.length > 0 && playerIds.length > 0) {
+         if (!isPrefetch && validChosenEntityIds.length > 0 && playerIds.length > 0) {
             console.log(
                `${logPrefix} Recording entity history for ${playerIds.length} user(s)`,
             );
@@ -1891,8 +1915,8 @@ serve(async (req) => {
             }
          }
 
-         // Log the chosen handcrafted questions in the user history table for tracking
-         if (chosenHandcraftedIds.length > 0 && playerIds.length > 0) {
+         // Log the chosen handcrafted questions in the user history table for tracking (skip for unplayed prefetches)
+         if (!isPrefetch && chosenHandcraftedIds.length > 0 && playerIds.length > 0) {
             console.log(
                `${logPrefix} Recording handcrafted history for ${playerIds.length} user(s)`,
             );

@@ -11,7 +11,15 @@ import {
    getQuestionRequestContext,
    recordPlayedQuestions,
 } from "../wordup/shared/questionHistoryService";
-import { extractQuestionIds } from "../wordup/shared/recentQuestions";
+import {
+   extractEntityIds,
+   extractPromptKeys,
+   extractQuestionIds,
+   getRecentEntityIds,
+   getRecentPrompts,
+   getRecentQuestionIds,
+   isQuestionUuid,
+} from "../wordup/shared/recentQuestions";
 
 export interface PrefetchedBotMatch {
    matchId: string;
@@ -21,10 +29,20 @@ export interface PrefetchedBotMatch {
    encryptionKey: string;
    timestamp: number;
    totalRounds?: number;
+   chosenEntityIds?: string[];
+   cacheVersion?: number;
 }
 
 const CACHE_KEY = "wordup_bot_prefetches";
 const EXPIRATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+export const PREFETCH_CACHE_VERSION = 2;
+
+const inFlightPrefetches = new Map<string, Promise<void>>();
+
+/** Test helper to clear module-level in-flight locks between tests. */
+export function resetPrefetchLocksForTesting(): void {
+   inFlightPrefetches.clear();
+}
 
 // Helper to get raw cache object
 function getCache(): Record<string, PrefetchedBotMatch[]> {
@@ -48,15 +66,20 @@ function saveCache(cache: Record<string, PrefetchedBotMatch[]>) {
    }
 }
 
-/** Clean up prefetched matches older than 24 hours */
+/** Clean up prefetched matches older than 24 hours or from older cache versions */
 export function cleanExpiredPrefetches() {
    const cache = getCache();
    const now = Date.now();
    let dirty = false;
 
    Object.keys(cache).forEach((cat) => {
-      const filtered = cache[cat].filter((item) => {
-         const isValid = now - item.timestamp < EXPIRATION_MS;
+      const list = Array.isArray(cache[cat]) ? cache[cat] : [];
+      if (!Array.isArray(cache[cat])) dirty = true;
+      const filtered = list.filter((item) => {
+         const isValid =
+            Boolean(item) &&
+            now - item.timestamp < EXPIRATION_MS &&
+            item.cacheVersion === PREFETCH_CACHE_VERSION;
          if (!isValid) dirty = true;
          return isValid;
       });
@@ -77,20 +100,24 @@ export function cleanExpiredPrefetches() {
 async function generateBotMatchData(
    category: string,
    extraExcludeIds: string[] = [],
+   extraExcludeEntityIds: string[] = [],
 ): Promise<PrefetchedBotMatch> {
    const rawId = crypto.randomUUID();
    const matchId = `bot-match-${rawId}`;
    let questions: WordUpQuestion[];
    let encryptedQuestions: string;
    let encryptionKey: string;
+   let chosenEntityIds: string[] = [];
 
    if (isProceduralCategory(category)) {
       const seed = `${rawId}-${category}`;
       try {
-         const { userId, excludeQuestionIds } = await getQuestionRequestContext(
-            category,
-            extraExcludeIds,
-         );
+         const { userId, excludeQuestionIds, excludeEntityIds } =
+            await getQuestionRequestContext(
+               category,
+               extraExcludeIds,
+               extraExcludeEntityIds,
+            );
          const { data: edgeData } = await supabase.functions.invoke(
             "generate-match-questions",
             {
@@ -100,6 +127,8 @@ async function generateBotMatchData(
                   seed,
                   userId,
                   excludeQuestionIds,
+                  excludeEntityIds,
+                  isPrefetch: true,
                },
             },
          );
@@ -111,6 +140,9 @@ async function generateBotMatchData(
                encryption_key: edgeData.encryptionKey,
                // eslint-disable-next-line @typescript-eslint/no-explicit-any
             } as any);
+            chosenEntityIds = Array.isArray(edgeData?.chosenEntityIds)
+               ? edgeData.chosenEntityIds.filter(isQuestionUuid)
+               : extractEntityIds(questions);
          } else {
             questions = await generateWordUpQuestions(category);
             const fKey = generateSecretKey();
@@ -142,11 +174,35 @@ async function generateBotMatchData(
       encryptionKey,
       timestamp: Date.now(),
       totalRounds: questions.length,
+      chosenEntityIds,
+      cacheVersion: PREFETCH_CACHE_VERSION,
    };
+}
+
+function hasOverlapWithRecent(
+   item: PrefetchedBotMatch,
+   recentQids: Set<string>,
+   recentEids: Set<string>,
+   recentPrompts: Set<string>,
+): boolean {
+   const qids = extractQuestionIds(item.questions as Array<{ id?: unknown }>);
+   if (qids.some((id) => recentQids.has(id))) return true;
+
+   const eids = [
+      ...(item.chosenEntityIds || []).filter(isQuestionUuid),
+      ...extractEntityIds(item.questions as Array<{ entityId?: unknown }>),
+   ];
+   if (eids.some((id) => recentEids.has(id))) return true;
+
+   const prompts = extractPromptKeys(item.questions as Array<{ prompt?: unknown }>);
+   if (prompts.some((p) => recentPrompts.has(p))) return true;
+
+   return false;
 }
 
 /**
  * Retrieves a prefetched bot match for a category, removes it from cache,
+ * skips/purges any cached matches overlapping with recently played questions,
  * and asynchronously kicks off a background fetch to replenish the cache.
  */
 export function getPrefetchedBotMatch(
@@ -157,60 +213,113 @@ export function getPrefetchedBotMatch(
    const cache = getCache();
    const list = cache[category] || [];
 
-   const matchIdx = list.findIndex(
-      (item) => (item.totalRounds || item.questions.length) === requiredRounds
-   );
+   const recentQids = new Set(getRecentQuestionIds(category));
+   const recentEids = new Set(getRecentEntityIds(category));
+   const recentPrompts = new Set(getRecentPrompts(category));
 
-   if (matchIdx === -1) {
+   const nextList: PrefetchedBotMatch[] = [];
+   let chosenItem: PrefetchedBotMatch | null = null;
+   let dirty = false;
+
+   for (const item of list) {
+      const rounds = item.totalRounds || item.questions.length;
+      if (rounds === requiredRounds) {
+         if (!chosenItem && !hasOverlapWithRecent(item, recentQids, recentEids, recentPrompts)) {
+            chosenItem = item;
+            dirty = true;
+            continue;
+         }
+         if (!chosenItem) {
+            // Prune stale/overlapping cached match
+            dirty = true;
+            continue;
+         }
+      }
+      nextList.push(item);
+   }
+
+   if (dirty) {
+      if (nextList.length === 0) {
+         delete cache[category];
+      } else {
+         cache[category] = nextList;
+      }
+      saveCache(cache);
+   }
+
+   if (!chosenItem) {
       if (requiredRounds === 7) {
-         prefetchBotMatchInBackground(category);
+         void prefetchBotMatchInBackground(category);
       }
       return null;
    }
 
-   const item = list.splice(matchIdx, 1)[0];
-   cache[category] = list;
-   saveCache(cache);
-
    // Mark consumed prefetch questions as played immediately so back-to-back games
    // and newly replenished prefetches never repeat them.
-   recordPlayedQuestions(category, item.questions as Array<{ id?: unknown }>);
+   recordPlayedQuestions(
+      category,
+      chosenItem.questions as Array<{ id?: unknown; entityId?: unknown; prompt?: unknown }>,
+      chosenItem.chosenEntityIds || [],
+   );
 
    if (requiredRounds === 7) {
-      prefetchBotMatchInBackground(category);
+      void prefetchBotMatchInBackground(category);
    }
 
-   return item;
+   return chosenItem;
 }
 
 /** Pre-populates the cache for a category up to a target size (default: 2 matches) */
-export async function prefetchBotMatchInBackground(
+export function prefetchBotMatchInBackground(
    category: string,
    targetCount = 2,
-) {
-   // Run asynchronously without blocking the caller
-   setTimeout(async () => {
-      try {
-         const cache = getCache();
-         const list = cache[category] || [];
-         if (list.length >= targetCount) return;
+): Promise<void> {
+   const existing = inFlightPrefetches.get(category);
+   if (existing) return existing;
 
-         const needed = targetCount - list.length;
-         // Collect IDs already queued in the prefetch cache so queued matches never overlap
-         const queuedIds = new Set<string>(
-            list.flatMap((m) => extractQuestionIds(m.questions as Array<{ id?: unknown }>)),
-         );
-         for (let i = 0; i < needed; i++) {
-            const matchData = await generateBotMatchData(category, Array.from(queuedIds));
-            for (const qid of extractQuestionIds(matchData.questions as Array<{ id?: unknown }>)) {
-               queuedIds.add(qid);
-            }
-            // Re-read cache to avoid race conditions during async loop
+   const workPromise = (async () => {
+      try {
+         await new Promise((r) => setTimeout(r, 50));
+         cleanExpiredPrefetches();
+
+         for (let i = 0; i < targetCount; i++) {
+            const cache = getCache();
+            const list = cache[category] || [];
+            if (list.length >= targetCount) break;
+
+            // Collect IDs already queued in the prefetch cache so queued matches never overlap
+            const queuedQuestionIds = Array.from(
+               new Set(
+                  list.flatMap((m) =>
+                     extractQuestionIds(m.questions as Array<{ id?: unknown }>),
+                  ),
+               ),
+            );
+            const queuedEntityIds = Array.from(
+               new Set(
+                  list.flatMap((m) => [
+                     ...(m.chosenEntityIds || []).filter(isQuestionUuid),
+                     ...extractEntityIds(m.questions as Array<{ entityId?: unknown }>),
+                  ]),
+               ),
+            );
+
+            const matchData = await generateBotMatchData(
+               category,
+               queuedQuestionIds,
+               queuedEntityIds,
+            );
+
+            // Re-read cache to avoid race conditions during async fetch
             const latestCache = getCache();
             const latestList = latestCache[category] || [];
-            latestList.push(matchData);
-            latestCache[category] = latestList;
-            saveCache(latestCache);
+            if (latestList.length < targetCount) {
+               latestList.push(matchData);
+               latestCache[category] = latestList;
+               saveCache(latestCache);
+            } else {
+               break;
+            }
          }
       } catch (e) {
          console.error(
@@ -218,6 +327,13 @@ export async function prefetchBotMatchInBackground(
             category,
             e,
          );
+      } finally {
+         if (inFlightPrefetches.get(category) === workPromise) {
+            inFlightPrefetches.delete(category);
+         }
       }
-   }, 50);
+   })();
+
+   inFlightPrefetches.set(category, workPromise);
+   return workPromise;
 }

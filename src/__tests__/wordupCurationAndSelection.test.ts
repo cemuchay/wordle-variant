@@ -16,11 +16,22 @@ import {
    maybeCurateWordUpTrivia,
 } from "../wordup/shared/otdbClientCurator";
 import {
+   MAX_RECENT_EIDS,
+   MAX_RECENT_PROMPTS,
    MAX_RECENT_QIDS,
+   RECENT_EIDS_PREFIX,
+   RECENT_PROMPTS_PREFIX,
    RECENT_QIDS_PREFIX,
+   addRecentEntityIds,
+   addRecentPrompts,
    addRecentQuestionIds,
+   extractEntityIds,
+   extractPromptKeys,
    extractQuestionIds,
+   getRecentEntityIds,
+   getRecentPrompts,
    getRecentQuestionIds,
+   normalizePromptKey,
 } from "../wordup/shared/recentQuestions";
 
 const makeUuid = (n: number) =>
@@ -128,6 +139,35 @@ describe("recentQuestions — client ring buffer for anti-repetition", () => {
       ]);
       expect(extracted).toEqual([u1, u2]);
    });
+
+   it("stores unique entity UUIDs newest-first and caps at MAX_RECENT_EIDS", () => {
+      const batch1 = Array.from({ length: 25 }, (_, i) => makeUuid(i + 1));
+      const batch2 = Array.from({ length: 25 }, (_, i) => makeUuid(i + 21));
+      addRecentEntityIds("geography", batch1);
+      const after = addRecentEntityIds("geography", batch2);
+
+      expect(after).toHaveLength(MAX_RECENT_EIDS);
+      expect(after[0]).toBe(makeUuid(21));
+      expect(getRecentEntityIds("geography")).toEqual(after);
+      expect(localStorage.getItem(`${RECENT_EIDS_PREFIX}geography`)).not.toBeNull();
+      expect(extractEntityIds([{ entityId: makeUuid(5) }, { entityId: "bad" }])).toEqual([makeUuid(5)]);
+   });
+
+   it("normalizes and stores prompt keys newest-first capped at MAX_RECENT_PROMPTS", () => {
+      expect(normalizePromptKey("  What   is   HTTP? ")).toBe("what is http?");
+      expect(normalizePromptKey("   ")).toBeNull();
+
+      const batch1 = Array.from({ length: 25 }, (_, i) => `Prompt ${i + 1}`);
+      const batch2 = Array.from({ length: 25 }, (_, i) => `  prompt   ${i + 21} `);
+      addRecentPrompts("computers", batch1);
+      const after = addRecentPrompts("computers", batch2);
+
+      expect(after).toHaveLength(MAX_RECENT_PROMPTS);
+      expect(after[0]).toBe("prompt 21");
+      expect(getRecentPrompts("computers")).toEqual(after);
+      expect(localStorage.getItem(`${RECENT_PROMPTS_PREFIX}computers`)).not.toBeNull();
+      expect(extractPromptKeys([{ prompt: "  Hello   World " }, { prompt: "" }])).toEqual(["hello world"]);
+   });
 });
 
 describe("otdbClientCurator — browser throttling & graceful failure", () => {
@@ -162,14 +202,16 @@ describe("tiered question selection — anti-repetition & LRU recycling", () => 
       seenStatus: "none" | "some" | "all";
       lastSeenAt: number;
       difficultyProximity: number;
+      clientExcluded?: boolean;
+      clientExcludeOrder?: number;
    }
 
-   // Mirrors the tiered band-shuffle algorithm in generate-match-questions/index.ts
+   // Mirrors the 4-tier band-shuffle algorithm in generate-match-questions/index.ts
    function rankCandidates(
       candidates: Candidate[],
       rand: () => number = Math.random,
    ): Candidate[] {
-      const DAY_MS = 86_400_000;
+      const HOUR_MS = 3_600_000;
       const bandShuffle = (items: Candidate[], bandOf: (q: Candidate) => number) => {
          const bands = new Map<number, Candidate[]>();
          for (const q of items) {
@@ -182,14 +224,18 @@ describe("tiered question selection — anti-repetition & LRU recycling", () => 
             .flatMap((b) => fisherYatesShuffle(bands.get(b)!, rand));
       };
 
-      const unseen = candidates.filter((q) => q.seenStatus === "none");
-      const seenSome = candidates.filter((q) => q.seenStatus === "some");
-      const seenAll = candidates.filter((q) => q.seenStatus === "all");
+      const unseen = candidates.filter((q) => !q.clientExcluded && q.seenStatus === "none");
+      const seenSome = candidates.filter((q) => !q.clientExcluded && q.seenStatus === "some");
+      const seenAll = candidates.filter((q) => !q.clientExcluded && q.seenStatus === "all");
+      const excludedRecent = candidates
+         .filter((q) => q.clientExcluded)
+         .sort((a, b) => (b.clientExcludeOrder ?? 0) - (a.clientExcludeOrder ?? 0));
 
       return [
          ...bandShuffle(unseen, (q) => (q.difficultyProximity <= 1 ? 0 : q.difficultyProximity)),
-         ...bandShuffle(seenSome, (q) => Math.floor(q.lastSeenAt / DAY_MS)),
-         ...bandShuffle(seenAll, (q) => Math.floor(q.lastSeenAt / DAY_MS)),
+         ...bandShuffle(seenSome, (q) => Math.floor(q.lastSeenAt / HOUR_MS)),
+         ...bandShuffle(seenAll, (q) => Math.floor(q.lastSeenAt / HOUR_MS)),
+         ...excludedRecent,
       ];
    }
 
@@ -232,5 +278,44 @@ describe("tiered question selection — anti-repetition & LRU recycling", () => 
 
       const ordered = rankCandidates(candidates).map((c) => c.id);
       expect(ordered).toEqual(["unseen-1", "old-1", "mid-1", "recent-1"]);
+   });
+
+   it("places clientExcluded questions strictly after same-day seenAll questions, ordered least-recently-played first", () => {
+      const now = Date.now();
+      const HOUR = 3_600_000;
+      const candidates: Candidate[] = [
+         {
+            id: "just-played",
+            difficulty: 3,
+            seenCount: 1,
+            seenStatus: "all",
+            lastSeenAt: now,
+            difficultyProximity: 0,
+            clientExcluded: true,
+            clientExcludeOrder: 0,
+         },
+         {
+            id: "played-two-games-ago",
+            difficulty: 3,
+            seenCount: 1,
+            seenStatus: "all",
+            lastSeenAt: now,
+            difficultyProximity: 0,
+            clientExcluded: true,
+            clientExcludeOrder: 5,
+         },
+         {
+            id: "same-day-not-excluded",
+            difficulty: 3,
+            seenCount: 1,
+            seenStatus: "all",
+            lastSeenAt: now - 2 * HOUR,
+            difficultyProximity: 0,
+            clientExcluded: false,
+         },
+      ];
+
+      const ordered = rankCandidates(candidates).map((c) => c.id);
+      expect(ordered).toEqual(["same-day-not-excluded", "played-two-games-ago", "just-played"]);
    });
 });

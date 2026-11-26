@@ -1247,10 +1247,10 @@ export function useGameEngine(props: EngineProps) {
                         const { getQuestionRequestContext, recordPlayedQuestions } = await import(
                             "../../shared/questionHistoryService"
                         );
-                        const { userId, excludeQuestionIds } = await getQuestionRequestContext(category);
+                        const { userId, excludeQuestionIds, excludeEntityIds } = await getQuestionRequestContext(category);
                         const { data: edgeData } = await supabase.functions.invoke(
                             "generate-match-questions",
-                            { body: { matchId: cleanId, category, seed, userId, excludeQuestionIds } },
+                            { body: { matchId: cleanId, category, seed, userId, excludeQuestionIds, excludeEntityIds } },
                         );
                         if (edgeData?.encryptedQuestions && edgeData?.encryptionKey) {
                             encryptedQuestionsRef.current = edgeData.encryptedQuestions;
@@ -1259,7 +1259,11 @@ export function useGameEngine(props: EngineProps) {
                                 questions: edgeData.encryptedQuestions,
                                 encryption_key: edgeData.encryptionKey,
                             } as unknown as Parameters<typeof decryptMatchQuestions>[0]);
-                            recordPlayedQuestions(category, questions as Array<{ id?: unknown }>);
+                            recordPlayedQuestions(
+                                category,
+                                questions as Array<{ id?: unknown; entityId?: unknown; prompt?: unknown }>,
+                                Array.isArray(edgeData?.chosenEntityIds) ? edgeData.chosenEntityIds : [],
+                            );
                         } else {
                             questions = await generateWordUpQuestions(category);
                             const fKey = generateSecretKey();
@@ -1351,6 +1355,12 @@ export function useGameEngine(props: EngineProps) {
                 if (!match) return;
                 matchData = match;
                 questions = await decryptMatchQuestions(match);
+                void import("../../shared/questionHistoryService").then(({ recordPlayedQuestions }) => {
+                    recordPlayedQuestions(
+                        (match.category as string | undefined) || activeCategory,
+                        questions as Array<{ id?: unknown; entityId?: unknown; prompt?: unknown }>,
+                    );
+                });
                 await preloadMatchImages(questions);
 
                 const oppId = activeRole === "player1" ? match.player2_id : match.player1_id;

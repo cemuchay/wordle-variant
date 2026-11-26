@@ -152,10 +152,10 @@ export const WordUpContainer = ({
             const seed = `${rawMatchId}-${cat}`;
             try {
                const { getQuestionRequestContext, recordPlayedQuestions } = await import("./shared/questionHistoryService");
-               const { userId, excludeQuestionIds } = await getQuestionRequestContext(cat);
+               const { userId, excludeQuestionIds, excludeEntityIds } = await getQuestionRequestContext(cat);
                const { data: edgeData } = await supabase.functions.invoke(
                   "generate-match-questions",
-                  { body: { matchId: rawMatchId, category: cat, seed, count: totalRounds, userId, excludeQuestionIds } }
+                  { body: { matchId: rawMatchId, category: cat, seed, count: totalRounds, userId, excludeQuestionIds, excludeEntityIds } }
                );
                if (edgeData?.encryptedQuestions && edgeData?.encryptionKey) {
                   secretKey = edgeData.encryptionKey;
@@ -164,7 +164,11 @@ export const WordUpContainer = ({
                      questions: edgeData.encryptedQuestions,
                      encryption_key: edgeData.encryptionKey,
                   });
-                  recordPlayedQuestions(cat, rawQuestions);
+                  recordPlayedQuestions(
+                     cat,
+                     rawQuestions,
+                     Array.isArray(edgeData?.chosenEntityIds) ? edgeData.chosenEntityIds : [],
+                  );
                }
             } catch (err) {
                console.warn("[WordUpContainer] Edge question generation failed for category:", cat, err);

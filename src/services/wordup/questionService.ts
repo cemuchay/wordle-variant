@@ -2,7 +2,7 @@ import { supabase } from "../../lib/supabaseClient";
 import { isProceduralCategory } from "./generatorRegistry";
 import { wordupNetworkGate } from "../../wordup/shared/wordupNetworkGate";
 import { getQuestionRequestContext } from "../../wordup/shared/questionHistoryService";
-import { addRecentQuestionIds } from "../../wordup/shared/recentQuestions";
+import { addRecentEntityIds, addRecentQuestionIds } from "../../wordup/shared/recentQuestions";
 
 /**
  * Generates questions for a match.
@@ -19,7 +19,7 @@ export async function generateMatchQuestions(matchId: string, category: string):
 
 async function generateViaEdgeFunction(matchId: string, category: string): Promise<void> {
    const seed = `${matchId}-${category}`;
-   const { userId, excludeQuestionIds } = await getQuestionRequestContext(category);
+   const { userId, excludeQuestionIds, excludeEntityIds } = await getQuestionRequestContext(category);
 
    const invokeResult = await wordupNetworkGate.enqueue(
       'post',
@@ -27,11 +27,14 @@ async function generateViaEdgeFunction(matchId: string, category: string): Promi
       async () => {
          const { data, error } = await supabase.functions.invoke(
             "generate-match-questions",
-            { body: { matchId, category, seed, userId, excludeQuestionIds } },
+            { body: { matchId, category, seed, userId, excludeQuestionIds, excludeEntityIds } },
          );
          if (error) throw error;
          if (Array.isArray(data?.chosenHandcraftedIds) && data.chosenHandcraftedIds.length > 0) {
             addRecentQuestionIds(category, data.chosenHandcraftedIds);
+         }
+         if (Array.isArray(data?.chosenEntityIds) && data.chosenEntityIds.length > 0) {
+            addRecentEntityIds(category, data.chosenEntityIds);
          }
          return data;
       }
