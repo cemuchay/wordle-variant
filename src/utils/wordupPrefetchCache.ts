@@ -277,7 +277,8 @@ export function prefetchBotMatchInBackground(
    const existing = inFlightPrefetches.get(category);
    if (existing) return existing;
 
-   const workPromise = (async () => {
+   let workPromise: Promise<void> | undefined;
+   workPromise = (async () => {
       try {
          await new Promise((r) => setTimeout(r, 50));
          cleanExpiredPrefetches();
